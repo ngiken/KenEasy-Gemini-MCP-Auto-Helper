@@ -10,8 +10,8 @@ function runTests(test) {
     assert.strictEqual(def.autoAllow, true);
     assert.strictEqual(def.preferAlwaysAllow, true);
     assert.strictEqual(def.autoContinue, true);
-    assert.strictEqual(def.maxContinuesPerTask, 5);
-    assert.strictEqual(def.dailyContinueLimit, 30);
+    assert.strictEqual(def.maxContinuesPerTask, 10);
+    assert.strictEqual(def.dailyContinueLimit, 0);
     assert.strictEqual(def.continueCooldownMs, 4000);
     assert.strictEqual(def.idleSettleMs, 1800);
 
@@ -25,12 +25,41 @@ function runTests(test) {
       hudMinimized: true
     });
     assert.strictEqual(clamped.maxContinuesPerTask, 100);
-    assert.strictEqual(clamped.dailyContinueLimit, 1);
+    assert.strictEqual(clamped.dailyContinueLimit, 0);
     assert.strictEqual(clamped.continueCooldownMs, 1000);
     assert.strictEqual(clamped.allowCooldownMs, 30000);
     assert.strictEqual(clamped.idleSettleMs, 1800);
     assert.strictEqual(clamped.enabled, false);
     assert.strictEqual(clamped.hudMinimized, true);
+  });
+
+  test('migrateStoredSettings upgrades v1 stored config to 10/0 and unions new built-in keywords once', () => {
+    const v1Stored = {
+      enabled: true,
+      maxContinuesPerTask: 5,
+      dailyContinueLimit: 30,
+      alwaysAllowKeywords: ['始终允许'],
+      continueKeywords: ['继续'],
+      customContinueKeywords: ['自定义词']
+    };
+    const r1 = D.migrateStoredSettings(v1Stored);
+    assert.strictEqual(r1.migrated, true);
+    assert.strictEqual(r1.settings.settingsVersion, D.SETTINGS_VERSION);
+    assert.strictEqual(r1.settings.maxContinuesPerTask, 10);
+    assert.strictEqual(r1.settings.dailyContinueLimit, 0);
+    assert.ok(r1.settings.continueKeywords.includes('yes'));
+    assert.ok(r1.settings.alwaysAllowKeywords.includes('always allow for this conversation'));
+    assert.deepStrictEqual(r1.settings.customContinueKeywords, ['自定义词']);
+
+    // Already v2 config with user custom limits must NOT be overwritten
+    const v2Custom = Object.assign({}, r1.settings, {
+      maxContinuesPerTask: 25,
+      dailyContinueLimit: 50
+    });
+    const r2 = D.migrateStoredSettings(v2Custom);
+    assert.strictEqual(r2.migrated, false);
+    assert.strictEqual(r2.settings.maxContinuesPerTask, 25);
+    assert.strictEqual(r2.settings.dailyContinueLimit, 50);
   });
 
   test('parseKeywordInput splits by newline, commas, semicolons and deduplicates case-insensitively', () => {
@@ -40,10 +69,12 @@ function runTests(test) {
     assert.deepStrictEqual(D.parseKeywordInput(null), []);
   });
 
-  test('normalizeText and stripEdgePunctuation strip zero-width chars and edge punctuation', () => {
+  test('normalizeText and stripEdgePunctuation strip zero-width chars, arrows, and edge punctuation', () => {
     assert.strictEqual(D.normalizeText('  始终\u200B允许 \n  此工具  '), '始终允许 此工具');
     assert.strictEqual(D.stripEdgePunctuation('» 「继续生成」！'), '继续生成');
     assert.strictEqual(D.stripEdgePunctuation('  [Always Allow]  '), 'always allow');
+    assert.strictEqual(D.stripEdgePunctuation('  ↪ Yes  '), 'yes');
+    assert.strictEqual(D.stripEdgePunctuation('↳ 确认！'), '确认');
   });
 
   test('containsKeyword enforces ASCII word boundaries so substrings never false-trigger', () => {

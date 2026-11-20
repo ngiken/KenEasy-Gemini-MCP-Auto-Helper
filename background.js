@@ -70,7 +70,45 @@
       }
     }
 
-    function syncAllGeminiTabs(sendTick) {
+    function injectIntoTab(tabId, onDone) {
+      if (!api || !api.scripting || typeof api.scripting.executeScript !== 'function') {
+        if (onDone) onDone(false);
+        return;
+      }
+      if (typeof tabId !== 'number') {
+        if (onDone) onDone(false);
+        return;
+      }
+      try {
+        if (typeof api.scripting.insertCSS === 'function') {
+          const cssRes = api.scripting.insertCSS(
+            { target: { tabId }, files: ['hud.css'] },
+            () => {
+              void (api.runtime && api.runtime.lastError);
+            }
+          );
+          if (cssRes && typeof cssRes.catch === 'function') {
+            cssRes.catch(() => {});
+          }
+        }
+        const jsRes = api.scripting.executeScript(
+          { target: { tabId }, files: ['defaults.js', 'hud.js', 'content.js'] },
+          () => {
+            const hadErr = Boolean(api.runtime && api.runtime.lastError);
+            if (onDone) onDone(!hadErr);
+          }
+        );
+        if (jsRes && typeof jsRes.catch === 'function') {
+          jsRes.catch(() => {
+            if (onDone) onDone(false);
+          });
+        }
+      } catch (_) {
+        if (onDone) onDone(false);
+      }
+    }
+
+    function syncAllGeminiTabs(sendTick, autoInject) {
       if (!api || !api.tabs || typeof api.tabs.query !== 'function') return;
       try {
         api.tabs.query({ url: GEMINI_URL_PATTERN }, (tabs) => {
@@ -79,6 +117,9 @@
           for (const tab of tabs) {
             if (!tab || typeof tab.id !== 'number') continue;
             applyDiscardProtection(tab.id);
+            if (autoInject && !tab.discarded && !ports.has(tab.id)) {
+              injectIntoTab(tab.id);
+            }
             if (sendTick && settings.enabled && settings.backgroundMode) {
               pingTab(tab.id, 'alarm');
             }
@@ -106,7 +147,12 @@
             tabId,
             { type: 'GMAH_BG_TICK', source, ts: Date.now() },
             () => {
-              void (api.runtime && api.runtime.lastError);
+              const hadErr = Boolean(api.runtime && api.runtime.lastError);
+              if (hadErr && source !== 'post_inject') {
+                injectIntoTab(tabId, (ok) => {
+                  if (ok) pingTab(tabId, 'post_inject');
+                });
+              }
             }
           );
           if (res && typeof res.catch === 'function') {
@@ -269,7 +315,7 @@
         api.runtime.onInstalled.addListener(() => {
           loadSettings(() => {
             ensureAlarm();
-            syncAllGeminiTabs(false);
+            syncAllGeminiTabs(false, true);
           });
         });
       }
@@ -277,7 +323,7 @@
         api.runtime.onStartup.addListener(() => {
           loadSettings(() => {
             ensureAlarm();
-            syncAllGeminiTabs(false);
+            syncAllGeminiTabs(false, true);
           });
         });
       }
@@ -290,6 +336,7 @@
       handleTabUpdated,
       handleStorageChanged,
       syncAllGeminiTabs,
+      injectIntoTab,
       tickConnectedPorts,
       getConnectedTabIds: () => Array.from(ports.keys()),
       isHeartbeatRunning: () => heartbeatTimer !== null,

@@ -24,6 +24,7 @@ function runTests(test) {
     assert.ok(manifest.permissions.includes('storage'));
     assert.ok(manifest.permissions.includes('tabs'));
     assert.ok(manifest.permissions.includes('alarms'));
+    assert.ok(manifest.permissions.includes('scripting'));
     assert.ok(manifest.host_permissions.includes('https://gemini.google.com/*'));
     assert.strictEqual(manifest.background.service_worker, 'background.js');
     assert.strictEqual(manifest.action.default_popup, 'popup.html');

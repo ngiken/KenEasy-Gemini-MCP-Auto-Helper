@@ -3,8 +3,10 @@
 
   const STORAGE_KEY = 'gmah_settings_v1';
   const STATS_KEY = 'gmah_stats_v1';
+  const SETTINGS_VERSION = 2;
 
   const DEFAULT_SETTINGS = {
+    settingsVersion: SETTINGS_VERSION,
     enabled: true,
     autoAllow: true,
     preferAlwaysAllow: true,
@@ -16,8 +18,8 @@
     hudMinimized: false,
 
     // 6-layer anti-quota-burn circuit breaker defaults
-    maxContinuesPerTask: 5,
-    dailyContinueLimit: 30,
+    maxContinuesPerTask: 10,
+    dailyContinueLimit: 0, // 0 = unlimited (theoretically no daily cap, user can still set a positive cap)
     continueCooldownMs: 4000,
     allowCooldownMs: 600,
     idleSettleMs: 1800,
@@ -30,38 +32,105 @@
       '始终允许',
       '一律允许',
       '总是允许',
+      '永远允许',
       '始終允許',
       '一律允許',
       '總是允許',
+      '永遠允許',
       '在此对话中始终允许',
+      '在此對話中始終允許',
+      '在此对话中总是允许',
       '在此對話中總是允許',
+      '在此对话中一律允许',
+      '在此對話中一律允許',
       '在此对话中允许',
       '在此對話中允許',
       '在此会话中始终允许',
       '本次会话始终允许',
       '本次对话始终允许',
+      '本次對話始終允許',
       '始终允许此工具',
       '始終允許此工具',
+      '始终允许所有',
+      '始終允許所有',
+      '允许所有',
+      '允許所有',
+      '始终运行',
+      '始終執行',
+      '始终批准',
+      '始終批准',
+      '始终同意',
+      '始終同意',
+      '总是同意',
+      '總是同意',
       'always allow',
       'always allow this tool',
+      'always allow this action',
+      'always allow this server',
+      'always allow for this chat',
+      'always allow in this chat',
+      'always allow for this conversation',
+      'always allow in this conversation',
+      'always allow for this session',
+      'always allow in this session',
+      'always allow from',
       'allow always',
       'allow for this chat',
       'allow in this chat',
+      'allow for this conversation',
+      'allow in this conversation',
       'allow for this session',
+      'allow in this session',
       'allow all in this chat',
-      'allow all'
+      'allow all for this chat',
+      'allow all for this conversation',
+      'allow all tools',
+      'allow all',
+      'always run',
+      'always approve',
+      'always permit',
+      'always accept',
+      'yes, always allow',
+      'yes, allow all'
     ],
     singleAllowKeywords: [
       '允许',
       '允许一次',
       '仅允许一次',
+      '本次允许',
+      '仅本次允许',
+      '此次允许',
+      '允许本次',
+      '允许运行',
+      '允许执行',
+      '允许此工具',
+      '确认允许',
       '允許',
       '允許一次',
       '僅允許一次',
+      '本次允許',
+      '僅本次允許',
+      '此次允許',
+      '允許本次',
+      '允許執行',
+      '允許此工具',
+      '確認允許',
       '批准',
+      '同意',
       'allow',
       'allow once',
-      'approve'
+      'allow this time',
+      'allow just once',
+      'allow for this turn',
+      'allow this tool',
+      'allow this action',
+      'approve',
+      'approve once',
+      'accept',
+      'accept once',
+      'permit',
+      'run tool',
+      'run once'
     ],
     continueKeywords: [
       '继续',
@@ -76,6 +145,16 @@
       '继续下一步',
       '点击继续',
       '请继续',
+      '是',
+      '是的',
+      '好',
+      '好的',
+      '确认',
+      '确定',
+      '开始',
+      '开始执行',
+      '立即执行',
+      '马上执行',
       '繼續',
       '繼續生成',
       '繼續執行',
@@ -88,7 +167,22 @@
       '繼續下一步',
       '點擊繼續',
       '請繼續',
+      '確認',
+      '確定',
+      '開始',
+      '開始執行',
+      '立即執行',
+      '馬上執行',
+      'yes',
+      'yes, please',
+      'yes, continue',
+      'yes, proceed',
+      'yes, go ahead',
+      'confirm',
+      'proceed',
+      'go ahead',
       'continue',
+      'continue please',
       'continue generating',
       'continue response',
       'continue working',
@@ -236,9 +330,21 @@
     );
   }
 
+  function mergeKeywordArrays(baseDefaults, stored) {
+    const merged = Array.isArray(baseDefaults) ? baseDefaults.slice() : [];
+    if (Array.isArray(stored)) {
+      for (const item of stored) merged.push(item);
+    }
+    return sanitizeKeywordArray(merged, baseDefaults || []);
+  }
+
   function mergeSettings(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
     return {
+      settingsVersion:
+        typeof src.settingsVersion === 'number' && Number.isFinite(src.settingsVersion)
+          ? src.settingsVersion
+          : SETTINGS_VERSION,
       enabled: typeof src.enabled === 'boolean' ? src.enabled : DEFAULT_SETTINGS.enabled,
       autoAllow: typeof src.autoAllow === 'boolean' ? src.autoAllow : DEFAULT_SETTINGS.autoAllow,
       preferAlwaysAllow:
@@ -272,8 +378,8 @@
       dailyContinueLimit: clampNumber(
         src.dailyContinueLimit,
         DEFAULT_SETTINGS.dailyContinueLimit,
-        1,
-        500
+        0,
+        10000
       ),
       continueCooldownMs: clampNumber(
         src.continueCooldownMs,
@@ -306,17 +412,17 @@
           ? src.stopOnQuotaOrError
           : DEFAULT_SETTINGS.stopOnQuotaOrError,
 
-      alwaysAllowKeywords: sanitizeKeywordArray(
-        src.alwaysAllowKeywords,
-        DEFAULT_SETTINGS.alwaysAllowKeywords
+      alwaysAllowKeywords: mergeKeywordArrays(
+        DEFAULT_SETTINGS.alwaysAllowKeywords,
+        src.alwaysAllowKeywords
       ),
-      singleAllowKeywords: sanitizeKeywordArray(
-        src.singleAllowKeywords,
-        DEFAULT_SETTINGS.singleAllowKeywords
+      singleAllowKeywords: mergeKeywordArrays(
+        DEFAULT_SETTINGS.singleAllowKeywords,
+        src.singleAllowKeywords
       ),
-      continueKeywords: sanitizeKeywordArray(
-        src.continueKeywords,
-        DEFAULT_SETTINGS.continueKeywords
+      continueKeywords: mergeKeywordArrays(
+        DEFAULT_SETTINGS.continueKeywords,
+        src.continueKeywords
       ),
       customAlwaysAllowKeywords: sanitizeKeywordArray(
         src.customAlwaysAllowKeywords,
@@ -326,23 +432,46 @@
         src.customContinueKeywords,
         DEFAULT_SETTINGS.customContinueKeywords
       ),
-      denyBlacklistKeywords: sanitizeKeywordArray(
-        src.denyBlacklistKeywords,
-        DEFAULT_SETTINGS.denyBlacklistKeywords
+      denyBlacklistKeywords: mergeKeywordArrays(
+        DEFAULT_SETTINGS.denyBlacklistKeywords,
+        src.denyBlacklistKeywords
       ),
-      completionCueKeywords: sanitizeKeywordArray(
-        src.completionCueKeywords,
-        DEFAULT_SETTINGS.completionCueKeywords
+      completionCueKeywords: mergeKeywordArrays(
+        DEFAULT_SETTINGS.completionCueKeywords,
+        src.completionCueKeywords
       ),
-      truncationCueKeywords: sanitizeKeywordArray(
-        src.truncationCueKeywords,
-        DEFAULT_SETTINGS.truncationCueKeywords
+      truncationCueKeywords: mergeKeywordArrays(
+        DEFAULT_SETTINGS.truncationCueKeywords,
+        src.truncationCueKeywords
       ),
-      quotaErrorKeywords: sanitizeKeywordArray(
-        src.quotaErrorKeywords,
-        DEFAULT_SETTINGS.quotaErrorKeywords
+      quotaErrorKeywords: mergeKeywordArrays(
+        DEFAULT_SETTINGS.quotaErrorKeywords,
+        src.quotaErrorKeywords
       )
     };
+  }
+
+  /**
+   * Migrates persisted chrome.storage settings from v1 to v2 once:
+   * - Updates defaults to 10 continues per task and 0 (unlimited) daily cap
+   * - Unions all newly added built-in allow/continue keywords
+   */
+  function migrateStoredSettings(raw) {
+    if (!raw || typeof raw !== 'object') {
+      return { settings: mergeSettings(null), migrated: false };
+    }
+    const ver = typeof raw.settingsVersion === 'number' ? raw.settingsVersion : 1;
+    if (ver < SETTINGS_VERSION) {
+      const upgraded = mergeSettings(
+        Object.assign({}, raw, {
+          settingsVersion: SETTINGS_VERSION,
+          maxContinuesPerTask: DEFAULT_SETTINGS.maxContinuesPerTask,
+          dailyContinueLimit: DEFAULT_SETTINGS.dailyContinueLimit
+        })
+      );
+      return { settings: upgraded, migrated: true };
+    }
+    return { settings: mergeSettings(raw), migrated: false };
   }
 
   function normalizeText(str) {
@@ -356,7 +485,7 @@
 
   function stripEdgePunctuation(str) {
     return normalizeText(str)
-      .replace(/^[\s•·\-–—>»›\[\]()（）「」『』"'`.,!?！？:：]+|[\s•·\-–—>»›\[\]()（）「」『』"'`.,!?！？:：]+$/g, '')
+      .replace(/^[\s•·\-–—>»›↪↳↵↩→➔➜▶▸►✓✔✨\[\]()（）「」『』"'`.,!?！？:：]+|[\s•·\-–—>»›↪↳↵↩→➔➜▶▸►✓✔✨\[\]()（）「」『』"'`.,!?！？:：]+$/g, '')
       .trim();
   }
 
@@ -458,9 +587,11 @@
   const api = {
     STORAGE_KEY,
     STATS_KEY,
+    SETTINGS_VERSION,
     DEFAULT_SETTINGS,
     getTodayKey,
     mergeSettings,
+    migrateStoredSettings,
     parseKeywordInput,
     normalizeText,
     stripEdgePunctuation,

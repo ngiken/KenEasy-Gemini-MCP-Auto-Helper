@@ -15,7 +15,15 @@
     'a[role="button"]',
     'mat-chip',
     'mat-chip-option',
+    'mat-action-chip',
     '.mat-mdc-chip',
+    '.mdc-evolution-chip',
+    'md-filled-button',
+    'md-outlined-button',
+    'md-text-button',
+    'md-tonal-button',
+    'md-elevated-button',
+    'mwc-button',
     '[data-test-id*="button"]',
     '[data-test-id*="chip"]',
     '[data-test-id*="continue"]',
@@ -24,6 +32,53 @@
     '.suggestion-chip',
     '.follow-up-chip'
   ].join(',');
+
+  const APPROVAL_EXTRA_SIBLING_KEYWORDS = [
+    'no',
+    'not now',
+    'skip',
+    'block',
+    'never',
+    '否',
+    '暂不',
+    '跳过',
+    '阻止'
+  ];
+
+  const GENERIC_AFFIRMATIVE_CONTINUE_SET = new Set([
+    'yes',
+    'confirm',
+    '是',
+    '是的',
+    '好',
+    '好的',
+    '确认',
+    '確認',
+    '确定',
+    '確定'
+  ]);
+
+  const DIALOG_OR_SURVEY_NEGATIVE_SIBLINGS = [
+    'no',
+    'cancel',
+    'delete',
+    'remove',
+    'deny',
+    'reject',
+    'dismiss',
+    'close',
+    'not now',
+    '否',
+    '不是',
+    '取消',
+    '删除',
+    '刪除',
+    '拒绝',
+    '拒絕',
+    '关闭',
+    '關閉',
+    '不需要'
+  ];
 
   const STOP_BUTTON_SELECTORS = [
     'button[aria-label*="Stop" i]',
@@ -97,16 +152,44 @@
       }
       if (cur.getAttribute) {
         const role = (cur.getAttribute('role') || '').toLowerCase();
-        if (role === 'navigation' || role === 'menubar' || role === 'menu') return true;
+        if (role === 'navigation' || role === 'menubar') return true;
         if (cur.getAttribute('contenteditable') === 'true') return true;
         const testId = (cur.getAttribute('data-test-id') || '').toLowerCase();
-        if (testId.includes('conversation-list') || testId.includes('sidebar') || testId.includes('sidenav')) {
+        if (
+          testId.includes('conversation-list') ||
+          testId.includes('sidebar') ||
+          testId.includes('sidenav') ||
+          testId.includes('feedback') ||
+          testId.includes('survey')
+        ) {
           return true;
         }
       }
       cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
     }
     return false;
+  }
+
+  function hasAncestorRoleOrTag(el, roles, tags) {
+    let cur = el;
+    while (cur && cur.nodeType === 1) {
+      const tag = (cur.tagName || '').toUpperCase();
+      if (tags && tags.indexOf(tag) >= 0) return true;
+      if (cur.getAttribute) {
+        const role = (cur.getAttribute('role') || '').toLowerCase();
+        if (roles && roles.indexOf(role) >= 0) return true;
+      }
+      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    }
+    return false;
+  }
+
+  function isInsideMenu(el) {
+    return hasAncestorRoleOrTag(el, ['menu'], ['MAT-MENU']);
+  }
+
+  function isInsideModalDialog(el) {
+    return hasAncestorRoleOrTag(el, ['dialog', 'alertdialog'], ['DIALOG', 'MAT-DIALOG-CONTAINER']);
   }
 
   function isElementVisible(el, win, doc) {
@@ -122,6 +205,7 @@
 
     // Walk element & ancestors so hidden parents (display:none / visibility:hidden / hidden) are always caught,
     // including when the browser window is minimized or in a background tab.
+    let selfDisplay = '';
     let cur = el;
     while (cur && cur.nodeType === 1) {
       if (cur.hidden === true) return false;
@@ -130,6 +214,7 @@
         try {
           const style = w.getComputedStyle(cur);
           if (style) {
+            if (cur === el) selfDisplay = style.display || '';
             if (style.display === 'none' || style.visibility === 'hidden') return false;
             if (style.opacity !== '' && parseFloat(style.opacity) === 0) return false;
             if (cur === el && style.pointerEvents === 'none') return false;
@@ -147,7 +232,7 @@
       d && d.hidden === true && w && w.innerWidth === 0 && w.innerHeight === 0
     );
 
-    if (!isWindowMinimized && typeof el.getBoundingClientRect === 'function') {
+    if (!isWindowMinimized && selfDisplay !== 'contents' && typeof el.getBoundingClientRect === 'function') {
       try {
         const rect = el.getBoundingClientRect();
         if (rect && rect.width === 0 && rect.height === 0) return false;
@@ -195,6 +280,33 @@
     if (!node) return '';
     if (!isRoot && isIconOrDecorativeNode(node)) return '';
 
+    // Support Material Web Components (<md-filled-button> etc.) that project labels via <slot>
+    if (
+      node.nodeType === 1 &&
+      (node.tagName || '').toUpperCase() === 'SLOT' &&
+      typeof node.assignedNodes === 'function'
+    ) {
+      let assigned = [];
+      try {
+        assigned = node.assignedNodes({ flatten: true }) || [];
+      } catch (_) {
+        assigned = [];
+      }
+      if (assigned.length > 0) {
+        let slotOut = '';
+        for (let i = 0; i < assigned.length; i++) {
+          const item = assigned[i];
+          if (!item) continue;
+          if (item.nodeType === 3) {
+            slotOut += item.nodeValue || item.textContent || '';
+          } else if (item.nodeType === 1 && !isIconOrDecorativeNode(item)) {
+            slotOut += extractVisibleLabelText(item, false);
+          }
+        }
+        return slotOut.replace(/\s+/g, ' ').trim();
+      }
+    }
+
     if (node.childNodes && typeof node.childNodes.length === 'number' && node.childNodes.length > 0) {
       let out = '';
       for (let i = 0; i < node.childNodes.length; i++) {
@@ -207,7 +319,9 @@
           out += extractVisibleLabelText(child, false);
         }
       }
-      return out.replace(/\s+/g, ' ').trim();
+      const cleaned = out.replace(/\s+/g, ' ').trim();
+      if (cleaned) return cleaned;
+      return node.shadowRoot ? extractVisibleLabelText(node.shadowRoot, false) : '';
     }
 
     if (node.children && node.children.length > 0) {
@@ -217,10 +331,18 @@
         if (!child || isIconOrDecorativeNode(child)) continue;
         out += extractVisibleLabelText(child, false);
       }
-      return out.replace(/\s+/g, ' ').trim();
+      const cleaned = out.replace(/\s+/g, ' ').trim();
+      if (cleaned) return cleaned;
+      return node.shadowRoot ? extractVisibleLabelText(node.shadowRoot, false) : '';
     }
 
-    return (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
+    const direct = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
+    if (direct) return direct;
+
+    if (node.shadowRoot) {
+      return extractVisibleLabelText(node.shadowRoot, false);
+    }
+    return '';
   }
 
   function getElementLabel(el) {
@@ -303,28 +425,32 @@
     return valid.filter((item) => !dropSet.has(item.el));
   }
 
+  const SIBLING_BUTTON_SELECTOR =
+    'button, [role="button"], md-filled-button, md-outlined-button, md-text-button, md-tonal-button, md-elevated-button, mwc-button';
+
   function hasClickedSiblingButton(el, clickedElements) {
     if (!clickedElements || clickedElements.size === 0) return false;
     let container =
       el.parentElement ||
       el.parentNode ||
       (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
-    for (let depth = 0; depth < 3 && container; depth++) {
+    for (let depth = 0; depth < 5 && container; depth++) {
       const tag = (container.tagName || '').toUpperCase();
       if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
       if (typeof container.querySelectorAll === 'function') {
-        const siblings = container.querySelectorAll('button, [role="button"]');
+        const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
         if (siblings.length > 8) break;
-        if (siblings.length > 1) {
-          for (let i = 0; i < siblings.length; i++) {
-            const sib = siblings[i];
-            if (sib !== el && clickedElements.has(sib)) {
-              return true;
-            }
+        let otherCount = 0;
+        for (let i = 0; i < siblings.length; i++) {
+          const sib = siblings[i];
+          if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
+          otherCount += 1;
+          if (clickedElements.has(sib)) {
+            return true;
           }
-          // Stop at the innermost multi-button group so separate stacked cards stay independent
-          break;
         }
+        // Stop at the innermost multi-button group so separate stacked cards stay independent
+        if (otherCount > 0) break;
       }
       container =
         container.parentElement ||
@@ -337,6 +463,7 @@
   function hasSiblingApprovalContext(el, settings) {
     const denyAndAlways = []
       .concat(settings.denyBlacklistKeywords || [])
+      .concat(APPROVAL_EXTRA_SIBLING_KEYWORDS)
       .concat(settings.alwaysAllowKeywords || [])
       .concat(settings.customAlwaysAllowKeywords || []);
 
@@ -344,20 +471,51 @@
       el.parentElement ||
       el.parentNode ||
       (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
-    for (let depth = 0; depth < 3 && container; depth++) {
+    for (let depth = 0; depth < 5 && container; depth++) {
       const tag = (container.tagName || '').toUpperCase();
       if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
       if (typeof container.querySelectorAll === 'function') {
-        const siblings = container.querySelectorAll('button, [role="button"]');
+        const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
         if (siblings.length > 8) break;
         for (let i = 0; i < siblings.length; i++) {
           const sib = siblings[i];
-          if (sib === el) continue;
+          if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
           const sibLabel = getElementLabel(sib);
-          if (sibLabel && sibLabel.length <= 40 && D.containsKeyword(sibLabel, denyAndAlways)) {
+          if (sibLabel && sibLabel.length <= 64 && D.containsKeyword(sibLabel, denyAndAlways)) {
             return true;
           }
         }
+      }
+      container =
+        container.parentElement ||
+        (container.nodeType === 11 ? container.host : container.parentNode) ||
+        null;
+    }
+    return false;
+  }
+
+  function hasNegativeSiblingInGroup(el) {
+    let container =
+      el.parentElement ||
+      el.parentNode ||
+      (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
+    for (let depth = 0; depth < 4 && container; depth++) {
+      const tag = (container.tagName || '').toUpperCase();
+      if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
+      if (typeof container.querySelectorAll === 'function') {
+        const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
+        if (siblings.length > 8) break;
+        let otherCount = 0;
+        for (let i = 0; i < siblings.length; i++) {
+          const sib = siblings[i];
+          if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
+          otherCount += 1;
+          const sibLabel = getElementLabel(sib);
+          if (sibLabel && sibLabel.length <= 40 && D.containsKeyword(sibLabel, DIALOG_OR_SURVEY_NEGATIVE_SIBLINGS)) {
+            return true;
+          }
+        }
+        if (otherCount > 0) break;
       }
       container =
         container.parentElement ||
@@ -688,11 +846,11 @@
 
         const mAlways =
           D.matchButtonLabel(item.label, defaultAlways, {
-            maxLen: 48,
-            mode: 'exact_or_prefix'
+            maxLen: 72,
+            mode: 'exact_or_contains'
           }) ||
           D.matchButtonLabel(item.label, customAlways, {
-            maxLen: 64,
+            maxLen: 80,
             mode: 'exact_or_contains'
           });
 
@@ -701,14 +859,27 @@
           continue;
         }
 
+        // Only explicit "Always allow" items may be clicked inside role="menu" dropdowns
+        if (isInsideMenu(item.el)) continue;
+
         const mSingle = D.matchButtonLabel(item.label, singleKws, {
-          maxLen: 28,
+          maxLen: 56,
           mode: 'exact_or_prefix'
         });
 
         if (mSingle) {
           const lower = D.normalizeText(item.label);
-          if (lower.includes('cookie') || lower.includes('notification') || lower.includes('通知')) {
+          if (
+            lower.includes('cookie') ||
+            lower.includes('notification') ||
+            lower.includes('通知') ||
+            lower.includes('microphone') ||
+            lower.includes('camera') ||
+            lower.includes('location') ||
+            lower.includes('麦克风') ||
+            lower.includes('摄像头') ||
+            lower.includes('位置')
+          ) {
             continue;
           }
           // Non-exact single allow (e.g. "Allow Desktop Commander") requires sibling approval context
@@ -741,6 +912,7 @@
 
       for (const item of clickables) {
         if (this.clickedElements.has(item.el)) continue;
+        if (isInsideMenu(item.el) || isInsideModalDialog(item.el)) continue;
         if (D.containsKeyword(item.label, denyKws)) continue;
         if (isInsideOlderTurn(item.el, turns)) continue;
 
@@ -750,15 +922,23 @@
           maxLen: 36,
           mode: 'exact'
         });
-        const mCustom =
-          !mDefault &&
-          D.matchButtonLabel(item.label, customCont, {
-            maxLen: 80,
-            mode: 'exact_or_contains'
-          });
+        if (mDefault) {
+          const matchedKey = D.stripEdgePunctuation(mDefault.keyword);
+          // Protect generic affirmative words ("Yes", "确认", "好的") from clicking survey or delete confirmation dialogs
+          if (GENERIC_AFFIRMATIVE_CONTINUE_SET.has(matchedKey) && hasNegativeSiblingInGroup(item.el)) {
+            continue;
+          }
+          matches.push({ item, match: mDefault });
+          continue;
+        }
 
-        if (mDefault || mCustom) {
-          matches.push({ item, match: mDefault || mCustom });
+        const mCustom = D.matchButtonLabel(item.label, customCont, {
+          maxLen: 80,
+          mode: 'exact_or_contains'
+        });
+
+        if (mCustom) {
+          matches.push({ item, match: mCustom });
         }
       }
 
@@ -771,9 +951,11 @@
       const clickables = collectClickableElements(this.doc, this.win);
       const seenLabels = new Set();
       const out = [];
-      for (const item of clickables) {
+      // Traverse bottom-to-top so newest chat buttons (approval cards, Yes/继续 chips) appear first
+      for (let i = clickables.length - 1; i >= 0; i--) {
+        const item = clickables[i];
         const txt = item.label.replace(/\s+/g, ' ').trim();
-        if (!txt || txt.length > 60) continue;
+        if (!txt || txt.length > 72) continue;
         const key = txt.toLowerCase();
         if (seenLabels.has(key)) continue;
         seenLabels.add(key);
@@ -911,8 +1093,8 @@
         return { action: 'tripped', reason: 'task_limit' };
       }
 
-      // Layer D: Daily cap
-      if (this.stats.continueCount >= this.settings.dailyContinueLimit) {
+      // Layer D: Daily cap (0 = unlimited, user can set a positive cap at any time)
+      if (this.settings.dailyContinueLimit > 0 && this.stats.continueCount >= this.settings.dailyContinueLimit) {
         this.tripBreaker(
           'daily_limit',
           `已达今日继续总上限 (${this.stats.continueCount}/${this.settings.dailyContinueLimit})`
@@ -1117,8 +1299,10 @@
       try {
         chrome.storage.local.get([D.STORAGE_KEY, D.STATS_KEY], (res) => {
           if (!isContextAlive()) return;
-          if (res && res[D.STORAGE_KEY]) {
-            engine.settings = D.mergeSettings(res[D.STORAGE_KEY]);
+          const migratedRes = D.migrateStoredSettings(res && res[D.STORAGE_KEY]);
+          engine.settings = migratedRes.settings;
+          if (migratedRes.migrated) {
+            saveSettings(engine.settings);
           }
           if (res && res[D.STATS_KEY]) {
             engine.stats = D.normalizeStats(res[D.STATS_KEY]);
@@ -1138,9 +1322,10 @@
           if (
             engine.circuitBreaker.tripped &&
             engine.circuitBreaker.reasonCode === 'daily_limit' &&
-            engine.stats.continueCount < engine.settings.dailyContinueLimit
+            (engine.settings.dailyContinueLimit === 0 ||
+              engine.stats.continueCount < engine.settings.dailyContinueLimit)
           ) {
-            engine.clearBreaker('今日计数已清零或上限已提高，自动解除每日熔断');
+            engine.clearBreaker('今日计数已清零或上限已放开，自动解除每日熔断');
             return;
           }
           if (

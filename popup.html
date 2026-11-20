@@ -29,7 +29,7 @@
       </div>
       <div class="stat-item">
         <span class="stat-label">今日继续</span>
-        <strong id="statContinue">0 / 30</strong>
+        <strong id="statContinue">0 / ∞</strong>
       </div>
       <div class="stat-item">
         <span class="stat-label">当前状态</span>
@@ -77,8 +77,8 @@
           <input type="number" id="maxContinuesPerTask" min="1" max="100" step="1" />
         </label>
         <label class="field">
-          <span>每日继续总上限</span>
-          <input type="number" id="dailyContinueLimit" min="1" max="500" step="1" />
+          <span>每日继续总上限 (0=无上限)</span>
+          <input type="number" id="dailyContinueLimit" min="0" max="10000" step="1" />
         </label>
         <label class="field">
           <span>继续冷却 (秒)</span>

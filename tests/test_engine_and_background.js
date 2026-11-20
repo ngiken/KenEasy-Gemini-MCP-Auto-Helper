@@ -863,7 +863,7 @@ function runTests(test) {
 
     assert.strictEqual(pdoc.getElementById('maxContinuesPerTask').value, '8');
     assert.strictEqual(pdoc.getElementById('statAllow').textContent, '12');
-    assert.strictEqual(pdoc.getElementById('statContinue').textContent, '3 / 30');
+    assert.strictEqual(pdoc.getElementById('statContinue').textContent, '3 / ∞');
     assert.strictEqual(pdoc.getElementById('statLive').textContent, '后台就绪');
 
     pdoc.getElementById('dailyContinueLimit').value = '45';
@@ -1168,6 +1168,245 @@ function runTests(test) {
     assert.strictEqual(c1Once.clickCount, 0);
     assert.strictEqual(c1Deny.clickCount, 0);
     assert.strictEqual(c2Deny.clickCount, 0);
+  });
+
+  // 21. Auto-injection into already-open Gemini tabs (popup & background) + needs_reload distinction
+  test('popup.js auto-injects into already-open Gemini tabs and shows 请刷新 Gemini instead of 未打开 Gemini if unreachable', () => {
+    const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+    const pdoc = popupEnv.doc;
+    const ids = [
+      'enabled', 'autoAllow', 'preferAlwaysAllow', 'fallbackSingleAllow',
+      'autoContinue', 'backgroundMode', 'preventTabDiscard', 'showHud',
+      'maxContinuesPerTask', 'dailyContinueLimit', 'continueCooldownSec', 'idleSettleSec',
+      'stopOnCompletionCues', 'stopOnStagnantOutput', 'stopOnQuotaOrError',
+      'customAlwaysAllowKeywords', 'customContinueKeywords',
+      'statAllow', 'statContinue', 'statLive',
+      'btnEmergency', 'btnResetBreaker', 'btnResetStats', 'btnDefaults', 'btnSave', 'toast'
+    ];
+    for (const id of ids) {
+      pdoc.body.appendChild(pdoc.createElement('input', { id }));
+    }
+
+    const storageState = {
+      [D.STORAGE_KEY]: D.mergeSettings({ enabled: true, backgroundMode: true }),
+      [D.STATS_KEY]: { date: D.getTodayKey(), allowCount: 0, continueCount: 0 }
+    };
+
+    let injected = false;
+    let cssInjected = false;
+    const mockChromeWithScripting = {
+      runtime: { lastError: null },
+      storage: {
+        local: {
+          get(_keys, cb) { cb(Object.assign({}, storageState)); },
+          set(obj, cb) { Object.assign(storageState, obj); if (cb) cb(); }
+        }
+      },
+      tabs: {
+        query(_q, cb) { cb([{ id: 10, active: true, discarded: false }]); },
+        sendMessage(_tabId, _msg, cb) {
+          if (!injected) {
+            mockChromeWithScripting.runtime.lastError = { message: 'Could not establish connection.' };
+            cb(undefined);
+            mockChromeWithScripting.runtime.lastError = null;
+          } else {
+            cb({ ok: true, state: { settings: storageState[D.STORAGE_KEY], circuitBreaker: { tripped: false } } });
+          }
+        }
+      },
+      scripting: {
+        insertCSS(_opts, cb) {
+          cssInjected = true;
+          mockChromeWithScripting.runtime.lastError = null;
+          if (cb) cb();
+        },
+        executeScript(_opts, cb) {
+          injected = true;
+          mockChromeWithScripting.runtime.lastError = null;
+          if (cb) cb();
+        }
+      }
+    };
+
+    const popup = createPopupController(pdoc, mockChromeWithScripting);
+    popup.init();
+    assert.strictEqual(cssInjected, true);
+    assert.strictEqual(injected, true);
+    assert.strictEqual(pdoc.getElementById('statLive').textContent, '后台就绪');
+
+    // If scripting is unavailable and tab does not answer, must show "请刷新 Gemini" (not "未打开 Gemini")
+    const mockChromeNoScripting = {
+      runtime: { lastError: { message: 'Receiving end does not exist' } },
+      storage: mockChromeWithScripting.storage,
+      tabs: {
+        query(_q, cb) { cb([{ id: 11, active: true, discarded: false }]); },
+        sendMessage(_tabId, _msg, cb) { cb(undefined); }
+      }
+    };
+    const popup2 = createPopupController(pdoc, mockChromeNoScripting);
+    popup2.init();
+    assert.strictEqual(pdoc.getElementById('statLive').textContent, '请刷新 Gemini');
+    assert.strictEqual(pdoc.getElementById('statLive').className, 'badge-warn');
+
+    // Background syncAllGeminiTabs(false, true) auto-injects into open tabs with no port
+    const bgInjectedTabs = [];
+    const bgMockChrome = {
+      runtime: { lastError: null },
+      storage: { local: { get(_k, cb) { cb({}); } } },
+      tabs: {
+        update(_id, _p, cb) { if (cb) cb(); },
+        query(_q, cb) { cb([{ id: 55, url: 'https://gemini.google.com/app', discarded: false }]); }
+      },
+      scripting: {
+        insertCSS(_o, cb) { if (cb) cb(); },
+        executeScript(opts, cb) { bgInjectedTabs.push(opts.target.tabId); if (cb) cb(); }
+      }
+    };
+    const bg = createBackgroundController(bgMockChrome);
+    bg.syncAllGeminiTabs(false, true);
+    assert.deepStrictEqual(bgInjectedTabs, [55]);
+  });
+
+  // 22. Follow-up "↪ Yes" confirmation chip clicks safely, while survey [Yes][No] & modal [Cancel][确认] are blocked
+  test('auto-continue clicks "↪ Yes" follow-up chip but ignores [Yes][No] survey and modal [Cancel][确认] dialogs', () => {
+    const { doc, win } = createMockEnv();
+    let now = 300000;
+
+    // 1) Feedback survey pair [Yes] [No] must NOT be clicked
+    const survey = doc.createElement('div', { className: 'feedback-row' });
+    const surveyYes = doc.createElement('button', { text: 'Yes' });
+    const surveyNo = doc.createElement('button', { text: 'No' });
+    survey.appendChild(surveyYes);
+    survey.appendChild(surveyNo);
+    doc.body.appendChild(survey);
+
+    // 2) Modal confirmation dialog [Cancel] [确认] must NOT be clicked
+    const modal = doc.createElement('div', { attrs: { role: 'dialog' } });
+    const cancelBtn = doc.createElement('button', { text: 'Cancel' });
+    const confirmDelete = doc.createElement('button', { text: '确认' });
+    modal.appendChild(cancelBtn);
+    modal.appendChild(confirmDelete);
+    doc.body.appendChild(modal);
+
+    addTurn(doc, '确认没问题，请点下方按钮开始写入代码。');
+
+    const engine = new GmahEngine({ doc, win, now: () => now });
+    assert.strictEqual(engine.scanOnce().action, 'noop');
+    assert.strictEqual(surveyYes.clickCount, 0);
+    assert.strictEqual(confirmDelete.clickCount, 0);
+
+    // 3) Actual Gemini follow-up chip "↪ Yes" at bottom of conversation MUST be clicked
+    const yesChip = doc.createElement('button', { className: 'follow-up-chip', text: '↪ Yes' });
+    doc.body.appendChild(yesChip);
+
+    now += 2500;
+    const res = engine.scanOnce();
+    assert.strictEqual(res.action, 'clicked_continue');
+    assert.strictEqual(res.element, yesChip);
+    assert.strictEqual(yesChip.clickCount, 1);
+    assert.strictEqual(surveyYes.clickCount, 0);
+    assert.strictEqual(confirmDelete.clickCount, 0);
+  });
+
+  // 23. Material Web Component <md-filled-button> with ShadowRoot + <slot> assignedNodes & role="menu" Always Allow
+  test('auto-allow reads <slot> projected labels in Material Web Components and handles Always Allow in role="menu"', () => {
+    const { doc, win } = createMockEnv();
+    let now = 320000;
+
+    // Card with <md-outlined-button>Not now</md-outlined-button> and <md-filled-button>Always allow Desktop Commander for this conversation</md-filled-button>
+    const card = doc.createElement('div', { className: 'mcp-approval' });
+
+    const notNowHost = doc.createElement('md-outlined-button', { text: 'Not now' });
+    const allowHost = doc.createElement('md-filled-button');
+    const lightTextNode = { nodeType: 3, nodeValue: 'Always allow Desktop Commander for this conversation' };
+    const sr = allowHost.attachShadow();
+    const innerBtn = doc.createElement('button');
+    const slot = doc.createElement('slot');
+    slot.assignedNodes = () => [lightTextNode];
+    innerBtn.appendChild(slot);
+    sr.appendChild(innerBtn);
+
+    card.appendChild(notNowHost);
+    card.appendChild(allowHost);
+    doc.body.appendChild(card);
+
+    assert.strictEqual(getElementLabel(innerBtn), 'Always allow Desktop Commander for this conversation');
+
+    const engine = new GmahEngine({ doc, win, now: () => now });
+    const r1 = engine.scanOnce();
+    assert.strictEqual(r1.action, 'clicked_allow');
+    assert.strictEqual(r1.tier, 'always');
+    assert.strictEqual(r1.element, innerBtn);
+    assert.strictEqual(innerBtn.clickCount, 1);
+
+    // Role="menu" dropdown: Always allow item IS allowed, while Continue/Yes inside menu is blocked
+    card.remove();
+    const menu = doc.createElement('div', { attrs: { role: 'menu' } });
+    const menuContinue = doc.createElement('button', { text: 'Yes' });
+    const menuAllowOnce = doc.createElement('button', { text: 'Allow once' });
+    const menuAlways = doc.createElement('button', { text: 'Always allow for this chat' });
+    menu.appendChild(menuContinue);
+    menu.appendChild(menuAllowOnce);
+    menu.appendChild(menuAlways);
+    doc.body.appendChild(menu);
+
+    now += 1500;
+    const r2 = engine.scanOnce();
+    assert.strictEqual(r2.action, 'clicked_allow');
+    assert.strictEqual(r2.element, menuAlways);
+    assert.strictEqual(menuAlways.clickCount, 1);
+    assert.strictEqual(menuAllowOnce.clickCount, 0);
+    assert.strictEqual(menuContinue.clickCount, 0);
+
+    // Once menuAlways is removed, menuAllowOnce & menuContinue in role="menu" must NOT be clicked
+    menuAlways.remove();
+    now += 2500;
+    assert.strictEqual(engine.scanOnce().action, 'noop');
+    assert.strictEqual(menuAllowOnce.clickCount, 0);
+    assert.strictEqual(menuContinue.clickCount, 0);
+  });
+
+  // 24. Unlimited daily cap (0) never trips daily_limit, and inspectVisibleButtons lists bottom-most buttons first
+  test('dailyContinueLimit=0 allows unlimited daily continues while HUD shows ∞ and inspectVisibleButtons prioritizes newest buttons', () => {
+    const { doc, win } = createMockEnv();
+    let now = 350000;
+
+    const topBtn = doc.createElement('button', { text: '顶部旧按钮' });
+    doc.body.appendChild(topBtn);
+
+    const contBtn = doc.createElement('button', { text: '继续' });
+    addTurn(doc, '第 101 次长任务输出...', [contBtn]);
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      settings: { maxContinuesPerTask: 10, dailyContinueLimit: 0, continueCooldownMs: 1000, idleSettleMs: 400 },
+      stats: { date: D.getTodayKey(new Date(now)), allowCount: 5, continueCount: 150 }
+    });
+
+    // Bottom-most button ("继续") must appear before top-most ("顶部旧按钮")
+    const inspected = engine.inspectVisibleButtons();
+    assert.strictEqual(inspected[0].text, '继续');
+    assert.strictEqual(inspected[1].text, '顶部旧按钮');
+
+    // Even at 150 daily continues, dailyContinueLimit=0 does NOT trip daily_limit
+    const res = engine.scanOnce();
+    assert.strictEqual(res.action, 'clicked_continue');
+    assert.strictEqual(engine.stats.continueCount, 151);
+
+    // HUD displays ∞ when dailyContinueLimit === 0
+    const prevDoc = global.document;
+    global.document = doc;
+    try {
+      const hud = createHud();
+      const rootEl = hud.mount();
+      hud.update(engine.getState());
+      assert.ok(rootEl.textContent.includes('今日 151/∞'));
+      hud.unmount();
+    } finally {
+      global.document = prevDoc;
+    }
   });
 }
 

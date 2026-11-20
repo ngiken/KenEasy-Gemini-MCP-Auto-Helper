@@ -64,16 +64,22 @@
       const s = D.mergeSettings(settings);
       const allowEl = byId('statAllow');
       const contEl = byId('statContinue');
+      const dailyCapLabel = s.dailyContinueLimit > 0 ? String(s.dailyContinueLimit) : '∞';
       if (allowEl) allowEl.textContent = String(st.allowCount);
-      if (contEl) contEl.textContent = `${st.continueCount} / ${s.dailyContinueLimit}`;
+      if (contEl) contEl.textContent = `${st.continueCount} / ${dailyCapLabel}`;
     }
 
-    function renderLiveStatus(tabState) {
+    function renderLiveStatus(tabState, meta) {
       const liveEl = byId('statLive');
       if (!liveEl) return;
       if (!tabState) {
-        liveEl.textContent = '未打开 Gemini';
-        liveEl.className = '';
+        if (meta && meta.reason === 'needs_reload') {
+          liveEl.textContent = '请刷新 Gemini';
+          liveEl.className = 'badge-warn';
+        } else {
+          liveEl.textContent = '未打开 Gemini';
+          liveEl.className = '';
+        }
         return;
       }
       if (tabState.circuitBreaker && tabState.circuitBreaker.tripped) {
@@ -130,14 +136,77 @@
       );
     }
 
+    function injectIntoTabs(tabs, done) {
+      if (!api || !api.scripting || typeof api.scripting.executeScript !== 'function') {
+        done(false);
+        return;
+      }
+      const targets = tabs.filter((t) => t && typeof t.id === 'number' && !t.discarded);
+      if (targets.length === 0) {
+        done(false);
+        return;
+      }
+      let remaining = targets.length;
+      let anySuccess = false;
+      for (const tab of targets) {
+        try {
+          if (typeof api.scripting.insertCSS === 'function') {
+            const cssRes = api.scripting.insertCSS(
+              { target: { tabId: tab.id }, files: ['hud.css'] },
+              () => {
+                void (api.runtime && api.runtime.lastError);
+              }
+            );
+            if (cssRes && typeof cssRes.catch === 'function') cssRes.catch(() => {});
+          }
+          const jsRes = api.scripting.executeScript(
+            { target: { tabId: tab.id }, files: ['defaults.js', 'hud.js', 'content.js'] },
+            () => {
+              const hadErr = Boolean(api.runtime && api.runtime.lastError);
+              if (!hadErr) anySuccess = true;
+              remaining -= 1;
+              if (remaining === 0) done(anySuccess);
+            }
+          );
+          if (jsRes && typeof jsRes.catch === 'function') {
+            jsRes.catch(() => {
+              remaining -= 1;
+              if (remaining === 0) done(anySuccess);
+            });
+          }
+        } catch (_) {
+          remaining -= 1;
+          if (remaining === 0) done(anySuccess);
+        }
+      }
+    }
+
+    function queryTabsAndSend(ordered, message, onDone) {
+      const results = new Array(ordered.length).fill(null);
+      let pending = ordered.length;
+      ordered.forEach((tab, idx) => {
+        api.tabs.sendMessage(tab.id, message, (resp) => {
+          void (api.runtime && api.runtime.lastError);
+          if (resp && resp.ok) {
+            results[idx] = resp.state || null;
+          }
+          pending -= 1;
+          if (pending === 0) {
+            const best = results.find((s) => s !== null) || null;
+            onDone(best);
+          }
+        });
+      });
+    }
+
     function sendToGeminiTabs(message, cb) {
       if (!api || !api.tabs || typeof api.tabs.query !== 'function') {
-        if (cb) cb(null);
+        if (cb) cb(null, { reason: 'no_tab', tabCount: 0 });
         return;
       }
       api.tabs.query({ url: 'https://gemini.google.com/*' }, (tabs) => {
         if (!Array.isArray(tabs) || tabs.length === 0) {
-          if (cb) cb(null);
+          if (cb) cb(null, { reason: 'no_tab', tabCount: 0 });
           return;
         }
         // Prefer currently active tab so multi-tab status reflects what the user is looking at
@@ -146,19 +215,25 @@
           const bScore = (b && b.active ? 2 : 0) + (b && b.highlighted ? 1 : 0);
           return bScore - aScore;
         });
-        const results = new Array(ordered.length).fill(null);
-        let pending = ordered.length;
-        ordered.forEach((tab, idx) => {
-          api.tabs.sendMessage(tab.id, message, (resp) => {
-            void (api.runtime && api.runtime.lastError);
-            if (resp && resp.ok) {
-              results[idx] = resp.state || null;
+
+        queryTabsAndSend(ordered, message, (best) => {
+          if (best) {
+            if (cb) cb(best, { reason: 'ok', tabCount: ordered.length });
+            return;
+          }
+          // Gemini tab is open but content script isn't injected yet (e.g., tab was open before install/reload)
+          injectIntoTabs(ordered, (injected) => {
+            if (!injected) {
+              if (cb) cb(null, { reason: 'needs_reload', tabCount: ordered.length });
+              return;
             }
-            pending -= 1;
-            if (pending === 0 && cb) {
-              const best = results.find((s) => s !== null) || null;
-              cb(best);
-            }
+            queryTabsAndSend(ordered, message, (retryBest) => {
+              if (retryBest) {
+                if (cb) cb(retryBest, { reason: 'ok', injected: true, tabCount: ordered.length });
+              } else if (cb) {
+                cb(null, { reason: 'needs_reload', tabCount: ordered.length });
+              }
+            });
           });
         });
       });
@@ -173,11 +248,11 @@
           api.storage.local.get([D.STATS_KEY], (res) => {
             renderStats(res && res[D.STATS_KEY], next);
           });
-          sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state) => {
+          sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
             if (state) {
-              renderLiveStatus(Object.assign({}, state, { settings: next }));
+              renderLiveStatus(Object.assign({}, state, { settings: next }), meta);
             } else {
-              renderLiveStatus(null);
+              renderLiveStatus(null, meta);
             }
           });
         });
@@ -188,8 +263,12 @@
     function loadInitial() {
       if (api && api.storage && api.storage.local) {
         api.storage.local.get([D.STORAGE_KEY, D.STATS_KEY], (res) => {
-          const settings = D.mergeSettings(res && res[D.STORAGE_KEY]);
+          const migratedRes = D.migrateStoredSettings(res && res[D.STORAGE_KEY]);
+          const settings = migratedRes.settings;
           const stats = D.normalizeStats(res && res[D.STATS_KEY]);
+          if (migratedRes.migrated && typeof api.storage.local.set === 'function') {
+            api.storage.local.set({ [D.STORAGE_KEY]: settings });
+          }
           renderSettings(settings);
           renderStats(stats, settings);
         });
@@ -197,8 +276,8 @@
         renderSettings(D.DEFAULT_SETTINGS);
         renderStats(D.createEmptyStats(), D.DEFAULT_SETTINGS);
       }
-      sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state) => {
-        renderLiveStatus(state);
+      sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
+        renderLiveStatus(state, meta);
       });
     }
 
@@ -227,10 +306,12 @@
       const btnEmergency = byId('btnEmergency');
       if (btnEmergency) {
         btnEmergency.addEventListener('click', () => {
-          sendToGeminiTabs({ type: 'GMAH_EMERGENCY_STOP' }, (state) => {
-            renderLiveStatus(state);
+          sendToGeminiTabs({ type: 'GMAH_EMERGENCY_STOP' }, (state, meta) => {
+            renderLiveStatus(state, meta);
             if (state) {
               showToast('已向 Gemini 标签页发送紧急停止指令', true);
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast('检测到 Gemini 页面，请先按 F5 刷新页面后重试', true);
             } else {
               showToast('当前未检测到已打开的 Gemini 标签页', true);
             }
@@ -241,10 +322,12 @@
       const btnResetBreaker = byId('btnResetBreaker');
       if (btnResetBreaker) {
         btnResetBreaker.addEventListener('click', () => {
-          sendToGeminiTabs({ type: 'GMAH_RESET_BREAKER' }, (state) => {
-            renderLiveStatus(state);
+          sendToGeminiTabs({ type: 'GMAH_RESET_BREAKER' }, (state, meta) => {
+            renderLiveStatus(state, meta);
             if (state) {
               showToast('已解除熔断并重置本次任务计数');
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast('检测到 Gemini 页面，请先按 F5 刷新页面后重试', true);
             } else {
               showToast('当前未检测到已打开的 Gemini 标签页', true);
             }
@@ -260,8 +343,8 @@
             api.storage.local.set({ [D.STATS_KEY]: fresh }, () => {
               renderStats(fresh, readSettingsFromForm());
               showToast('今日统计计数已清零');
-              sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state) => {
-                renderLiveStatus(state);
+              sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
+                renderLiveStatus(state, meta);
               });
             });
           }

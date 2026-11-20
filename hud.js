@@ -279,7 +279,8 @@
       }
 
       // Status text
-      const countsText = `允许 ${stats.allowCount} · 本次继续 ${state.taskContinueCount}/${s.maxContinuesPerTask} · 今日 ${stats.continueCount}/${s.dailyContinueLimit}`;
+      const dailyCapLabel = s.dailyContinueLimit > 0 ? String(s.dailyContinueLimit) : '∞';
+      const countsText = `允许 ${stats.allowCount} · 本次继续 ${state.taskContinueCount}/${s.maxContinuesPerTask} · 今日 ${stats.continueCount}/${dailyCapLabel}`;
       if (cbState.tripped) {
         els.statusBox.className = 'gmah-status alert';
         els.statusBox.textContent = `熔断: ${cbState.reason}\n${countsText}`;
