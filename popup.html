@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemini MCP Auto Helper</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-wrap">
+    <header class="header">
+      <div class="brand">
+        <img src="icons/icon48.png" alt="icon" class="logo" />
+        <div>
+          <h1>Gemini MCP 助手</h1>
+          <p class="subtitle">自动允许 · 后台保活 · 防刷额度熔断</p>
+        </div>
+      </div>
+      <label class="switch" title="总开关">
+        <input type="checkbox" id="enabled" />
+        <span class="slider"></span>
+      </label>
+    </header>
+
+    <section class="stats-bar" id="statsBar">
+      <div class="stat-item">
+        <span class="stat-label">今日允许</span>
+        <strong id="statAllow">0</strong>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">今日继续</span>
+        <strong id="statContinue">0 / 30</strong>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">当前状态</span>
+        <strong id="statLive" class="badge-ok">待检测</strong>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>核心自动化</h2>
+      <label class="toggle-row">
+        <span>自动点击 MCP「始终允许」</span>
+        <input type="checkbox" id="autoAllow" />
+      </label>
+      <label class="toggle-row sub">
+        <span>优先选择「始终允许」（推荐）</span>
+        <input type="checkbox" id="preferAlwaysAllow" />
+      </label>
+      <label class="toggle-row sub">
+        <span>无始终允许时回退点「允许一次」</span>
+        <input type="checkbox" id="fallbackSingleAllow" />
+      </label>
+      <label class="toggle-row">
+        <span>自动点击下方「继续」按钮</span>
+        <input type="checkbox" id="autoContinue" />
+      </label>
+      <label class="toggle-row">
+        <span>后台静默运行（切屏 / 最小化不中断）</span>
+        <input type="checkbox" id="backgroundMode" />
+      </label>
+      <label class="toggle-row sub">
+        <span>防止 Chrome 休眠丢弃 Gemini 标签页</span>
+        <input type="checkbox" id="preventTabDiscard" />
+      </label>
+      <label class="toggle-row">
+        <span>在 Gemini 页面显示右下角悬浮窗</span>
+        <input type="checkbox" id="showHud" />
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>防刷额度熔断保护</h2>
+      <div class="grid-2">
+        <label class="field">
+          <span>单次任务继续上限</span>
+          <input type="number" id="maxContinuesPerTask" min="1" max="100" step="1" />
+        </label>
+        <label class="field">
+          <span>每日继续总上限</span>
+          <input type="number" id="dailyContinueLimit" min="1" max="500" step="1" />
+        </label>
+        <label class="field">
+          <span>继续冷却 (秒)</span>
+          <input type="number" id="continueCooldownSec" min="1" max="120" step="0.5" />
+        </label>
+        <label class="field">
+          <span>输出停稳等待 (秒)</span>
+          <input type="number" id="idleSettleSec" min="0.5" max="30" step="0.2" />
+        </label>
+      </div>
+      <label class="toggle-row">
+        <span>检测到「全部完成」等完工信号时跳过继续</span>
+        <input type="checkbox" id="stopOnCompletionCues" />
+      </label>
+      <label class="toggle-row">
+        <span>输出无新进展 / 重复时自动熔断</span>
+        <input type="checkbox" id="stopOnStagnantOutput" />
+      </label>
+      <label class="toggle-row">
+        <span>检测到限流 / 额度 / 报错提示时立刻熔断</span>
+        <input type="checkbox" id="stopOnQuotaOrError" />
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>自定义匹配词（可选，换行或逗号分隔）</h2>
+      <label class="field">
+        <span>额外「始终允许」关键词</span>
+        <textarea id="customAlwaysAllowKeywords" rows="2" placeholder="例如：始终同意、允许此工具"></textarea>
+      </label>
+      <label class="field">
+        <span>额外「继续」关键词</span>
+        <textarea id="customContinueKeywords" rows="2" placeholder="例如：继续下一步、接着写"></textarea>
+      </label>
+    </section>
+
+    <section class="quick-actions">
+      <button type="button" id="btnEmergency" class="btn danger">紧急停止</button>
+      <button type="button" id="btnResetBreaker" class="btn secondary">解除熔断</button>
+      <button type="button" id="btnResetStats" class="btn secondary">清零计数</button>
+    </section>
+
+    <footer class="footer">
+      <button type="button" id="btnDefaults" class="btn ghost">恢复默认</button>
+      <button type="button" id="btnSave" class="btn primary">保存设置</button>
+    </footer>
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </div>
+
+  <script src="defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
