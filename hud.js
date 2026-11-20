@@ -246,6 +246,8 @@
       let dotClass = 'gmah-dot';
       if (cbState.tripped) {
         dotClass += cbState.reasonCode === 'emergency_stop' ? ' stopped' : ' warn';
+      } else if (state.stallAlertActive) {
+        dotClass += ' warn';
       } else if (s.enabled && (s.autoAllow || s.autoContinue)) {
         dotClass += ' active';
       }
@@ -287,6 +289,9 @@
       } else if (!s.enabled) {
         els.statusBox.className = 'gmah-status';
         els.statusBox.textContent = `已暂停监控\n${countsText}`;
+      } else if (state.stallAlertActive) {
+        els.statusBox.className = 'gmah-status alert';
+        els.statusBox.textContent = `${state.lastStatusText || '⚠️ 连接超时无进展'}\n${countsText}`;
       } else if (state.isGenerating) {
         els.statusBox.className = 'gmah-status';
         els.statusBox.textContent = `Gemini 输出中（等待完成后检测继续）\n${countsText}`;

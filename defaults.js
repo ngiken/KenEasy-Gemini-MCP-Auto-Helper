@@ -27,6 +27,10 @@
     stopOnStagnantOutput: true,
     stopOnQuotaOrError: true,
 
+    // Connection / stall timeout desktop notification defaults
+    stallAlertEnabled: true,
+    stallAlertMinutes: 5,
+
     // Keyword lists
     alwaysAllowKeywords: [
       '始终允许',
@@ -411,6 +415,17 @@
         typeof src.stopOnQuotaOrError === 'boolean'
           ? src.stopOnQuotaOrError
           : DEFAULT_SETTINGS.stopOnQuotaOrError,
+
+      stallAlertEnabled:
+        typeof src.stallAlertEnabled === 'boolean'
+          ? src.stallAlertEnabled
+          : DEFAULT_SETTINGS.stallAlertEnabled,
+      stallAlertMinutes: clampNumber(
+        src.stallAlertMinutes,
+        DEFAULT_SETTINGS.stallAlertMinutes,
+        1,
+        60
+      ),
 
       alwaysAllowKeywords: mergeKeywordArrays(
         DEFAULT_SETTINGS.alwaysAllowKeywords,

@@ -101,6 +101,14 @@
         <span>检测到限流 / 额度 / 报错提示时立刻熔断</span>
         <input type="checkbox" id="stopOnQuotaOrError" />
       </label>
+      <label class="toggle-row">
+        <span>连接 / 卡死超时发送电脑桌面通知</span>
+        <input type="checkbox" id="stallAlertEnabled" />
+      </label>
+      <label class="field">
+        <span>连接超时提醒阈值 (分钟)</span>
+        <input type="number" id="stallAlertMinutes" min="1" max="60" step="1" />
+      </label>
     </section>
 
     <section class="card">
