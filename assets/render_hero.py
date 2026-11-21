@@ -1,5 +1,5 @@
 import os
-import sys
+import shutil
 import subprocess
 import base64
 from PIL import Image
@@ -9,6 +9,7 @@ ASSETS_DIR = os.path.join(ROOT, 'assets')
 ICONS_DIR = os.path.join(ROOT, 'icons')
 CHROME_PATH = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
 
+
 def get_icon_b64(name='icon128.png'):
     p = os.path.join(ICONS_DIR, name)
     if os.path.exists(p):
@@ -16,12 +17,13 @@ def get_icon_b64(name='icon128.png'):
             return 'data:image/png;base64,' + base64.b64encode(f.read()).decode('utf-8')
     return ''
 
-def render_html_to_png(html_content, output_png_path, width=1280, height=640, dpr=1):
+
+def render_html_to_png(html_content, output_png_path, width=1280, height=640, dpr=2):
     os.makedirs(ASSETS_DIR, exist_ok=True)
     temp_html = os.path.join(ASSETS_DIR, '_temp_render.html')
     with open(temp_html, 'w', encoding='utf-8') as f:
         f.write(html_content)
-    
+
     cmd = [
         CHROME_PATH,
         '--headless=new',
@@ -35,19 +37,19 @@ def render_html_to_png(html_content, output_png_path, width=1280, height=640, dp
     res = subprocess.run(cmd, capture_output=True, text=True)
     if os.path.exists(temp_html):
         os.remove(temp_html)
-    
+
     if not os.path.exists(output_png_path):
         raise RuntimeError(f"Failed to render {output_png_path}: {res.stderr}")
-    
-    # If dpr was > 1 or window-size differed, resize or crop cleanly with Pillow
+
     im = Image.open(output_png_path)
     if im.size != (width, height):
         im = im.resize((width, height), Image.Resampling.LANCZOS)
         im.save(output_png_path, 'PNG', optimize=True)
     else:
         im.close()
-    
+
     print(f"Generated: {output_png_path} ({os.path.getsize(output_png_path)} bytes, {width}x{height})")
+
 
 def build_hero_banner():
     icon_b64 = get_icon_b64('icon128.png')
@@ -60,395 +62,472 @@ def build_hero_banner():
   body {{
     width: 1280px;
     height: 640px;
-    background: radial-gradient(circle at 15% 20%, #1e1b4b 0%, #0d1117 55%, #05070c 100%);
+    background: #070b14;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f3f4f6;
+    color: #f8fafc;
     overflow: hidden;
     position: relative;
+    padding: 46px 56px 34px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 44px 56px;
   }}
 
-  /* Ambient Glows */
-  .glow-1 {{
+  /* Subtle architectural dot grid + soft Gemini aura */
+  .bg-grid {{
     position: absolute;
-    width: 600px;
-    height: 600px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(66, 133, 244, 0.18) 0%, rgba(66, 133, 244, 0) 70%);
-    top: -120px;
-    left: -100px;
+    inset: 0;
+    background-image: radial-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(ellipse at 65% 45%, black 35%, transparent 82%);
     pointer-events: none;
   }}
-  .glow-2 {{
+  .aura-blue {{
     position: absolute;
-    width: 500px;
-    height: 500px;
+    width: 680px; height: 680px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0) 70%);
-    bottom: -100px;
-    right: 50px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 68%);
+    top: -190px; left: -120px;
     pointer-events: none;
   }}
-  .glow-3 {{
+  .aura-violet {{
     position: absolute;
-    width: 400px;
-    height: 400px;
+    width: 620px; height: 620px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(52, 168, 83, 0.12) 0%, rgba(52, 168, 83, 0) 70%);
-    top: 50px;
-    right: 250px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, rgba(139, 92, 246, 0) 68%);
+    top: -80px; right: -60px;
+    pointer-events: none;
+  }}
+  .aura-emerald {{
+    position: absolute;
+    width: 520px; height: 520px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.14) 0%, rgba(16, 185, 129, 0) 68%);
+    bottom: -180px; right: 240px;
     pointer-events: none;
   }}
 
-  /* Header Section */
-  .header {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  /* Main Split Stage */
+  .stage {{
     position: relative;
     z-index: 2;
-  }}
-  .brand-wrap {{
-    display: flex;
+    display: grid;
+    grid-template-columns: 600px 1fr;
+    gap: 36px;
     align-items: center;
-    gap: 18px;
+    flex: 1;
   }}
-  .app-icon {{
-    width: 68px;
-    height: 68px;
-    border-radius: 18px;
-    box-shadow: 0 8px 24px rgba(66, 133, 244, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.18);
-  }}
-  .brand-text {{
+
+  /* Left Editorial Hero */
+  .left-col {{
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 20px;
   }}
-  .title-row {{
+
+  .top-meta {{
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
   }}
-  .brand-title {{
-    font-size: 32px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #ffffff 30%, #c7d2fe 70%, #93c5fd 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+  .logo-badge {{
+    width: 58px; height: 58px;
+    border-radius: 16px;
+    padding: 4px;
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.35), rgba(167, 139, 250, 0.25));
+    box-shadow: 0 12px 32px rgba(37, 99, 235, 0.35);
+    display: flex; align-items: center; justify-content: center;
   }}
-  .beta-tag {{
+  .logo-badge img {{
+    width: 50px; height: 50px;
+    border-radius: 12px;
+  }}
+
+  .pill-group {{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }}
+  .ver-pill {{
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(245, 158, 11, 0.15);
-    border: 1px solid rgba(245, 158, 11, 0.5);
-    color: #fbbf24;
-    padding: 4px 12px;
+    padding: 5px 12px;
     border-radius: 999px;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
-  }}
-  .beta-dot {{
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #f59e0b;
-    box-shadow: 0 0 8px #f59e0b;
-  }}
-  .brand-sub {{
-    font-size: 15px;
-    color: #94a3b8;
-    font-weight: 400;
-  }}
-
-  /* Badges bar */
-  .badge-bar {{
-    display: flex;
-    gap: 10px;
-  }}
-  .shield-badge {{
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    padding: 6px 12px;
     font-size: 12px;
-    font-weight: 600;
-    color: #cbd5e1;
-    backdrop-filter: blur(8px);
-  }}
-  .badge-blue {{ color: #60a5fa; border-color: rgba(96, 165, 250, 0.3); background: rgba(96, 165, 250, 0.08); }}
-  .badge-green {{ color: #34d399; border-color: rgba(52, 211, 153, 0.3); background: rgba(52, 211, 153, 0.08); }}
-  .badge-purple {{ color: #c084fc; border-color: rgba(192, 132, 252, 0.3); background: rgba(192, 132, 252, 0.08); }}
-
-  /* Cards Grid */
-  .cards-grid {{
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-gap: 16px;
-    margin-top: 24px;
-    margin-bottom: 24px;
-    position: relative;
-    z-index: 2;
-  }}
-  .feature-card {{
-    background: rgba(17, 24, 39, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 14px;
-    padding: 16px 18px;
-    backdrop-filter: blur(14px);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-    position: relative;
-    overflow: hidden;
-  }}
-  .feature-card.highlight {{
-    border-color: rgba(96, 165, 250, 0.45);
-    background: linear-gradient(145deg, rgba(30, 58, 138, 0.25) 0%, rgba(17, 24, 39, 0.8) 100%);
-    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.18);
-  }}
-  .card-top {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }}
-  .card-icon-title {{
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }}
-  .card-icon {{
-    font-size: 20px;
-    line-height: 1;
-  }}
-  .card-title {{
-    font-size: 15px;
     font-weight: 700;
-    color: #f9fafb;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(16, 185, 129, 0.2));
+    border: 1px solid rgba(96, 165, 250, 0.5);
+    color: #93c5fd;
+    box-shadow: 0 0 18px rgba(59, 130, 246, 0.2);
   }}
-  .card-tag {{
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 7px;
+  .ver-dot {{
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 8px #34d399;
+  }}
+  .lang-pill {{
+    padding: 5px 11px;
     border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #e2e8f0;
   }}
-  .tag-new {{
-    background: rgba(16, 185, 129, 0.2);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.5);
+
+  .hero-title {{
+    font-size: 42px;
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: -0.9px;
+    background: linear-gradient(125deg, #ffffff 15%, #dbeafe 55%, #93c5fd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }}
-  .tag-core {{
-    background: rgba(59, 130, 246, 0.2);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.5);
+
+  .hero-sub {{
+    font-size: 16px;
+    line-height: 1.55;
+    color: #94a3b8;
+    max-width: 590px;
   }}
-  .tag-guard {{
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.5);
+  .hero-sub strong {{
+    color: #e2e8f0;
+    font-weight: 600;
   }}
-  .card-desc {{
-    font-size: 12.5px;
-    color: #9ca3af;
-    line-height: 1.45;
-  }}
-  .card-pills {{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+
+  /* 2x2 Bento Feature Highlights */
+  .bento-mini {{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
     margin-top: 4px;
   }}
-  .card-pill {{
-    font-size: 10.5px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 6px;
-    padding: 2px 7px;
-    color: #cbd5e1;
+  .mini-card {{
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 13px 15px;
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+  }}
+  .mini-icon {{
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }}
+  .ic-blue {{ background: rgba(59, 130, 246, 0.18); border: 1px solid rgba(59, 130, 246, 0.35); }}
+  .ic-green {{ background: rgba(16, 185, 129, 0.18); border: 1px solid rgba(16, 185, 129, 0.35); }}
+  .ic-amber {{ background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35); }}
+  .ic-purple {{ background: rgba(168, 85, 247, 0.18); border: 1px solid rgba(168, 85, 247, 0.35); }}
+
+  .mini-title {{ font-size: 13.5px; font-weight: 700; color: #f1f5f9; margin-bottom: 2px; }}
+  .mini-desc {{ font-size: 11.5px; color: #94a3b8; line-height: 1.38; }}
+
+  /* Right Dual-Theme Live UI Showcase */
+  .right-stage {{
+    position: relative;
+    height: 470px;
   }}
 
-  /* Bottom Bar */
-  .footer-bar {{
+  /* Underlying MCP Approval Toast Card */
+  .mcp-glow-card {{
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    background: rgba(17, 24, 39, 0.88);
+    border: 1px solid rgba(96, 165, 250, 0.38);
+    border-radius: 16px;
+    padding: 15px 18px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }}
+  .mcp-head {{
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; font-weight: 600; color: #93c5fd; margin-bottom: 10px;
+  }}
+  .mcp-btn-row {{
+    display: flex; gap: 8px; justify-content: flex-end;
+  }}
+  .m-btn {{
+    padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
+  }}
+  .m-deny {{ background: rgba(255, 255, 255, 0.06); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); }}
+  .m-always {{
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: 1px solid #60a5fa;
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.55);
+  }}
+
+  /* Dark Mode HUD Card (Side-by-Side Left) */
+  .hud-card-dark {{
+    position: absolute;
+    top: 146px;
+    left: 0;
+    width: 248px;
+    background: rgba(20, 23, 29, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 16px;
+    padding: 12px 14px;
+    box-shadow: 0 24px 55px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    z-index: 3;
+  }}
+
+  /* Light Mode HUD Card (Side-by-Side Right) */
+  .hud-card-light {{
+    position: absolute;
+    top: 166px;
+    right: 0;
+    width: 260px;
+    background: rgba(255, 255, 255, 0.97);
+    color: #111827;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 16px;
+    padding: 12px 14px;
+    box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55), 0 0 36px rgba(96, 165, 250, 0.22);
+    z-index: 4;
+  }}
+
+  .h-top {{
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }}
+  .hud-card-light .h-top {{
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+  }}
+  .h-title {{
+    display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+  }}
+  .h-dot {{
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #22c55e; box-shadow: 0 0 8px #22c55e;
+  }}
+  .h-beta-dark {{
+    font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
+    background: rgba(96, 165, 250, 0.16); color: #93c5fd; border: 1px solid rgba(96, 165, 250, 0.35);
+  }}
+  .h-beta-light {{
+    font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
+    background: rgba(37, 99, 235, 0.1); color: #1d4ed8; border: 1px solid rgba(37, 99, 235, 0.3);
+  }}
+  .h-icons {{
+    display: flex; gap: 4px; font-size: 10px; opacity: 0.8;
+  }}
+  .h-chip-dark {{
+    padding: 2px 5px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); color: #cbd5e1;
+  }}
+  .h-chip-light {{
+    padding: 2px 5px; border-radius: 5px; background: rgba(15, 23, 42, 0.07); color: #334155;
+  }}
+
+  .h-rows {{ display: flex; flex-direction: column; gap: 7px; font-size: 11px; }}
+  .h-row {{ display: flex; justify-content: space-between; align-items: center; }}
+  .pill-dark-on {{
+    padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600;
+    background: rgba(34, 197, 94, 0.18); border: 1px solid rgba(34, 197, 94, 0.5); color: #86efac;
+  }}
+  .pill-light-on {{
+    padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600;
+    background: rgba(22, 163, 74, 0.14); border: 1px solid rgba(22, 163, 74, 0.45); color: #15803d;
+  }}
+  .h-status-dark {{
+    margin-top: 9px; padding: 7px 9px; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05); color: #94a3b8; font-size: 10.5px; line-height: 1.4;
+  }}
+  .h-status-light {{
+    margin-top: 9px; padding: 7px 9px; border-radius: 8px;
+    background: rgba(15, 23, 42, 0.05); color: #475569; font-size: 10.5px; line-height: 1.4;
+  }}
+  .h-actions {{
+    margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; text-align: center; font-size: 10.5px;
+  }}
+  .h-act-dark {{
+    padding: 4px; border-radius: 6px; background: rgba(255, 255, 255, 0.07); color: #e2e8f0;
+  }}
+  .h-act-light {{
+    padding: 4px; border-radius: 6px; background: rgba(15, 23, 42, 0.06); color: #1e293b;
+  }}
+
+  /* Theme label callouts */
+  .theme-tag {{
+    position: absolute;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    z-index: 5;
+  }}
+  .tag-dark {{
+    top: 126px; left: 10px;
+    background: #1e293b; color: #e2e8f0; border: 1px solid rgba(255, 255, 255, 0.2);
+  }}
+  .tag-light {{
+    top: 146px; right: 12px;
+    background: #ffffff; color: #0f172a; border: 1px solid rgba(15, 23, 42, 0.15);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  }}
+
+  /* Bottom Footer */
+  .footer {{
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-top: 14px;
-    font-size: 12.5px;
+    font-size: 12px;
     color: #64748b;
-    position: relative;
-    z-index: 2;
   }}
-  .footer-points {{
-    display: flex;
-    gap: 20px;
+  .footer-left {{
+    display: flex; gap: 22px; color: #94a3b8;
   }}
-  .footer-point {{
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: #94a3b8;
-  }}
-  .dot-green {{ width: 6px; height: 6px; border-radius: 50%; background: #10b981; }}
+  .f-item {{ display: flex; align-items: center; gap: 7px; }}
+  .f-dot {{ width: 6px; height: 6px; border-radius: 50%; background: #34d399; }}
 </style>
 </head>
 <body>
-  <div class="glow-1"></div>
-  <div class="glow-2"></div>
-  <div class="glow-3"></div>
+  <div class="bg-grid"></div>
+  <div class="aura-blue"></div>
+  <div class="aura-violet"></div>
+  <div class="aura-emerald"></div>
 
-  <header class="header">
-    <div class="brand-wrap">
-      <img src="{icon_b64}" class="app-icon" alt="Logo">
-      <div class="brand-text">
-        <div class="title-row">
-          <h1 class="brand-title">KenEasy Gemini MCP Auto Helper</h1>
-          <div class="beta-tag"><span class="beta-dot"></span>v0.1 Beta</div>
+  <div class="stage">
+    <div class="left-col">
+      <div class="top-meta">
+        <div class="logo-badge"><img src="{icon_b64}" alt="logo"></div>
+        <div class="pill-group">
+          <span class="ver-pill"><span class="ver-dot"></span>v0.2 Beta Release</span>
+          <span class="lang-pill">🌐 简 / 繁 / EN / 日本語</span>
+          <span class="lang-pill">🌗 Dark &amp; Light Mode</span>
         </div>
-        <p class="brand-sub">Google Gemini 网页端 MCP 自动化辅助与智能连续交互助手</p>
       </div>
-    </div>
-    <div class="badge-bar">
-      <div class="shield-badge badge-blue">Chrome / Edge</div>
-      <div class="shield-badge badge-purple">Manifest V3</div>
-      <div class="shield-badge badge-green">MIT License</div>
-    </div>
-  </header>
 
-  <div class="cards-grid">
-    <div class="feature-card highlight">
-      <div class="card-top">
-        <div class="card-icon-title">
-          <span class="card-icon">⚡</span>
-          <span class="card-title">MCP 权限智能穿透</span>
-        </div>
-        <span class="card-tag tag-core">CORE</span>
-      </div>
-      <p class="card-desc">自动点击「始终允许 / Always allow」，兼容 Material Web Components Shadow DOM 与下拉菜单，严格避让取消/拒绝黑名单。</p>
-      <div class="card-pills">
-        <span class="card-pill">始终允许优先</span>
-        <span class="card-pill">单次允许回退</span>
-        <span class="card-pill">Shadow DOM 穿透</span>
-      </div>
-    </div>
+      <h1 class="hero-title">KenEasy Gemini MCP<br>Auto Helper</h1>
 
-    <div class="feature-card highlight">
-      <div class="card-top">
-        <div class="card-icon-title">
-          <span class="card-icon">🖱️</span>
-          <span class="card-title">自由拖拽悬浮窗</span>
-        </div>
-        <span class="card-tag tag-new">v0.1 NEW</span>
-      </div>
-      <p class="card-desc">页面专属悬浮卡片随心拖曳，视口边界自适应防溢出，位置坐标本地持久化恢复，折叠小巧零遮挡。</p>
-      <div class="card-pills">
-        <span class="card-pill">任意自由拖拽</span>
-        <span class="card-pill">4px 判定消抖</span>
-        <span class="card-pill">位置持久记忆</span>
-      </div>
-    </div>
+      <p class="hero-sub">
+        专为 <strong>Google Gemini 网页端</strong> 打造的免手操 MCP 自动化扩展：自动放行「始终允许」、智能延续追问芯片，全新升级<strong>按住拖拽悬浮窗</strong>、<strong>4 语言切换</strong>、<strong>黑白双模式</strong>与<strong>多浏览器防误触守卫</strong>。
+      </p>
 
-    <div class="feature-card highlight">
-      <div class="card-top">
-        <div class="card-icon-title">
-          <span class="card-icon">🔔</span>
-          <span class="card-title">一键启停桌面提醒</span>
+      <div class="bento-mini">
+        <div class="mini-card">
+          <div class="mini-icon ic-blue">⚡</div>
+          <div>
+            <div class="mini-title">MCP 权限秒级放行</div>
+            <div class="mini-desc">Shadow DOM 穿透，优先「始终允许」，严防误点拒绝/删除。</div>
+          </div>
         </div>
-        <span class="card-tag tag-new">v0.1 NEW</span>
-      </div>
-      <p class="card-desc">悬浮窗与弹窗一键即时静音/开启，MCP 卡死或超时自动弹出桌面系统通知，点击一键唤醒标签页。</p>
-      <div class="card-pills">
-        <span class="card-pill">悬浮窗单触切换</span>
-        <span class="card-pill">超时停滞预警</span>
-        <span class="card-pill">红点角标联动</span>
+
+        <div class="mini-card">
+          <div class="mini-icon ic-green">🖱️</div>
+          <div>
+            <div class="mini-title">按住拖拽 · 精准防粘连</div>
+            <div class="mini-desc">左键按住标题栏才拖动，悬停零跟随，点击秒折叠展开。</div>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-icon ic-amber">🌗</div>
+          <div>
+            <div class="mini-title">4 语言 + 黑白双模式</div>
+            <div class="mini-desc">简中 / 繁中 / English / 日本語，深浅主题 HUD 与弹窗同步。</div>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-icon ic-purple">🛡️</div>
+          <div>
+            <div class="mini-title">多窗口防误点 + 6 层熔断</div>
+            <div class="mini-desc">屏蔽非对话页与历史旧芯片，防第 2 浏览器误点击与刷额度。</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="feature-card">
-      <div class="card-top">
-        <div class="card-icon-title">
-          <span class="card-icon">🛡️</span>
-          <span class="card-title">6 层防刷额度熔断</span>
+    <div class="right-stage">
+      <div class="mcp-glow-card">
+        <div class="mcp-head">
+          <span>⚙️ filesystem-mcp · 请求访问本地目录权限</span>
+          <span style="color: #34d399;">⚡ 已自动命中</span>
         </div>
-        <span class="card-tag tag-guard">SAFETY</span>
+        <div class="mcp-btn-row">
+          <span class="m-btn m-deny">拒绝</span>
+          <span class="m-btn m-deny">允许一次</span>
+          <span class="m-btn m-always">✓ 在此对话中始终允许</span>
+        </div>
       </div>
-      <p class="card-desc">内置层层守护回路：单次任务/每日总上限、输出停稳等待、完工信号跳过、无进展空转指纹与报错断路保护。</p>
-      <div class="card-pills">
-        <span class="card-pill">单次/每日上限</span>
-        <span class="card-pill">完工信号识别</span>
-        <span class="card-pill">额度报错熔断</span>
-      </div>
-    </div>
 
-    <div class="feature-card">
-      <div class="card-top">
-        <div class="card-icon-title">
-          <span class="card-icon">🌙</span>
-          <span class="card-title">后台静默常驻运行</span>
+      <span class="theme-tag tag-dark">🌙 深色夜间 · 简体中文</span>
+      <div class="hud-card-dark">
+        <div class="h-top">
+          <div class="h-title"><span class="h-dot"></span><span>MCP 助手</span><span class="h-beta-dark">v0.2 Beta</span></div>
+          <div class="h-icons"><span class="h-chip-dark">简体</span><span class="h-chip-dark">☀</span><span class="h-chip-dark">−</span></div>
         </div>
-        <span class="card-tag tag-core">CORE</span>
+        <div class="h-rows">
+          <div class="h-row"><span>插件状态</span><span class="pill-dark-on">运行中</span></div>
+          <div class="h-row"><span>自动始终允许</span><span class="pill-dark-on">已开启</span></div>
+          <div class="h-row"><span>自动点击继续</span><span class="pill-dark-on">已开启</span></div>
+          <div class="h-row"><span>桌面通知</span><span class="pill-dark-on">已开启</span></div>
+        </div>
+        <div class="h-status-dark">监控中<br>允许 24 · 本次 3/10 · 今日 18/∞</div>
+        <div class="h-actions">
+          <div class="h-act-dark">紧急停止</div>
+          <div class="h-act-dark">探测按钮</div>
+          <div class="h-act-dark">日志</div>
+        </div>
       </div>
-      <p class="card-desc">MV3 Service Worker 定时心跳唤醒，禁止 Chrome 内存节省程序休眠或丢弃标签页，切屏最小化无忧。</p>
-      <div class="card-pills">
-        <span class="card-pill">长连接心跳保活</span>
-        <span class="card-pill">防标签休眠丢弃</span>
-        <span class="card-pill">微任务后台调度</span>
-      </div>
-    </div>
 
-    <div class="feature-card">
-      <div class="card-top">
-        <div class="card-icon-title">
-          <span class="card-icon">↪</span>
-          <span class="card-title">智能继续与追问点击</span>
+      <span class="theme-tag tag-light">☀️ 浅色白昼 · English</span>
+      <div class="hud-card-light">
+        <div class="h-top">
+          <div class="h-title"><span class="h-dot"></span><span>MCP Helper</span><span class="h-beta-light">v0.2 Beta</span></div>
+          <div class="h-icons"><span class="h-chip-light">EN</span><span class="h-chip-light">☾</span><span class="h-chip-light">−</span></div>
         </div>
-        <span class="card-tag tag-core">SMART</span>
-      </div>
-      <p class="card-desc">严格匹对「继续 / Yes」等明确操作按钮，精准点击 <code>↪ Yes</code> 追问芯片，排除长文本追问与调查问卷。</p>
-      <div class="card-pills">
-        <span class="card-pill">↪ Yes 芯片识别</span>
-        <span class="card-pill">停稳延迟判定</span>
-        <span class="card-pill">自定义关键词</span>
+        <div class="h-rows">
+          <div class="h-row"><span>Extension</span><span class="pill-light-on">Active</span></div>
+          <div class="h-row"><span>Auto Always Allow</span><span class="pill-light-on">On</span></div>
+          <div class="h-row"><span>Auto Continue</span><span class="pill-light-on">On</span></div>
+          <div class="h-row"><span>Desktop Alert</span><span class="pill-light-on">On</span></div>
+        </div>
+        <div class="h-status-light">Monitoring<br>Allow 24 · Task 3/10 · Today 18/∞</div>
+        <div class="h-actions">
+          <div class="h-act-light">E-Stop</div>
+          <div class="h-act-light">Inspect</div>
+          <div class="h-act-light">Logs</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <footer class="footer-bar">
-    <div class="footer-points">
-      <span class="footer-point"><span class="dot-green"></span> 专为 Google Gemini 网页端深度定制</span>
-      <span class="footer-point"><span class="dot-green"></span> 零外部依赖 · 本地纯净执行</span>
-      <span class="footer-point"><span class="dot-green"></span> 欢迎提交 Issue / PR 共同完善</span>
+  <footer class="footer">
+    <div class="footer-left">
+      <span class="f-item"><span class="f-dot"></span> Chrome &amp; Edge · Manifest V3</span>
+      <span class="f-item"><span class="f-dot"></span> 100% 本地纯净运行 · 零数据上传</span>
+      <span class="f-item"><span class="f-dot"></span> 后台切屏保活 · 桌面卡死预警</span>
     </div>
-    <div>KenEasy Ecosystem · Open Source Beta Preview</div>
+    <div>KenEasy Ecosystem · MIT Open Source</div>
   </footer>
 </body>
 </html>
 """
     hero_path = os.path.join(ASSETS_DIR, 'hero-banner.png')
-    render_html_to_png(html, hero_path, width=1280, height=640)
-    
-    # Also banner.png and github-preview.png
+    render_html_to_png(html, hero_path, width=1280, height=640, dpr=2)
+
     banner_path = os.path.join(ASSETS_DIR, 'banner.png')
     gh_path = os.path.join(ASSETS_DIR, 'github-preview.png')
-    
-    # Save copies
-    import shutil
     shutil.copyfile(hero_path, banner_path)
     shutil.copyfile(hero_path, gh_path)
     print(f"Generated: {banner_path}")
     print(f"Generated: {gh_path}")
+
 
 if __name__ == '__main__':
     build_hero_banner()

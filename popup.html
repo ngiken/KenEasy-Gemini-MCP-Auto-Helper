@@ -5,40 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gemini MCP Auto Helper</title>
   <link rel="stylesheet" href="popup.css" />
-  <style>
-    .brand-title-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .badge-beta {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 600;
-      color: #8ab4f8;
-      background: rgba(138, 180, 248, 0.16);
-      border: 1px solid rgba(138, 180, 248, 0.4);
-      border-radius: 999px;
-      padding: 1px 6px;
-      line-height: 1.2;
-    }
-    .beta-notice {
-      font-size: 10px;
-      color: #fbbc04;
-      margin-top: 2px;
-      font-weight: 500;
-    }
-    .card-header-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-    .card-header-row h2 {
-      margin-bottom: 0;
-    }
-  </style>
 </head>
 <body>
   <div class="popup-wrap">
@@ -47,138 +13,153 @@
         <img src="icons/icon48.png" alt="icon" class="logo" />
         <div>
           <div class="brand-title-row">
-            <h1>Gemini MCP 助手</h1>
-            <span class="badge-beta" id="popupBetaBadge">v0.1 Beta</span>
+            <h1 data-i18n="popupTitle">Gemini MCP 助手</h1>
+            <span class="badge-beta" id="popupBetaBadge" data-i18n="betaBadge">v0.2 Beta</span>
           </div>
-          <p class="subtitle">自动允许 · 后台保活 · 自由悬浮 · 防刷熔断</p>
-          <div class="beta-notice">⚠️ 公开测试预览版 (Beta Preview)</div>
+          <p class="subtitle" data-i18n="popupSubtitle">自动允许 · 多语言黑白模式 · 防误触熔断</p>
+          <div class="beta-notice" data-i18n="popupBetaNotice">⚠️ 公开测试预览版 (v0.2 Beta)</div>
         </div>
       </div>
-      <label class="switch" title="总开关">
+      <label class="switch" title="总开关" data-i18n-title="popupMasterTitle">
         <input type="checkbox" id="enabled" />
         <span class="slider"></span>
       </label>
     </header>
 
+    <section class="appearance-bar">
+      <div class="appearance-item">
+        <span class="appearance-icon">🌐</span>
+        <select id="language" class="select-lang" aria-label="Language">
+          <option value="zh-CN">简体中文</option>
+          <option value="zh-TW">繁體中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </div>
+      <button type="button" id="btnToggleTheme" class="btn secondary btn-sm theme-btn">🌙 深色模式</button>
+    </section>
+
     <section class="stats-bar" id="statsBar">
       <div class="stat-item">
-        <span class="stat-label">今日允许</span>
+        <span class="stat-label" data-i18n="popupStatAllow">今日允许</span>
         <strong id="statAllow">0</strong>
       </div>
       <div class="stat-item">
-        <span class="stat-label">今日继续</span>
+        <span class="stat-label" data-i18n="popupStatContinue">今日继续</span>
         <strong id="statContinue">0 / ∞</strong>
       </div>
       <div class="stat-item">
-        <span class="stat-label">当前状态</span>
-        <strong id="statLive" class="badge-ok">待检测</strong>
+        <span class="stat-label" data-i18n="popupStatLive">当前状态</span>
+        <strong id="statLive" class="badge-ok" data-i18n="livePending">待检测</strong>
       </div>
     </section>
 
     <section class="card">
-      <h2>核心自动化</h2>
+      <h2 data-i18n="secCore">核心自动化</h2>
       <label class="toggle-row">
-        <span>自动点击 MCP「始终允许」</span>
+        <span data-i18n="lblAutoAllow">自动点击 MCP「始终允许」</span>
         <input type="checkbox" id="autoAllow" />
       </label>
       <label class="toggle-row sub">
-        <span>优先选择「始终允许」（推荐）</span>
+        <span data-i18n="lblPreferAlways">优先选择「始终允许」（推荐）</span>
         <input type="checkbox" id="preferAlwaysAllow" />
       </label>
       <label class="toggle-row sub">
-        <span>无始终允许时回退点「允许一次」</span>
+        <span data-i18n="lblFallbackSingle">无始终允许时回退点「允许一次」</span>
         <input type="checkbox" id="fallbackSingleAllow" />
       </label>
       <label class="toggle-row">
-        <span>自动点击下方「继续」按钮</span>
+        <span data-i18n="lblAutoContinue">自动点击下方「继续」按钮</span>
         <input type="checkbox" id="autoContinue" />
       </label>
       <label class="toggle-row">
-        <span>后台静默运行（切屏 / 最小化不中断）</span>
+        <span data-i18n="lblBgMode">后台静默运行（切屏 / 最小化不中断）</span>
         <input type="checkbox" id="backgroundMode" />
       </label>
       <label class="toggle-row sub">
-        <span>防止 Chrome 休眠丢弃 Gemini 标签页</span>
+        <span data-i18n="lblPreventDiscard">防止 Chrome 休眠丢弃 Gemini 标签页</span>
         <input type="checkbox" id="preventTabDiscard" />
       </label>
       <label class="toggle-row">
-        <span>在 Gemini 页面显示右下角悬浮窗</span>
+        <span data-i18n="lblShowHud">在 Gemini 页面显示悬浮窗</span>
         <input type="checkbox" id="showHud" />
       </label>
     </section>
 
     <section class="card">
-      <h2>防刷额度熔断保护</h2>
+      <h2 data-i18n="secBreaker">防刷额度熔断保护</h2>
       <div class="grid-2">
         <label class="field">
-          <span>单次任务继续上限</span>
+          <span data-i18n="lblMaxTask">单次任务继续上限</span>
           <input type="number" id="maxContinuesPerTask" min="1" max="100" step="1" />
         </label>
         <label class="field">
-          <span>每日继续总上限 (0=无上限)</span>
+          <span data-i18n="lblDailyCap">每日继续总上限 (0=无上限)</span>
           <input type="number" id="dailyContinueLimit" min="0" max="10000" step="1" />
         </label>
         <label class="field">
-          <span>继续冷却 (秒)</span>
+          <span data-i18n="lblCooldown">继续冷却 (秒)</span>
           <input type="number" id="continueCooldownSec" min="1" max="120" step="0.5" />
         </label>
         <label class="field">
-          <span>输出停稳等待 (秒)</span>
+          <span data-i18n="lblSettle">输出停稳等待 (秒)</span>
           <input type="number" id="idleSettleSec" min="0.5" max="30" step="0.2" />
         </label>
       </div>
       <label class="toggle-row">
-        <span>检测到「全部完成」等完工信号时跳过继续</span>
+        <span data-i18n="lblStopCompletion">检测到「全部完成」等完工信号时跳过继续</span>
         <input type="checkbox" id="stopOnCompletionCues" />
       </label>
       <label class="toggle-row">
-        <span>输出无新进展 / 重复时自动熔断</span>
+        <span data-i18n="lblStopStagnant">输出无新进展 / 重复时自动熔断</span>
         <input type="checkbox" id="stopOnStagnantOutput" />
       </label>
       <label class="toggle-row">
-        <span>检测到限流 / 额度 / 报错提示时立刻熔断</span>
+        <span data-i18n="lblStopQuota">检测到限流 / 额度 / 报错提示时立刻熔断</span>
         <input type="checkbox" id="stopOnQuotaOrError" />
       </label>
+    </section>
+
     <section class="card">
       <div class="card-header-row">
-        <h2>桌面通知提醒 (连接超时 / 卡死)</h2>
-        <button type="button" id="btnToggleNotif" class="btn secondary btn-sm">一键开启/关闭</button>
+        <h2 data-i18n="secNotif">桌面通知提醒 (连接超时 / 卡死)</h2>
+        <button type="button" id="btnToggleNotif" class="btn secondary btn-sm" data-i18n="btnNotifOn">桌面通知：开启</button>
       </div>
       <label class="toggle-row">
-        <span>连接 / 卡死超时发送电脑桌面通知</span>
+        <span data-i18n="lblStallEnable">连接 / 卡死超时发送电脑桌面通知</span>
         <input type="checkbox" id="stallAlertEnabled" />
       </label>
       <div class="inline-field">
         <label class="field">
-          <span>连接超时提醒阈值 (分钟)</span>
+          <span data-i18n="lblStallMinutes">连接超时提醒阈值 (分钟)</span>
           <input type="number" id="stallAlertMinutes" min="1" max="60" step="1" />
         </label>
-        <button type="button" id="btnTestNotif" class="btn secondary btn-sm">测试通知</button>
+        <button type="button" id="btnTestNotif" class="btn secondary btn-sm" data-i18n="btnTestNotif">测试通知</button>
       </div>
-    </section>
     </section>
 
     <section class="card">
-      <h2>自定义匹配词（可选，换行或逗号分隔）</h2>
+      <h2 data-i18n="secCustom">自定义匹配词（可选，换行或逗号分隔）</h2>
       <label class="field">
-        <span>额外「始终允许」关键词</span>
-        <textarea id="customAlwaysAllowKeywords" rows="2" placeholder="例如：始终同意、允许此工具"></textarea>
+        <span data-i18n="lblCustomAllow">额外「始终允许」关键词</span>
+        <textarea id="customAlwaysAllowKeywords" rows="2" placeholder="例如：始终同意、允许此工具" data-i18n-placeholder="phCustomAllow"></textarea>
       </label>
       <label class="field">
-        <span>额外「继续」关键词</span>
-        <textarea id="customContinueKeywords" rows="2" placeholder="例如：继续下一步、接着写"></textarea>
+        <span data-i18n="lblCustomCont">额外「继续」关键词</span>
+        <textarea id="customContinueKeywords" rows="2" placeholder="例如：继续下一步、接着写" data-i18n-placeholder="phCustomCont"></textarea>
       </label>
     </section>
 
-    <section class="quick-actions">
-      <button type="button" id="btnEmergency" class="btn danger">紧急停止</button>
-      <button type="button" id="btnResetBreaker" class="btn secondary">解除熔断</button>
-      <button type="button" id="btnResetStats" class="btn secondary">清零计数</button>
+    <section class="quick-actions-4">
+      <button type="button" id="btnEmergency" class="btn danger" data-i18n="btnEmergency">紧急停止</button>
+      <button type="button" id="btnResetBreaker" class="btn secondary" data-i18n="btnResetBreaker">解除熔断</button>
+      <button type="button" id="btnResetStats" class="btn secondary" data-i18n="btnResetStats">清零计数</button>
+      <button type="button" id="btnResetHudPos" class="btn secondary" data-i18n="btnResetHudPos">复位悬浮窗</button>
     </section>
 
     <footer class="footer">
-      <button type="button" id="btnDefaults" class="btn ghost">恢复默认</button>
-      <button type="button" id="btnSave" class="btn primary">保存设置</button>
+      <button type="button" id="btnDefaults" class="btn ghost" data-i18n="btnDefaults">恢复默认</button>
+      <button type="button" id="btnSave" class="btn primary" data-i18n="btnSave">保存设置</button>
     </footer>
     <div id="toast" class="toast" aria-live="polite"></div>
   </div>

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-11-22
+
+### ✨ Multi-Language, Light/Dark Mode, Drag & Multi-Window Guard Fixes (v0.2 Beta)
+
+#### 🐛 Critical Bug Fixes
+- **Fixed Floating HUD Hover-Sticking Drag Bug**:
+  - Added strict left-button press gating (`isPointerDown`) so hovering or moving the mouse over `.gmah-header` never drags or sticks the HUD to the cursor.
+  - Deferred `setPointerCapture` until after the 4px drag threshold is exceeded and excluded header buttons (`−`/`+`, theme toggle, language switch) from drag initiation so clicking to expand/collapse works reliably on the first click.
+  - Deduplicated `pointer*` and `mouse*` listeners, added `buttons === 0` off-window auto-release (preserving final dragged coordinates), `blur` cleanup, `resize` viewport re-clamping, and a **Reset HUD Position** button in the popup.
+- **Fixed Unintended Auto-Clicks on Non-Chat Pages & Secondary Browser Windows**:
+  - Added `isNonChatGeminiUrl` route guard to pause automation on non-chat Gemini pages (`/gems`, `/extensions`, `/saved-info`, `/settings`, `/updates`, `/faq`, `/pricing`, `/about`, etc.).
+  - Required at least one assistant response turn (`turns.length > 0`) before auto-clicking any continue/affirmative button, and removed overly broad `'开始'`/`'開始'` triggers from built-in defaults (with automatic `v2 -> v3` storage migration).
+  - Required sibling approval context for standalone generic single-allow words (`允许`, `同意`, `Allow`, `Accept`) and required follow-up chip or latest-turn containment for generic affirmative replies (`Yes`, `确认`, `好的`).
+  - Added `hasFocus()` check in Foreground-Only mode and `ignoreStaleInitialContinue` startup/navigation snapshot so restoring or switching to historical chats in a 2nd browser window never auto-clicks pre-existing stale chips.
+
+#### 🆕 New Features
+- **4-Language Interface & Keyword Support (`zh-CN`, `zh-TW`, `en`, `ja`)**:
+  - Full live i18n across HUD, Popup, and OS desktop notifications, plus built-in Japanese and Cantonese/Traditional Chinese MCP approval and continue keywords.
+  - Switch language seamlessly from either the HUD header pill or the Popup settings bar.
+- **Dark & Light Mode (黑白深浅双模式)**:
+  - Toggle between Dark Night and Light Daylight themes directly from the HUD (`☀` / `☾`) or Popup (`🌙` / `☀️`), synced in real time across tabs.
+- **Redesigned 2x Retina Promotional & Store Assets**:
+  - Rebuilt all README banners, feature walkthroughs, and Chrome Web Store screenshots/tiles at 2x DPI with clean non-overlapping Dark + Light showcases.
+
+#### 🧪 Quality Assurance & Tests
+- Expanded automated test suite to 49 unit and integration tests covering HUD hover-drag safety, off-window release, non-chat/0-turn/restored-tab guards, and 4-language/theme rendering (49/49 passing).
+
+---
+
 ## [0.1.0] - 2026-11-21
 
 ### 🚀 Public Beta Initial Release (v0.1 Beta Preview)

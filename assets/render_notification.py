@@ -8,6 +8,7 @@ ASSETS_DIR = os.path.join(ROOT, 'assets')
 ICONS_DIR = os.path.join(ROOT, 'icons')
 CHROME_PATH = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
 
+
 def get_icon_b64(name='icon128.png'):
     p = os.path.join(ICONS_DIR, name)
     if os.path.exists(p):
@@ -15,12 +16,13 @@ def get_icon_b64(name='icon128.png'):
             return 'data:image/png;base64,' + base64.b64encode(f.read()).decode('utf-8')
     return ''
 
-def render_html_to_png(html_content, output_png_path, width=1280, height=720, dpr=1):
+
+def render_html_to_png(html_content, output_png_path, width=1280, height=720, dpr=2):
     os.makedirs(ASSETS_DIR, exist_ok=True)
     temp_html = os.path.join(ASSETS_DIR, '_temp_render.html')
     with open(temp_html, 'w', encoding='utf-8') as f:
         f.write(html_content)
-    
+
     cmd = [
         CHROME_PATH,
         '--headless=new',
@@ -34,18 +36,19 @@ def render_html_to_png(html_content, output_png_path, width=1280, height=720, dp
     res = subprocess.run(cmd, capture_output=True, text=True)
     if os.path.exists(temp_html):
         os.remove(temp_html)
-    
+
     if not os.path.exists(output_png_path):
         raise RuntimeError(f"Failed to render {output_png_path}: {res.stderr}")
-    
+
     im = Image.open(output_png_path)
     if im.size != (width, height):
         im = im.resize((width, height), Image.Resampling.LANCZOS)
         im.save(output_png_path, 'PNG', optimize=True)
     else:
         im.close()
-    
+
     print(f"Generated: {output_png_path} ({os.path.getsize(output_png_path)} bytes, {width}x{height})")
+
 
 def render_notification_demo():
     icon_b64 = get_icon_b64('icon128.png')
@@ -58,502 +61,324 @@ def render_notification_demo():
   body {{
     width: 1280px;
     height: 720px;
-    background: #090d16;
+    background: #070b14;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #e5e7eb;
+    color: #f8fafc;
     overflow: hidden;
     position: relative;
-    padding: 24px 32px;
+    padding: 28px 40px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    gap: 18px;
   }}
 
-  /* Top Banner */
+  .aura-1 {{
+    position: absolute; width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.14) 0%, transparent 68%);
+    top: -160px; right: -100px; pointer-events: none;
+  }}
+  .aura-2 {{
+    position: absolute; width: 540px; height: 540px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, transparent 68%);
+    bottom: -180px; left: -100px; pointer-events: none;
+  }}
+
+  /* Header */
   .top-header {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
+    position: relative; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between;
   }}
-  .feature-badge-row {{
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  .brand-row {{ display: flex; align-items: center; gap: 14px; }}
+  .brand-row img {{ width: 42px; height: 42px; border-radius: 11px; box-shadow: 0 6px 18px rgba(59, 130, 246, 0.3); }}
+  .top-title {{ font-size: 22px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }}
+  .tag-pill {{
+    font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+    background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.45); color: #6ee7b7;
   }}
-  .main-tag {{
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
-    border: 1px solid rgba(16, 185, 129, 0.4);
-    color: #34d399;
-    font-size: 13px;
-    font-weight: 700;
-    padding: 5px 14px;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }}
-  .top-title {{
-    font-size: 24px;
-    font-weight: 800;
-    color: #f9fafb;
-    letter-spacing: -0.3px;
-  }}
-  .top-desc {{
-    font-size: 13.5px;
-    color: #94a3b8;
+  .top-sub {{ font-size: 13px; color: #94a3b8; margin-top: 2px; }}
+  .lang-chip {{
+    font-size: 12px; font-weight: 600; color: #cbd5e1;
+    padding: 6px 14px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
   }}
 
-  /* Main 2-column layout */
-  .main-layout {{
-    display: grid;
-    grid-template-columns: 580px 620px;
-    grid-gap: 24px;
+  /* Center Flow Grid */
+  .flow-grid {{
+    position: relative; z-index: 2;
     flex: 1;
-  }}
-
-  /* Column 1: Controls showcase */
-  .controls-col {{
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }}
-  .section-label {{
-    font-size: 14px;
-    font-weight: 700;
-    color: #60a5fa;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 56px 1fr;
     align-items: center;
-    gap: 8px;
-  }}
-
-  /* HUD Toggle Card Mockup */
-  .hud-toggle-card {{
-    background: rgba(24, 26, 31, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    padding: 16px 18px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-    display: flex;
-    flex-direction: column;
     gap: 12px;
   }}
-  .hud-card-header {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-    font-weight: 600;
-    color: #f3f4f6;
+
+  .col-panel {{
+    height: 100%;
+    background: rgba(15, 23, 42, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 50px rgba(0, 0, 0, 0.45);
+    border-radius: 18px;
+    padding: 22px 24px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 16px;
   }}
-  .hud-toggle-box {{
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px dashed rgba(52, 168, 83, 0.4);
-    border-radius: 10px;
-    padding: 12px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+
+  .panel-title {{
+    font-size: 14px; font-weight: 700; color: #93c5fd;
+    display: flex; align-items: center; justify-content: space-between;
   }}
-  .toggle-state-row {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .panel-sub {{ font-size: 11.5px; color: #64748b; font-weight: 500; }}
+
+  /* Left: Controls Cards */
+  .sub-card {{
+    background: #131823;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 15px 18px;
+    display: flex; flex-direction: column; gap: 12px;
   }}
-  .pill-interactive {{
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    border-radius: 999px;
-    font-size: 11.5px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 0 12px rgba(52, 168, 83, 0.25);
+  .sub-head {{
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12.5px; font-weight: 700; color: #e2e8f0;
   }}
+  .pill-row {{
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);
+  }}
+  .p-label {{ font-size: 12px; color: #cbd5e1; }}
   .pill-on {{
-    background: rgba(52, 168, 83, 0.22);
-    border: 1px solid rgba(52, 168, 83, 0.65);
-    color: #81c995;
+    padding: 4px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+    background: rgba(52, 168, 83, 0.2); border: 1px solid rgba(52, 168, 83, 0.55); color: #86efac;
   }}
   .pill-off {{
-    background: rgba(148, 163, 184, 0.15);
-    border: 1px solid rgba(148, 163, 184, 0.3);
-    color: #94a3b8;
+    padding: 4px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+    background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.3); color: #94a3b8;
   }}
 
-  /* Popup Settings Card Mockup */
-  .popup-settings-card {{
-    background: #14161a;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+  .switch {{ width: 38px; height: 20px; border-radius: 999px; background: #34a853; position: relative; }}
+  .switch::after {{ content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fff; right: 3px; top: 3px; }}
+  .thresh-box {{
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: rgba(255, 255, 255, 0.03); padding: 9px 12px; border-radius: 10px;
+  }}
+  .num-chip {{
+    background: #0b0e15; border: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 4px 12px; border-radius: 7px; font-weight: 700; color: #fff; font-size: 12px;
+  }}
+  .test-btn {{
+    background: rgba(59, 130, 246, 0.18); border: 1px solid rgba(96, 165, 250, 0.45);
+    color: #93c5fd; padding: 5px 12px; border-radius: 8px; font-size: 11.5px; font-weight: 600;
+  }}
+
+  /* Connector Arrow */
+  .connector {{
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  }}
+  .arrow-circle {{
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(16, 185, 129, 0.25));
+    border: 1px solid rgba(96, 165, 250, 0.45);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #93c5fd;
+    box-shadow: 0 0 24px rgba(59, 130, 246, 0.25);
+  }}
+
+  /* Right: System Notification + Badge */
+  .os-toast {{
+    background: #1b202b;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-left: 4px solid #f59e0b;
     border-radius: 14px;
-    padding: 16px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    padding: 18px 20px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+    display: flex; flex-direction: column; gap: 12px;
   }}
-  .popup-card-header {{
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #f3f4f6;
+  .toast-bar {{
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11.5px; color: #94a3b8;
   }}
-  .popup-row {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #cbd5e1;
+  .toast-main {{ display: flex; gap: 14px; align-items: flex-start; }}
+  .toast-ico {{
+    width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
+    background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.45);
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
   }}
-  .switch-ui {{
-    width: 38px;
-    height: 20px;
-    background: #34a853;
-    border-radius: 999px;
-    position: relative;
-  }}
-  .switch-circle {{
-    width: 14px;
-    height: 14px;
-    background: white;
-    border-radius: 50%;
-    position: absolute;
-    right: 3px;
-    top: 3px;
-  }}
-  .threshold-row {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    padding: 8px 12px;
-    border-radius: 8px;
-  }}
-  .num-input {{
-    background: #202124;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
-    color: white;
-    font-size: 12px;
-    padding: 4px 8px;
-    width: 50px;
-    text-align: center;
-  }}
-  .btn-test {{
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 6px;
-    color: #8ab4f8;
-    padding: 5px 12px;
-    font-size: 11.5px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 5px;
+  .toast-t {{ font-size: 14.5px; font-weight: 700; color: #fff; margin-bottom: 4px; }}
+  .toast-m {{ font-size: 12.5px; color: #cbd5e1; line-height: 1.5; }}
+  .toast-cta {{
+    margin-top: 4px; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 600; color: #60a5fa;
   }}
 
-  /* Column 2: Notification & System Action */
-  .system-col {{
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }}
-
-  /* Desktop Toast Notification */
-  .desktop-toast {{
-    background: #202124;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 12px;
-    padding: 16px 18px;
-    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.65), 0 0 20px rgba(234, 67, 53, 0.18);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    position: relative;
-    border-left: 4px solid #ea4335;
-  }}
-  .toast-app-bar {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }}
-  .toast-app-info {{
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: #9aa0a6;
-  }}
-  .chrome-icon {{
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-  }}
-  .toast-close {{
-    color: #9aa0a6;
-    font-size: 14px;
-    cursor: pointer;
-  }}
-  .toast-content {{
-    display: flex;
-    gap: 12px;
-  }}
-  .toast-icon-wrap {{
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
-    background: rgba(234, 67, 53, 0.15);
-    border: 1px solid rgba(234, 67, 53, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    flex-shrink: 0;
-  }}
-  .toast-body {{
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }}
-  .toast-title {{
-    font-size: 13.5px;
-    font-weight: 700;
-    color: #f1f3f4;
-  }}
-  .toast-message {{
-    font-size: 12px;
-    color: #bdc1c6;
-    line-height: 1.45;
-  }}
-  .toast-action-hint {{
-    font-size: 11px;
-    color: #8ab4f8;
-    margin-top: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }}
-
-  /* Browser Tab & Icon Badge Preview */
-  .badge-preview-card {{
-    background: #18191c;
+  .browser-tab-card {{
+    background: #131823;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 14px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    border-radius: 14px;
+    padding: 15px 18px;
+    display: flex; flex-direction: column; gap: 10px;
   }}
-  .mock-tab-bar {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #202124;
-    border-radius: 8px;
-    padding: 6px 12px;
+  .tab-strip {{
+    background: #0b0e15;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
   }}
-  .mock-tab {{
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: #e8eaed;
+  .tab-pill {{
+    display: flex; align-items: center; gap: 8px;
+    background: #1e2533; padding: 6px 14px; border-radius: 8px;
+    font-size: 12px; color: #f1f5f9; border: 1px solid rgba(255, 255, 255, 0.08);
   }}
-  .extension-icon-wrap {{
-    position: relative;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }}
-  .icon-img {{
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-  }}
-  .red-badge {{
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    background: #ea4335;
-    color: white;
-    font-size: 9px;
-    font-weight: 800;
-    border-radius: 50%;
-    width: 13px;
-    height: 13px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 6px #ea4335;
+  .ext-wrap {{ position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }}
+  .ext-wrap img {{ width: 24px; height: 24px; border-radius: 6px; }}
+  .badge-alert {{
+    position: absolute; top: -3px; right: -3px;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #ea4335; color: #fff; font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 8px #ea4335;
   }}
 
-  /* Bottom Feature Matrix */
-  .feature-matrix {{
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-gap: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding-top: 14px;
+  /* Bottom 3-Card Matrix */
+  .bottom-row {{
+    position: relative; z-index: 2;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
   }}
-  .matrix-item {{
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
+  .b-card {{
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex; align-items: flex-start; gap: 11px;
   }}
-  .m-icon {{
-    font-size: 16px;
-    line-height: 1.2;
-  }}
-  .m-title {{
-    font-size: 12.5px;
-    font-weight: 700;
-    color: #f3f4f6;
-  }}
-  .m-desc {{
-    font-size: 11px;
-    color: #94a3b8;
-    line-height: 1.4;
-  }}
+  .b-ico {{ font-size: 18px; line-height: 1.2; }}
+  .b-title {{ font-size: 13px; font-weight: 700; color: #f1f5f9; margin-bottom: 2px; }}
+  .b-desc {{ font-size: 11.5px; color: #94a3b8; line-height: 1.4; }}
 </style>
 </head>
 <body>
+  <div class="aura-1"></div>
+  <div class="aura-2"></div>
+
   <div class="top-header">
-    <div class="feature-badge-row">
-      <div class="main-tag"><span>🔔</span> v0.1 核心特性</div>
-      <h2 class="top-title">一键启停桌面提醒通知 · 超时卡死主动预警</h2>
+    <div class="brand-row">
+      <img src="{icon_b64}" alt="logo">
+      <div>
+        <div class="top-title">
+          <span>一键启停桌面通知 · 卡死超时主动预警</span>
+          <span class="tag-pill">v0.2 Beta · 多语言本地通知</span>
+        </div>
+        <div class="top-sub">HUD 悬浮窗与 Popup 双向秒切静音 · 超时无进展系统弹窗提醒 · 点击直达并唤醒对应窗口标签页</div>
+      </div>
     </div>
-    <div class="top-desc">网页悬浮窗极速启闭 · 超时无进展桌面预警 · 点击通知自动切回会话</div>
+    <div class="lang-chip">🌐 支持 简 / 繁 / EN / 日 通知文案</div>
   </div>
 
-  <div class="main-layout">
+  <div class="flow-grid">
     <!-- Left Column: Dual Controls -->
-    <div class="controls-col">
-      <div class="section-label">
-        <span>⚙️</span> 双向极速启闭控制 (Dual Fast Controls)
+    <div class="col-panel">
+      <div class="panel-title">
+        <span>⚙️ 1. 双向即时控制开关</span>
+        <span class="panel-sub">HUD / Popup 实时同步</span>
       </div>
 
-      <!-- HUD Card Mockup -->
-      <div class="hud-toggle-card">
-        <div class="hud-card-header">
-          <span>网页端悬浮窗 (HUD) 单触切换</span>
-          <span style="font-size: 11px; color: #81c995;">无需跳转弹窗</span>
+      <div class="sub-card">
+        <div class="sub-head">
+          <span>网页悬浮窗 (HUD) 第 5 行一键切换</span>
+          <span style="font-size: 11px; color: #34d399;">零跳转瞬切</span>
         </div>
-        <div class="hud-toggle-box">
-          <div class="toggle-state-row">
-            <span style="font-size: 12px; color: #d1d5db;">状态 A · 开启中</span>
-            <div class="pill-interactive pill-on">
-              <span>🔔</span> 桌面通知: [ 开启 ] (点击静音)
-            </div>
-          </div>
-          <div style="border-top: 1px dashed rgba(255,255,255,0.08); margin: 2px 0;"></div>
-          <div class="toggle-state-row">
-            <span style="font-size: 12px; color: #94a3b8;">状态 B · 已静音</span>
-            <div class="pill-interactive pill-off">
-              <span>🔕</span> 桌面通知: [ 关闭 ] (点击开启)
-            </div>
-          </div>
+        <div class="pill-row">
+          <span class="p-label">🔔 桌面通知 · 运行中</span>
+          <span class="pill-on">已开启</span>
+        </div>
+        <div class="pill-row">
+          <span class="p-label">🔕 桌面通知 · 静音模式</span>
+          <span class="pill-off">已关闭</span>
         </div>
       </div>
 
-      <!-- Popup Settings Card -->
-      <div class="popup-settings-card">
-        <div class="popup-card-header">
-          <img src="{icon_b64}" style="width: 18px; height: 18px; border-radius: 4px;">
-          <span>扩展 Popup 面板设置</span>
+      <div class="sub-card">
+        <div class="sub-head">
+          <span>扩展设置面板 (Popup) 精细配置</span>
+          <div class="switch"></div>
         </div>
-        <div class="popup-row">
-          <span>连接 / 卡死超时发送电脑桌面通知</span>
-          <div class="switch-ui"><div class="switch-circle"></div></div>
-        </div>
-        <div class="threshold-row">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="color: #94a3b8;">超时提醒阈值:</span>
-            <input class="num-input" value="5" readonly>
-            <span style="color: #94a3b8;">分钟</span>
+        <div class="thresh-box">
+          <div style="display:flex; align-items:center; gap:8px; font-size:12px; color:#cbd5e1;">
+            <span>超时提醒阈值:</span>
+            <span class="num-chip">5 分钟</span>
           </div>
-          <div class="btn-test">
-            <span>🔔</span> 测试通知
-          </div>
+          <span class="test-btn">🔔 测试通知</span>
         </div>
       </div>
     </div>
 
-    <!-- Right Column: System Action & Notification -->
-    <div class="system-col">
-      <div class="section-label">
-        <span>🖥️</span> 系统桌面通知与角标联动 (System Alert & Tab Focus)
+    <!-- Middle Arrow -->
+    <div class="connector">
+      <div class="arrow-circle">➔</div>
+    </div>
+
+    <!-- Right Column: Native OS Toast + Badge -->
+    <div class="col-panel">
+      <div class="panel-title">
+        <span>🖥️ 2. 原生桌面报警与标签唤醒</span>
+        <span class="panel-sub">智能过滤跳秒动画</span>
       </div>
 
-      <!-- Windows 11 / Chrome Toast -->
-      <div class="desktop-toast">
-        <div class="toast-app-bar">
-          <div class="toast-app-info">
-            <div class="chrome-icon" style="background: #4285f4; display: flex; align-items: center; justify-content: center; font-size: 10px; color: white;">●</div>
-            <span>Google Chrome • 刚才</span>
-          </div>
-          <span class="toast-close">✕</span>
+      <div class="os-toast">
+        <div class="toast-bar">
+          <span style="display:flex; align-items:center; gap:7px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:#4285f4;display:inline-block;"></span>
+            Google Chrome · 刚刚
+          </span>
+          <span>✕</span>
         </div>
-        <div class="toast-content">
-          <div class="toast-icon-wrap">⚠️</div>
-          <div class="toast-body">
-            <div class="toast-title">KenEasy Gemini MCP 任务停滞提醒</div>
-            <div class="toast-message">
-              检测到 MCP 外部工具执行或 Gemini 模型生成已超过 5 分钟无新输出，可能卡死或等待授权。点击立即切回标签页！
-            </div>
-            <div class="toast-action-hint">
-              <span>👉</span> 点击直接还原最小化窗口并激活对应 Gemini 标签页
-            </div>
+        <div class="toast-main">
+          <div class="toast-ico">⚠️</div>
+          <div>
+            <div class="toast-t">Gemini 连接已超过 5 分钟</div>
+            <div class="toast-m">检测到该对话连续连接或等待超过 5 分钟仍无新进展，点击此处立即切回对应标签页检查。</div>
+            <div class="toast-cta">👉 点击自动还原最小化窗口并聚焦 Gemini 标签页</div>
           </div>
         </div>
       </div>
 
-      <!-- Tab bar & Icon badge -->
-      <div class="badge-preview-card">
-        <div style="font-size: 11.5px; color: #94a3b8; display: flex; justify-content: space-between;">
-          <span>浏览器标签与工具栏扩展图标状态</span>
-          <span style="color: #f87171;">停滞报警触发中</span>
+      <div class="browser-tab-card">
+        <div class="sub-head">
+          <span>工具栏扩展图标红点角标联动</span>
+          <span style="font-size: 11px; color: #fbbf24;">超限预警中</span>
         </div>
-        <div class="mock-tab-bar">
-          <div class="mock-tab">
-            <span>♊</span>
-            <span>Gemini - 工作区 MCP 自动化会话</span>
-          </div>
-          <div class="extension-icon-wrap">
-            <img src="{icon_b64}" class="icon-img">
-            <div class="red-badge">!</div>
+        <div class="tab-strip">
+          <div class="tab-pill"><span>✦</span><span>Gemini - MCP 工程自动化会话</span></div>
+          <div class="ext-wrap">
+            <img src="{icon_b64}" alt="ext">
+            <span class="badge-alert">!</span>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Bottom Feature Matrix -->
-  <div class="feature-matrix">
-    <div class="matrix-item">
-      <span class="m-icon">⚡</span>
+  <div class="bottom-row">
+    <div class="b-card">
+      <span class="b-ico">⚡</span>
       <div>
-        <div class="m-title">双向实时无感同步</div>
-        <div class="m-desc">HUD 与 Popup 状态双向联动，修改立即持久化存储，无需刷新页面。</div>
+        <div class="b-title">双向秒级同步</div>
+        <div class="b-desc">HUD 药丸与 Popup 开关共享本地状态，关闭时即时撤回所有挂起通知。</div>
       </div>
     </div>
-    <div class="matrix-item">
-      <span class="m-icon">🔇</span>
+    <div class="b-card">
+      <span class="b-ico">🧮</span>
       <div>
-        <div class="m-title">智能静音与即时清空</div>
-        <div class="m-desc">关闭通知时立即清除所有挂起的桌面弹窗，并自动摘除扩展红点角标。</div>
+        <div class="b-title">指纹防误报过滤</div>
+        <div class="b-desc">自动忽略读秒倒计时和省略号动画，仅在输出真实停滞时精准计时。</div>
       </div>
     </div>
-    <div class="matrix-item">
-      <span class="m-icon">🔄</span>
+    <div class="b-card">
+      <span class="b-ico">🔄</span>
       <div>
-        <div class="m-title">自动恢复零打扰</div>
-        <div class="m-desc">用户发送新消息或 Gemini 恢复输出时，报警自动解除，避免持续无效干扰。</div>
+        <div class="b-title">恢复生成自动消警</div>
+        <div class="b-desc">工具返回数据或恢复文字输出后，自动清除桌面通知并摘除红色角标。</div>
       </div>
     </div>
   </div>
@@ -561,7 +386,8 @@ def render_notification_demo():
 </html>
 """
     output_png = os.path.join(ASSETS_DIR, 'notification-toggle-demo.png')
-    render_html_to_png(html, output_png, width=1280, height=720)
+    render_html_to_png(html, output_png, width=1280, height=720, dpr=2)
+
 
 if __name__ == '__main__':
     render_notification_demo()

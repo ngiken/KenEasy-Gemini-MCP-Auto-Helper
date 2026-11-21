@@ -56,8 +56,37 @@
     '确认',
     '確認',
     '确定',
-    '確定'
+    '確定',
+    'はい'
   ]);
+
+  const GENERIC_SINGLE_ALLOW_SET = new Set([
+    '允许',
+    '允許',
+    '容許',
+    '批准',
+    '同意',
+    'allow',
+    'approve',
+    'accept',
+    'permit',
+    '許可',
+    '承認'
+  ]);
+
+  const NON_CHAT_PATH_RE = /^\/(?:u\/\d+\/)?(?:gems|extensions|saved-info|plugins|updates|sharing|settings|faq|advanced|pricing|about)(?:\/|$)/i;
+
+  function isNonChatGeminiUrl(url) {
+    if (typeof url !== 'string' || !url) return false;
+    try {
+      const parsed = new URL(url, 'https://gemini.google.com');
+      return NON_CHAT_PATH_RE.test(parsed.pathname || '');
+    } catch (_) {
+      return /gemini\.google\.com\/(?:u\/\d+\/)?(?:gems|extensions|saved-info|plugins|updates|sharing|settings|faq|advanced|pricing|about)(?:\/|$|\?|#)/i.test(
+        url
+      );
+    }
+  }
 
   const DIALOG_OR_SURVEY_NEGATIVE_SIBLINGS = [
     'no',
@@ -774,6 +803,9 @@
       this.lastUrl = this.win && this.win.location ? this.win.location.href : '';
       this.lastStatusText = '监控中';
       this.isGenerating = false;
+      this.isNonChatPage = isNonChatGeminiUrl(this.lastUrl);
+      this.ignoreStaleInitialContinue = Boolean(opts.ignoreStaleInitialContinue);
+      this.suppressInitialContinueUntil = this.ignoreStaleInitialContinue ? this.now() + 2000 : 0;
 
       // Connection / waiting stall timer state
       this.stallStartAt = 0;
@@ -808,6 +840,7 @@
         stats: this.stats,
         taskContinueCount: this.taskContinueCount,
         isGenerating: this.isGenerating,
+        isNonChatPage: this.isNonChatPage,
         stallAlertActive: this.stallAlertActive,
         lastStatusText: this.lastStatusText,
         circuitBreaker: Object.assign({}, this.circuitBreaker),
@@ -911,6 +944,7 @@
 
     onUserManualPrompt() {
       this.resetStallMonitor(true);
+      this.suppressInitialContinueUntil = 0;
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
       this.lastContinueFingerprint = null;
@@ -932,6 +966,8 @@
     onConversationChange(newUrl) {
       this.resetStallMonitor(true);
       this.lastUrl = newUrl;
+      this.isNonChatPage = isNonChatGeminiUrl(newUrl);
+      this.suppressInitialContinueUntil = this.ignoreStaleInitialContinue ? this.now() + 2000 : 0;
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
       this.lastContinueFingerprint = null;
@@ -1119,8 +1155,11 @@
           ) {
             continue;
           }
-          // Non-exact single allow (e.g. "Allow Desktop Commander") requires sibling approval context
-          if (mSingle.exact || hasSiblingApprovalContext(item.el, this.settings)) {
+          // Non-exact or generic single-word allow (e.g. "Allow", "同意", "允许", "Allow Desktop Commander")
+          // requires sibling approval context (e.g. Deny / Cancel / Always Allow nearby)
+          const singleKey = D.stripEdgePunctuation(mSingle.keyword);
+          const needsSiblingContext = !mSingle.exact || GENERIC_SINGLE_ALLOW_SET.has(singleKey);
+          if (!needsSiblingContext || hasSiblingApprovalContext(item.el, this.settings)) {
             singleMatches.push({ item, match: mSingle, tier: 'single' });
           }
         }
@@ -1142,9 +1181,13 @@
     }
 
     findContinueCandidate(clickables, turns) {
+      // Never auto-click Continue / Yes on pages without at least one assistant turn
+      if (!Array.isArray(turns) || turns.length === 0) return null;
+
       const defaultCont = this.settings.continueKeywords || [];
       const customCont = this.settings.customContinueKeywords || [];
       const denyKws = this.settings.denyBlacklistKeywords || [];
+      const latestTurn = turns[turns.length - 1];
       const matches = [];
 
       for (const item of clickables) {
@@ -1161,14 +1204,16 @@
         });
         if (mDefault) {
           const matchedKey = D.stripEdgePunctuation(mDefault.keyword);
-          // Protect generic affirmative words ("Yes", "确认", "好的") from clicking survey or delete confirmation dialogs,
-          // while allowing explicit Gemini follow-up chips (e.g. "↪ Yes", mat-chip, .follow-up-chip) cleanly.
-          if (
-            GENERIC_AFFIRMATIVE_CONTINUE_SET.has(matchedKey) &&
-            !isFollowUpChipElement(item.el, item.label) &&
-            hasNegativeSiblingInGroup(item.el)
-          ) {
-            continue;
+          // Protect generic affirmative words ("Yes", "确认", "好的") from clicking unrelated page controls,
+          // surveys, or dialogs: must be an explicit Gemini follow-up chip or inside the latest assistant turn
+          // AND must not have a negative sibling.
+          if (GENERIC_AFFIRMATIVE_CONTINUE_SET.has(matchedKey)) {
+            const isChipOrInLatestTurn =
+              isFollowUpChipElement(item.el, item.label) ||
+              Boolean(latestTurn && containsDeep(latestTurn, item.el));
+            if (!isChipOrInLatestTurn || hasNegativeSiblingInGroup(item.el)) {
+              continue;
+            }
           }
           matches.push({ item, match: mDefault });
           continue;
@@ -1228,19 +1273,53 @@
     }
 
     /**
+     * Marks any currently visible continue candidates as already seen so restored/navigated
+     * chats in background or secondary browser windows do not auto-click stale history chips.
+     */
+    markExistingContinueCandidatesSeen() {
+      if (!this.doc) return 0;
+      const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
+      if (this.detectGenerating(searchRoots)) return 0;
+      const clickables = collectClickableElements(this.doc, this.win, searchRoots);
+      const turns = getAssistantTurns(this.doc, searchRoots);
+      let count = 0;
+      let guard = 0;
+      while (guard < 20) {
+        guard += 1;
+        const hit = this.findContinueCandidate(clickables, turns);
+        if (!hit) break;
+        this.clickedElements.add(hit.item.el);
+        count += 1;
+      }
+      return count;
+    }
+
+    /**
      * Single scan tick. Returns an action descriptor for deterministic testing & debugging.
      */
     scanOnce() {
       if (!this.doc) return { action: 'noop', reason: 'no_doc' };
 
       // SPA URL change check
-      if (this.win && this.win.location && this.win.location.href !== this.lastUrl) {
-        this.onConversationChange(this.win.location.href);
+      const currentHref = this.win && this.win.location ? this.win.location.href : this.lastUrl;
+      if (currentHref && currentHref !== this.lastUrl) {
+        this.onConversationChange(currentHref);
+      }
+
+      this.isNonChatPage = isNonChatGeminiUrl(currentHref || this.lastUrl);
+      if (this.isNonChatPage) {
+        this.isGenerating = false;
+        this.resetStallMonitor(true);
+        this.emitState();
+        return { action: 'noop', reason: 'non_chat_page' };
       }
 
       this.ensureTodayStats();
       const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
       this.isGenerating = this.detectGenerating(searchRoots);
+      if (this.isGenerating) {
+        this.suppressInitialContinueUntil = 0;
+      }
 
       if (!this.settings.enabled) {
         this.resetStallMonitor(true);
@@ -1333,6 +1412,12 @@
       if (!contHit) {
         this.emitState();
         return { action: 'noop', reason: 'no_continue_candidate' };
+      }
+
+      if (this.suppressInitialContinueUntil > 0 && now < this.suppressInitialContinueUntil) {
+        this.clickedElements.add(contHit.item.el);
+        this.emitState();
+        return { action: 'noop', reason: 'initial_stale_continue_ignored' };
       }
 
       // Layer C: Per-task cap
@@ -1429,6 +1514,7 @@
     isIgnoredAncestor,
     isElementVisible,
     isFollowUpChipElement,
+    isNonChatGeminiUrl,
     getElementLabel,
     computeResponseFingerprint,
     computeContentFingerprint,
@@ -1456,6 +1542,7 @@
       typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
 
     let contextInvalidated = false;
+    let settingsReady = !hasChromeStorage;
     let observer = null;
     let heartbeatInterval = null;
     let scanTimer = null;
@@ -1522,6 +1609,7 @@
     const engine = new GmahEngine({
       doc: document,
       win: window,
+      ignoreStaleInitialContinue: true,
       onSettingsSave: saveSettings,
       onStatsSave: saveStats,
       onStallAlert: (payload) => {
@@ -1536,11 +1624,39 @@
       }
     });
 
+    function canRunScanInCurrentVisibility() {
+      if (!settingsReady) return false;
+      if (engine.settings.backgroundMode) return true;
+      if (document.hidden) return false;
+      if (typeof document.hasFocus === 'function' && !document.hasFocus()) return false;
+      return true;
+    }
+
     if (hudApi && typeof hudApi.createHud === 'function') {
       hud = hudApi.createHud({
         onToggleMinimize: () => {
           if (!isContextAlive()) return;
           engine.updateSettings({ hudMinimized: !engine.settings.hudMinimized }, true);
+        },
+        onToggleTheme: () => {
+          if (!isContextAlive()) return;
+          const nextTheme = engine.settings.theme === 'light' ? 'dark' : 'light';
+          engine.updateSettings({ theme: nextTheme }, true);
+          engine.addLog(
+            nextTheme === 'light'
+              ? `☀️ ${D.t(engine.settings.language, 'toastThemeLight')}`
+              : `🌙 ${D.t(engine.settings.language, 'toastThemeDark')}`
+          );
+          engine.emitState();
+        },
+        onCycleLanguage: () => {
+          if (!isContextAlive()) return;
+          const order = D.SUPPORTED_LANGUAGES || ['zh-CN', 'zh-TW', 'en', 'ja'];
+          const cur = D.resolveLanguage(engine.settings.language);
+          const nextLang = order[(order.indexOf(cur) + 1) % order.length];
+          engine.updateSettings({ language: nextLang }, true);
+          engine.addLog(`🌐 ${D.t(nextLang, 'toastLangChanged')} (${D.t(nextLang, 'langLabel')})`);
+          engine.emitState();
         },
         onToggleEnabled: () => {
           if (!isContextAlive()) return;
@@ -1613,7 +1729,9 @@
           if (res && res[D.STATS_KEY]) {
             engine.stats = D.normalizeStats(res[D.STATS_KEY]);
           }
-          engine.addLog('🚀 Gemini MCP Auto Helper 已就绪');
+          settingsReady = true;
+          engine.markExistingContinueCandidatesSeen();
+          engine.addLog('🚀 Gemini MCP Auto Helper v0.2 已就绪');
           engine.emitState();
         });
 
@@ -1629,13 +1747,15 @@
               }
             }
           }
-          if (
-            changes.gmah_hud_position &&
-            changes.gmah_hud_position.newValue &&
-            hud &&
-            typeof hud.setPosition === 'function'
-          ) {
-            hud.setPosition(changes.gmah_hud_position.newValue);
+          if (changes.gmah_hud_position && hud) {
+            if (changes.gmah_hud_position.newValue && typeof hud.setPosition === 'function') {
+              hud.setPosition(changes.gmah_hud_position.newValue);
+            } else if (!changes.gmah_hud_position.newValue && typeof hud.resetPosition === 'function') {
+              const curPos = hud.getPosition ? hud.getPosition() : null;
+              if (curPos && (curPos.left !== null || curPos.top !== null)) {
+                hud.resetPosition();
+              }
+            }
           }
           if (changes[D.STATS_KEY] && changes[D.STATS_KEY].newValue) {
             engine.stats = D.normalizeStats(changes[D.STATS_KEY].newValue);
@@ -1729,6 +1849,8 @@
         lbl === '傳送' ||
         lbl === '傳送訊息' ||
         lbl === '提交' ||
+        lbl === '送信' ||
+        lbl === 'メッセージを送信' ||
         testId.includes('send') ||
         /\bsend-button\b/i.test(cls)
       ) {
@@ -1741,7 +1863,7 @@
       if (!document.hidden && !bgPort) {
         connectBackgroundPort();
       }
-      if (engine.settings.backgroundMode || !document.hidden) {
+      if (canRunScanInCurrentVisibility()) {
         engine.scanOnce();
       }
     }
@@ -1794,13 +1916,13 @@
     let microtaskQueued = false;
 
     function scheduleScan(delay) {
-      if (!isContextAlive()) return;
+      if (!isContextAlive() || !settingsReady) return;
       if (document.hidden && engine.settings.backgroundMode) {
         if (!microtaskQueued) {
           microtaskQueued = true;
           Promise.resolve().then(() => {
             microtaskQueued = false;
-            if (!isContextAlive()) return;
+            if (!isContextAlive() || !canRunScanInCurrentVisibility()) return;
             const now = Date.now();
             if (now - lastMicrotaskScanAt >= 200) {
               lastMicrotaskScanAt = now;
@@ -1813,7 +1935,7 @@
       if (scanTimer) return;
       scanTimer = setTimeout(() => {
         scanTimer = null;
-        if (!isContextAlive()) return;
+        if (!isContextAlive() || !canRunScanInCurrentVisibility()) return;
         engine.scanOnce();
       }, delay);
     }
@@ -1860,7 +1982,7 @@
           if (!isContextAlive()) return;
           quickReconnectCount = 0;
           if (msg && msg.type === 'GMAH_BG_TICK') {
-            if (engine.settings.backgroundMode || !document.hidden) {
+            if (canRunScanInCurrentVisibility()) {
               engine.scanOnce();
             }
             try {
@@ -1909,7 +2031,7 @@
       if (hud && engine.settings.showHud && !document.getElementById('gmah-hud')) {
         hud.mount();
       }
-      if (!document.hidden || engine.settings.backgroundMode) {
+      if (canRunScanInCurrentVisibility()) {
         engine.scanOnce();
       }
     }, 900);
@@ -1920,7 +2042,7 @@
         if (!isContextAlive() || !msg || typeof msg !== 'object') return;
         if (msg.type === 'GMAH_BG_TICK') {
           if (!bgPort) connectBackgroundPort();
-          if (engine.settings.backgroundMode || !document.hidden) {
+          if (canRunScanInCurrentVisibility()) {
             const res = engine.scanOnce();
             sendResponse({ ok: true, result: res });
           } else {
@@ -1933,6 +2055,11 @@
           sendResponse({ ok: true, state: engine.getState() });
         } else if (msg.type === 'GMAH_EMERGENCY_STOP') {
           engine.emergencyStop();
+          sendResponse({ ok: true, state: engine.getState() });
+        } else if (msg.type === 'GMAH_RESET_HUD_POS') {
+          if (hud && typeof hud.resetPosition === 'function') {
+            hud.resetPosition();
+          }
           sendResponse({ ok: true, state: engine.getState() });
         }
       });

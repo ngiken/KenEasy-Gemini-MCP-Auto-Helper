@@ -1,6 +1,10 @@
 (function (root) {
   'use strict';
 
+  const D =
+    root.GMAH_DEFAULTS ||
+    (typeof require === 'function' ? require('./defaults.js') : null);
+
   function createHud(callbacks) {
     const cb = callbacks || {};
     let container = null;
@@ -8,9 +12,25 @@
     let activePanel = null; // null | 'logs' | 'inspect'
     let currentState = null;
     let lastLogSignature = '';
+    let lastLang = null;
     let docCleanup = null;
 
     const STORAGE_POS_KEY = 'gmah_hud_position';
+
+    function getLang() {
+      const lang = currentState && currentState.settings && currentState.settings.language;
+      if (D && typeof D.resolveLanguage === 'function') {
+        return D.resolveLanguage(lang);
+      }
+      return lang || 'zh-CN';
+    }
+
+    function tr(key, vars) {
+      if (D && typeof D.t === 'function') {
+        return D.t(getLang(), key, vars);
+      }
+      return key;
+    }
 
     function getWindow() {
       if (typeof window !== 'undefined') return window;
@@ -125,74 +145,93 @@
 
       const card = el('div', 'gmah-card');
 
-      // Header (Acts as draggable handle)
+      // Header (Acts as draggable handle when left mouse button is pressed)
       const header = el('div', 'gmah-header');
       const title = el('div', 'gmah-title');
       const dot = el('span', 'gmah-dot');
-      const titleText = el('span', '', 'MCP 助手');
-      const betaBadge = el('span', 'gmah-badge-beta', 'v0.1 Beta');
-      betaBadge.title = '公开测试预览版 (Beta Preview)';
+      const titleText = el('span', '', tr('hudTitle'));
+      const betaBadge = el('span', 'gmah-badge-beta', tr('betaBadge'));
+      betaBadge.title = tr('betaBadgeTitle');
       title.appendChild(dot);
       title.appendChild(titleText);
       title.appendChild(betaBadge);
-      title.title = '按住可自由拖拽 · 点击折叠展开 · v0.1 Beta 预览版';
+      title.title = tr('hudTitleTip');
+
+      const headerActions = el('div', 'gmah-header-actions');
+
+      const langBtn = el('button', 'gmah-icon-btn gmah-lang-btn', tr('langLabel'));
+      langBtn.type = 'button';
+      langBtn.title = tr('langCycleTip');
+
+      const themeBtn = el('button', 'gmah-icon-btn gmah-theme-btn', '☀');
+      themeBtn.type = 'button';
+      themeBtn.title = tr('themeToggleToLight');
 
       const minBtn = el('button', 'gmah-icon-btn', '−');
       minBtn.type = 'button';
-      minBtn.title = '最小化 / 展开';
+      minBtn.title = tr('minBtnTitle');
+
+      headerActions.appendChild(langBtn);
+      headerActions.appendChild(themeBtn);
+      headerActions.appendChild(minBtn);
 
       header.appendChild(title);
-      header.appendChild(minBtn);
+      header.appendChild(headerActions);
 
       // Body
       const body = el('div', 'gmah-body');
 
       // Row 1: Master toggle
       const rowMaster = el('div', 'gmah-row');
-      rowMaster.appendChild(el('span', '', '插件状态'));
+      const lblMaster = el('span', '', tr('hudRowMaster'));
+      rowMaster.appendChild(lblMaster);
       const btnMaster = el('button', 'gmah-pill');
       btnMaster.type = 'button';
       rowMaster.appendChild(btnMaster);
 
       // Row 2: Auto Allow
       const rowAllow = el('div', 'gmah-row');
-      rowAllow.appendChild(el('span', '', '自动始终允许'));
+      const lblAllow = el('span', '', tr('hudRowAllow'));
+      rowAllow.appendChild(lblAllow);
       const btnAllow = el('button', 'gmah-pill');
       btnAllow.type = 'button';
       rowAllow.appendChild(btnAllow);
 
       // Row 3: Auto Continue
       const rowContinue = el('div', 'gmah-row');
-      rowContinue.appendChild(el('span', '', '自动点击继续'));
+      const lblContinue = el('span', '', tr('hudRowContinue'));
+      rowContinue.appendChild(lblContinue);
       const btnContinue = el('button', 'gmah-pill');
       btnContinue.type = 'button';
       rowContinue.appendChild(btnContinue);
 
       // Row 4: Background Mode
       const rowBackground = el('div', 'gmah-row');
-      rowBackground.appendChild(el('span', '', '后台切屏运行'));
+      const lblBackground = el('span', '', tr('hudRowBackground'));
+      rowBackground.appendChild(lblBackground);
       const btnBackground = el('button', 'gmah-pill');
       btnBackground.type = 'button';
       rowBackground.appendChild(btnBackground);
 
       // Row 5: Desktop Notification Toggle
       const rowNotification = el('div', 'gmah-row');
-      rowNotification.appendChild(el('span', '', '桌面通知'));
+      const lblNotification = el('span', '', tr('hudRowNotif'));
+      rowNotification.appendChild(lblNotification);
       const btnNotification = el('button', 'gmah-pill');
       btnNotification.type = 'button';
       rowNotification.appendChild(btnNotification);
 
       // Status box
-      const statusBox = el('div', 'gmah-status', '初始化中...');
+      const statusBox = el('div', 'gmah-status', tr('hudInit'));
       statusBox.style.whiteSpace = 'pre-line';
 
       // Action buttons
       const actions = el('div', 'gmah-actions');
-      const btnEmergency = el('button', '', '紧急停止');
+      const btnEmergency = el('button', '', tr('btnEmergency'));
       btnEmergency.type = 'button';
-      const btnInspect = el('button', '', '探测按钮');
+      const btnInspect = el('button', '', tr('btnInspect'));
       btnInspect.type = 'button';
-      const btnLogs = el('button', '', '日志');
+      const btnLogs = el('button', '', tr('btnLogs'));
       btnLogs.type = 'button';
       actions.appendChild(btnEmergency);
       actions.appendChild(btnInspect);
@@ -214,34 +253,70 @@
       card.appendChild(body);
       container.appendChild(card);
 
-      // Dragging logic
+      // Dragging logic: strictly requires pressing left mouse button on header
+      let isPointerDown = false;
       let isDragging = false;
       let hasDragged = false;
+      let activeInputMode = null; // null | 'pointer' | 'mouse'
+      let activePointerId = null;
+      let hasDraggedResetTimer = null;
       let startPointerX = 0;
       let startPointerY = 0;
       let startElemLeft = 0;
       let startElemTop = 0;
 
       function getEventCoords(e) {
-        const clientX = e.clientX !== undefined ? e.clientX : (e.pageX !== undefined ? e.pageX : 0);
-        const clientY = e.clientY !== undefined ? e.clientY : (e.pageY !== undefined ? e.pageY : 0);
+        const clientX = e && e.clientX !== undefined ? e.clientX : (e && e.pageX !== undefined ? e.pageX : 0);
+        const clientY = e && e.clientY !== undefined ? e.clientY : (e && e.pageY !== undefined ? e.pageY : 0);
         return { x: clientX, y: clientY };
       }
 
-      function onDragStart(e) {
+      function isInteractiveControl(target) {
+        let cur = target;
+        while (cur && cur !== header) {
+          const tag = cur.tagName ? String(cur.tagName).toUpperCase() : '';
+          if (tag === 'BUTTON' || tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'A') {
+            return true;
+          }
+          cur = cur.parentNode || cur.parentElement || null;
+        }
+        return false;
+      }
+
+      function releaseCaptureSafe(pointerId) {
+        if (pointerId !== null && typeof header.releasePointerCapture === 'function') {
+          try {
+            header.releasePointerCapture(pointerId);
+          } catch (_) {}
+        }
+      }
+
+      function onDragStart(mode, e) {
+        if (!e) return;
         if (e.button !== undefined && e.button !== 0) return;
+        if (activeInputMode && activeInputMode !== mode) return;
+        if (isInteractiveControl(e.target)) return;
+
+        if (hasDraggedResetTimer) {
+          clearTimeout(hasDraggedResetTimer);
+          hasDraggedResetTimer = null;
+        }
+
         const coords = getEventCoords(e);
         startPointerX = coords.x;
         startPointerY = coords.y;
-        hasDragged = false;
+        isPointerDown = true;
         isDragging = false;
+        hasDragged = false;
+        activeInputMode = mode;
+        activePointerId = e.pointerId !== undefined ? e.pointerId : null;
 
-        const rect = (container.getBoundingClientRect && container.getBoundingClientRect()) || { width: 248, height: 280 };
+        const rect = (container.getBoundingClientRect && container.getBoundingClientRect()) || { width: 262, height: 290 };
         const win = getWindow();
         const vw = (win && typeof win.innerWidth === 'number') ? win.innerWidth : 1024;
         const vh = (win && typeof win.innerHeight === 'number') ? win.innerHeight : 768;
-        const w = (rect && rect.width) || 248;
-        const h = (rect && rect.height) || 280;
+        const w = (rect && rect.width) || 262;
+        const h = (rect && rect.height) || 290;
 
         if (container.style.left && container.style.left !== 'auto') {
           startElemLeft = parseFloat(container.style.left) || 0;
@@ -258,15 +333,36 @@
         } else {
           startElemTop = vh - h - 84;
         }
-
-        if (typeof header.setPointerCapture === 'function' && e.pointerId !== undefined) {
-          try {
-            header.setPointerCapture(e.pointerId);
-          } catch (_) {}
-        }
       }
 
-      function onDragMove(e) {
+      function onDragMove(mode, e) {
+        if (!isPointerDown || !e) return;
+        if (activeInputMode && activeInputMode !== mode) return;
+        if (typeof e.buttons === 'number' && (e.buttons & 1) === 0) {
+          // Left button was released off-screen: finalize at current HUD coordinates without jumping
+          const capturedId = activePointerId;
+          const wasDragging = isDragging;
+          isPointerDown = false;
+          isDragging = false;
+          activeInputMode = null;
+          activePointerId = null;
+          if (wasDragging) {
+            const curLeft = parseFloat(container.style.left);
+            const curTop = parseFloat(container.style.top);
+            if (Number.isFinite(curLeft) && Number.isFinite(curTop)) {
+              savePosition({ left: curLeft, top: curTop });
+            }
+            removeClass(container, 'gmah-dragging');
+            hasDragged = true;
+            hasDraggedResetTimer = setTimeout(() => {
+              hasDragged = false;
+              hasDraggedResetTimer = null;
+            }, 80);
+          }
+          releaseCaptureSafe(capturedId);
+          return;
+        }
+
         const coords = getEventCoords(e);
         const dx = coords.x - startPointerX;
         const dy = coords.y - startPointerY;
@@ -276,63 +372,125 @@
             isDragging = true;
             hasDragged = true;
             addClass(container, 'gmah-dragging');
+            // Capture pointer ONLY once drag threshold is exceeded so regular clicks hit title/buttons normally
+            if (mode === 'pointer' && activePointerId !== null && typeof header.setPointerCapture === 'function') {
+              try {
+                header.setPointerCapture(activePointerId);
+              } catch (_) {}
+            }
           }
         }
 
         if (isDragging) {
+          if (typeof e.preventDefault === 'function') e.preventDefault();
           applyPosition(startElemLeft + dx, startElemTop + dy);
         }
       }
 
-      function onDragEnd(e) {
-        if (isDragging) {
+      function onDragEnd(mode, e) {
+        if (activeInputMode && activeInputMode !== mode) return;
+        if (!isPointerDown && !isDragging) return;
+
+        const wasDragging = isDragging;
+        const capturedId = activePointerId;
+        isPointerDown = false;
+        isDragging = false;
+        activeInputMode = null;
+        activePointerId = null;
+
+        if (wasDragging) {
           const coords = getEventCoords(e);
           const dx = coords.x - startPointerX;
           const dy = coords.y - startPointerY;
           const finalPos = applyPosition(startElemLeft + dx, startElemTop + dy);
           savePosition(finalPos);
-          isDragging = false;
           removeClass(container, 'gmah-dragging');
-          setTimeout(() => {
+          hasDragged = true;
+          hasDraggedResetTimer = setTimeout(() => {
             hasDragged = false;
+            hasDraggedResetTimer = null;
           }, 80);
-        } else {
-          isDragging = false;
         }
-        if (typeof header.releasePointerCapture === 'function' && e.pointerId !== undefined) {
-          try {
-            header.releasePointerCapture(e.pointerId);
-          } catch (_) {}
-        }
+        releaseCaptureSafe(capturedId);
       }
 
-      header.addEventListener('pointerdown', onDragStart);
-      header.addEventListener('pointermove', onDragMove);
-      header.addEventListener('pointerup', onDragEnd);
-      header.addEventListener('pointercancel', onDragEnd);
-      header.addEventListener('mousedown', onDragStart);
-      header.addEventListener('mousemove', onDragMove);
-      header.addEventListener('mouseup', onDragEnd);
+      function cancelActiveDrag() {
+        if (!isPointerDown && !isDragging) return;
+        const capturedId = activePointerId;
+        isPointerDown = false;
+        isDragging = false;
+        hasDragged = false;
+        activeInputMode = null;
+        activePointerId = null;
+        removeClass(container, 'gmah-dragging');
+        releaseCaptureSafe(capturedId);
+      }
 
-      function handleDocMove(e) {
-        if (isDragging) onDragMove(e);
+      const onHeaderPointerDown = (e) => onDragStart('pointer', e);
+      const onHeaderPointerMove = (e) => onDragMove('pointer', e);
+      const onHeaderPointerUp = (e) => onDragEnd('pointer', e);
+      const onHeaderPointerCancel = () => cancelActiveDrag();
+      const onHeaderMouseDown = (e) => onDragStart('mouse', e);
+      const onHeaderMouseMove = (e) => onDragMove('mouse', e);
+      const onHeaderMouseUp = (e) => onDragEnd('mouse', e);
+
+      header.addEventListener('pointerdown', onHeaderPointerDown);
+      header.addEventListener('pointermove', onHeaderPointerMove);
+      header.addEventListener('pointerup', onHeaderPointerUp);
+      header.addEventListener('pointercancel', onHeaderPointerCancel);
+      header.addEventListener('mousedown', onHeaderMouseDown);
+      header.addEventListener('mousemove', onHeaderMouseMove);
+      header.addEventListener('mouseup', onHeaderMouseUp);
+
+      function handleDocPointerMove(e) {
+        if (isPointerDown) onDragMove('pointer', e);
       }
-      function handleDocUp(e) {
-        if (isDragging) onDragEnd(e);
+      function handleDocPointerUp(e) {
+        if (isPointerDown || isDragging) onDragEnd('pointer', e);
       }
+      function handleDocMouseMove(e) {
+        if (isPointerDown) onDragMove('mouse', e);
+      }
+      function handleDocMouseUp(e) {
+        if (isPointerDown || isDragging) onDragEnd('mouse', e);
+      }
+      function handleWinResize() {
+        if (container && container.style.left && container.style.top) {
+          applyPosition(parseFloat(container.style.left), parseFloat(container.style.top));
+        }
+      }
+      function handleWinBlur() {
+        cancelActiveDrag();
+      }
+
       if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-        document.addEventListener('pointermove', handleDocMove);
-        document.addEventListener('pointerup', handleDocUp);
-        document.addEventListener('mousemove', handleDocMove);
-        document.addEventListener('mouseup', handleDocUp);
+        document.addEventListener('pointermove', handleDocPointerMove);
+        document.addEventListener('pointerup', handleDocPointerUp);
+        document.addEventListener('pointercancel', cancelActiveDrag);
+        document.addEventListener('mousemove', handleDocMouseMove);
+        document.addEventListener('mouseup', handleDocMouseUp);
+      }
+      const win = getWindow();
+      if (win && typeof win.addEventListener === 'function') {
+        win.addEventListener('resize', handleWinResize);
+        win.addEventListener('blur', handleWinBlur);
       }
 
       docCleanup = () => {
+        if (hasDraggedResetTimer) {
+          clearTimeout(hasDraggedResetTimer);
+          hasDraggedResetTimer = null;
+        }
         if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
-          document.removeEventListener('pointermove', handleDocMove);
-          document.removeEventListener('pointerup', handleDocUp);
-          document.removeEventListener('mousemove', handleDocMove);
-          document.removeEventListener('mouseup', handleDocUp);
+          document.removeEventListener('pointermove', handleDocPointerMove);
+          document.removeEventListener('pointerup', handleDocPointerUp);
+          document.removeEventListener('pointercancel', cancelActiveDrag);
+          document.removeEventListener('mousemove', handleDocMouseMove);
+          document.removeEventListener('mouseup', handleDocMouseUp);
+        }
+        if (win && typeof win.removeEventListener === 'function') {
+          win.removeEventListener('resize', handleWinResize);
+          win.removeEventListener('blur', handleWinBlur);
         }
       };
 
@@ -346,6 +504,15 @@
       }
       title.addEventListener('click', handleToggleMin);
       minBtn.addEventListener('click', handleToggleMin);
+
+      themeBtn.addEventListener('click', (e) => {
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+        if (cb.onToggleTheme) cb.onToggleTheme();
+      });
+      langBtn.addEventListener('click', (e) => {
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+        if (cb.onCycleLanguage) cb.onCycleLanguage();
+      });
 
       btnMaster.addEventListener('click', () => {
         if (cb.onToggleEnabled) cb.onToggleEnabled();
@@ -380,14 +547,24 @@
 
       els = {
         card,
+        header,
         dot,
+        title,
         titleText,
+        betaBadge,
+        langBtn,
+        themeBtn,
         minBtn,
         body,
+        lblMaster,
         btnMaster,
+        lblAllow,
         btnAllow,
+        lblContinue,
         btnContinue,
+        lblBackground,
         btnBackground,
+        lblNotification,
         btnNotification,
         statusBox,
         btnEmergency,
@@ -431,7 +608,7 @@
       if (activePanel === 'logs') {
         const logs = (currentState && currentState.logs) || [];
         if (logs.length === 0) {
-          els.panel.appendChild(el('div', 'gmah-log-item', '暂无操作记录'));
+          els.panel.appendChild(el('div', 'gmah-log-item', tr('logsEmpty')));
           return;
         }
         for (const item of logs) {
@@ -446,8 +623,8 @@
           'div',
           'gmah-log-item',
           candidates.length > 0
-            ? `发现 ${candidates.length} 个可见按钮（点击添加到规则）：`
-            : '当前页面未发现可点击按钮'
+            ? tr('inspectFound', { count: candidates.length })
+            : tr('inspectNone')
         );
         els.panel.appendChild(hint);
 
@@ -456,19 +633,19 @@
           const labelSpan = el('span', '', `「${item.text}」 `);
           wrap.appendChild(labelSpan);
 
-          const addAllow = el('button', 'gmah-inspect-btn', '+允许词');
+          const addAllow = el('button', 'gmah-inspect-btn', tr('inspectAddAllow'));
           addAllow.type = 'button';
           addAllow.addEventListener('click', () => {
             if (cb.onAddKeyword) cb.onAddKeyword('allow', item.text);
-            addAllow.textContent = '已加允许 ✓';
+            addAllow.textContent = tr('inspectAddedAllow');
             addAllow.disabled = true;
           });
 
-          const addCont = el('button', 'gmah-inspect-btn', '+继续词');
+          const addCont = el('button', 'gmah-inspect-btn', tr('inspectAddCont'));
           addCont.type = 'button';
           addCont.addEventListener('click', () => {
             if (cb.onAddKeyword) cb.onAddKeyword('continue', item.text);
-            addCont.textContent = '已加继续 ✓';
+            addCont.textContent = tr('inspectAddedCont');
             addCont.disabled = true;
           });
 
@@ -486,9 +663,40 @@
       const s = state.settings;
       const stats = state.stats;
       const cbState = state.circuitBreaker;
+      const lang = getLang();
 
       container.style.display = s.showHud ? 'block' : 'none';
       if (!s.showHud) return;
+
+      // Apply Light/Dark theme
+      if (s.theme === 'light') {
+        addClass(container, 'gmah-theme-light');
+      } else {
+        removeClass(container, 'gmah-theme-light');
+      }
+
+      // Update localized labels
+      els.titleText.textContent = tr('hudTitle');
+      els.betaBadge.textContent = tr('betaBadge');
+      els.betaBadge.title = tr('betaBadgeTitle');
+      els.title.title = tr('hudTitleTip');
+      els.minBtn.title = tr('minBtnTitle');
+      if (els.langBtn) {
+        els.langBtn.textContent = tr('langLabel');
+        els.langBtn.title = tr('langCycleTip');
+      }
+      if (els.themeBtn) {
+        els.themeBtn.textContent = s.theme === 'light' ? '☾' : '☀';
+        els.themeBtn.title = s.theme === 'light' ? tr('themeToggleToDark') : tr('themeToggleToLight');
+      }
+
+      els.lblMaster.textContent = tr('hudRowMaster');
+      els.lblAllow.textContent = tr('hudRowAllow');
+      els.lblContinue.textContent = tr('hudRowContinue');
+      els.lblBackground.textContent = tr('hudRowBackground');
+      els.lblNotification.textContent = tr('hudRowNotif');
+      els.btnInspect.textContent = tr('btnInspect');
+      els.btnLogs.textContent = tr('btnLogs');
 
       // Minimized state
       if (s.hudMinimized) {
@@ -513,61 +721,75 @@
       els.dot.className = dotClass;
 
       // Master pill
-      els.btnMaster.textContent = s.enabled ? '运行中' : '已暂停';
+      els.btnMaster.textContent = s.enabled ? tr('stateRunning') : tr('statePaused');
       els.btnMaster.className = s.enabled ? 'gmah-pill on' : 'gmah-pill';
 
       // Auto Allow pill
-      els.btnAllow.textContent = s.autoAllow ? '已开启' : '已关闭';
+      els.btnAllow.textContent = s.autoAllow ? tr('stateOn') : tr('stateOff');
       els.btnAllow.className = s.autoAllow ? 'gmah-pill on' : 'gmah-pill';
 
       // Auto Continue pill
-      els.btnContinue.textContent = s.autoContinue ? '已开启' : '已关闭';
+      els.btnContinue.textContent = s.autoContinue ? tr('stateOn') : tr('stateOff');
       els.btnContinue.className = s.autoContinue ? 'gmah-pill on' : 'gmah-pill';
 
       // Background Mode pill
       if (els.btnBackground) {
-        els.btnBackground.textContent = s.backgroundMode ? '已开启' : '仅前台';
+        els.btnBackground.textContent = s.backgroundMode ? tr('stateOn') : tr('stateForeground');
         els.btnBackground.className = s.backgroundMode ? 'gmah-pill on' : 'gmah-pill';
       }
 
       // Desktop Notification pill
       if (els.btnNotification) {
         const notifOn = Boolean(s.stallAlertEnabled);
-        els.btnNotification.textContent = notifOn ? '已开启' : '已关闭';
+        els.btnNotification.textContent = notifOn ? tr('stateOn') : tr('stateOff');
         els.btnNotification.className = notifOn ? 'gmah-pill on' : 'gmah-pill';
-        els.btnNotification.title = notifOn ? '点击关闭连接超时桌面通知' : '点击开启连接超时桌面通知';
+        els.btnNotification.title = notifOn ? tr('notifPillDisableTip') : tr('notifPillEnableTip');
       }
 
       // Emergency / Reset button
       if (cbState.tripped) {
-        els.btnEmergency.textContent = '解除熔断';
+        els.btnEmergency.textContent = tr('btnResetBreaker');
         els.btnEmergency.className = 'gmah-pill danger';
       } else {
-        els.btnEmergency.textContent = '紧急停止';
+        els.btnEmergency.textContent = tr('btnEmergency');
         els.btnEmergency.className = '';
       }
 
       // Status text
       const dailyCapLabel = s.dailyContinueLimit > 0 ? String(s.dailyContinueLimit) : '∞';
-      const countsText = `允许 ${stats.allowCount} · 本次继续 ${state.taskContinueCount}/${s.maxContinuesPerTask} · 今日 ${stats.continueCount}/${dailyCapLabel}`;
+      const countsText = tr('hudCounts', {
+        allow: stats.allowCount,
+        task: state.taskContinueCount,
+        max: s.maxContinuesPerTask,
+        daily: stats.continueCount,
+        cap: dailyCapLabel
+      });
       if (cbState.tripped) {
         els.statusBox.className = 'gmah-status alert';
-        els.statusBox.textContent = `熔断: ${cbState.reason}\n${countsText}`;
+        els.statusBox.textContent = `${tr('hudStatusBreaker', { reason: cbState.reason })}\n${countsText}`;
       } else if (!s.enabled) {
         els.statusBox.className = 'gmah-status';
-        els.statusBox.textContent = `已暂停监控\n${countsText}`;
+        els.statusBox.textContent = `${tr('hudStatusPaused')}\n${countsText}`;
       } else if (state.stallAlertActive) {
         els.statusBox.className = 'gmah-status alert';
-        els.statusBox.textContent = `${state.lastStatusText || '⚠️ 连接超时无进展'}\n${countsText}`;
+        els.statusBox.textContent = `${state.lastStatusText || tr('hudStatusStallFallback')}\n${countsText}`;
       } else if (state.isGenerating) {
         els.statusBox.className = 'gmah-status';
-        els.statusBox.textContent = `Gemini 输出中（等待完成后检测继续）\n${countsText}`;
-      } else {
+        els.statusBox.textContent = `${tr('hudStatusGenerating')}\n${countsText}`;
+      } else if (state.isNonChatPage) {
         els.statusBox.className = 'gmah-status';
-        els.statusBox.textContent = `${state.lastStatusText || '监控中'}\n${countsText}`;
+        els.statusBox.textContent = `${tr('hudStatusNonChat')}\n${countsText}`;
+      } else {
+        const statusLine = state.lastStatusText || tr('hudStatusMonitoring');
+        els.statusBox.className = 'gmah-status';
+        els.statusBox.textContent = `${statusLine}\n${countsText}`;
       }
 
-      if (activePanel === 'logs') {
+      const langChanged = lastLang !== null && lastLang !== lang;
+      lastLang = lang;
+      if (activePanel && langChanged) {
+        renderPanel();
+      } else if (activePanel === 'logs') {
         const logs = (state && state.logs) || [];
         const sig = logs.length > 0 ? `${logs.length}|${logs[0].time}|${logs[0].message}` : '0';
         if (sig !== lastLogSignature) {
@@ -604,12 +826,18 @@
       }),
       setPosition: (pos) => (pos ? applyPosition(pos.left, pos.top) : null),
       resetPosition: () => {
+        const ls = getLocalStorage();
+        if (ls && typeof ls.removeItem === 'function') {
+          try { ls.removeItem(STORAGE_POS_KEY); } catch (_) {}
+        }
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local && typeof chrome.storage.local.remove === 'function') {
+          try { chrome.storage.local.remove([STORAGE_POS_KEY]); } catch (_) {}
+        }
         if (!container) return;
         container.style.left = '';
         container.style.top = '';
         container.style.right = '18px';
         container.style.bottom = '84px';
-        savePosition(null);
       }
     };
   }

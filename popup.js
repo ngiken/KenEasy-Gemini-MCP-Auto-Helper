@@ -15,6 +15,52 @@
       return d ? d.getElementById(id) : null;
     }
 
+    function tr(key, vars) {
+      return D.t(currentSettings.language, key, vars);
+    }
+
+    function applyTheme(theme) {
+      if (!d || !d.body) return;
+      const isLight = theme === 'light';
+      if (d.body.classList && typeof d.body.classList.add === 'function') {
+        if (isLight) d.body.classList.add('theme-light');
+        else d.body.classList.remove('theme-light');
+      } else {
+        const parts = String(d.body.className || '').split(/\s+/).filter((c) => c && c !== 'theme-light');
+        if (isLight) parts.push('theme-light');
+        d.body.className = parts.join(' ');
+      }
+    }
+
+    function applyI18n(lang) {
+      if (!d || typeof d.querySelectorAll !== 'function') return;
+      if (d.documentElement && typeof d.documentElement.setAttribute === 'function') {
+        d.documentElement.setAttribute('lang', lang);
+      }
+      const textNodes = d.querySelectorAll('[data-i18n]');
+      for (let i = 0; i < textNodes.length; i++) {
+        const node = textNodes[i];
+        const key = node.getAttribute && node.getAttribute('data-i18n');
+        if (key) node.textContent = D.t(lang, key);
+      }
+      const phNodes = d.querySelectorAll('[data-i18n-placeholder]');
+      for (let i = 0; i < phNodes.length; i++) {
+        const node = phNodes[i];
+        const key = node.getAttribute && node.getAttribute('data-i18n-placeholder');
+        if (key && typeof node.setAttribute === 'function') {
+          node.setAttribute('placeholder', D.t(lang, key));
+        }
+      }
+      const titleNodes = d.querySelectorAll('[data-i18n-title]');
+      for (let i = 0; i < titleNodes.length; i++) {
+        const node = titleNodes[i];
+        const key = node.getAttribute && node.getAttribute('data-i18n-title');
+        if (key && typeof node.setAttribute === 'function') {
+          node.setAttribute('title', D.t(lang, key));
+        }
+      }
+    }
+
     function showToast(msg, isError) {
       const el = byId('toast');
       if (!el) return;
@@ -29,6 +75,9 @@
     function renderSettings(settings) {
       const s = D.mergeSettings(settings);
       currentSettings = s;
+      applyTheme(s.theme);
+      applyI18n(s.language);
+
       const boolIds = [
         'enabled',
         'autoAllow',
@@ -52,6 +101,7 @@
         const el = byId(id);
         if (el) el.value = String(val);
       };
+      setVal('language', s.language);
       setVal('maxContinuesPerTask', s.maxContinuesPerTask);
       setVal('dailyContinueLimit', s.dailyContinueLimit);
       setVal('continueCooldownSec', Number((s.continueCooldownMs / 1000).toFixed(1)));
@@ -62,8 +112,13 @@
 
       const btnToggleNotif = byId('btnToggleNotif');
       if (btnToggleNotif) {
-        btnToggleNotif.textContent = s.stallAlertEnabled ? '桌面通知：开启' : '桌面通知：关闭';
+        btnToggleNotif.textContent = s.stallAlertEnabled ? tr('btnNotifOn') : tr('btnNotifOff');
         btnToggleNotif.className = s.stallAlertEnabled ? 'btn primary btn-sm' : 'btn secondary btn-sm';
+      }
+
+      const btnToggleTheme = byId('btnToggleTheme');
+      if (btnToggleTheme) {
+        btnToggleTheme.textContent = s.theme === 'light' ? tr('popupThemeLight') : tr('popupThemeDark');
       }
     }
 
@@ -82,25 +137,25 @@
       if (!liveEl) return;
       if (!tabState) {
         if (meta && meta.reason === 'needs_reload') {
-          liveEl.textContent = '请刷新 Gemini';
+          liveEl.textContent = tr('liveNeedsReload');
           liveEl.className = 'badge-warn';
         } else {
-          liveEl.textContent = '未打开 Gemini';
+          liveEl.textContent = tr('liveNoTab');
           liveEl.className = '';
         }
         return;
       }
       if (tabState.circuitBreaker && tabState.circuitBreaker.tripped) {
-        liveEl.textContent = '已熔断';
+        liveEl.textContent = tr('liveTripped');
         liveEl.className = 'badge-stop';
       } else if (!tabState.settings || !tabState.settings.enabled) {
-        liveEl.textContent = '已暂停';
+        liveEl.textContent = tr('livePaused');
         liveEl.className = 'badge-warn';
       } else if (tabState.stallAlertActive) {
-        liveEl.textContent = '连接超时';
+        liveEl.textContent = tr('liveStall');
         liveEl.className = 'badge-warn';
       } else {
-        liveEl.textContent = tabState.settings.backgroundMode ? '后台就绪' : '监控中';
+        liveEl.textContent = tabState.settings.backgroundMode ? tr('liveBgReady') : tr('liveMonitoring');
         liveEl.className = 'badge-ok';
       }
     }
@@ -121,11 +176,16 @@
         return el ? String(el.value || '') : '';
       };
 
+      const langEl = byId('language');
+      const selectedLang =
+        langEl && langEl.value ? D.resolveLanguage(langEl.value) : currentSettings.language;
+
       const cooldownSec = getNum('continueCooldownSec', D.DEFAULT_SETTINGS.continueCooldownMs / 1000);
       const settleSec = getNum('idleSettleSec', D.DEFAULT_SETTINGS.idleSettleMs / 1000);
 
       return D.mergeSettings(
         Object.assign({}, currentSettings, {
+          language: selectedLang,
           enabled: getBool('enabled', D.DEFAULT_SETTINGS.enabled),
           autoAllow: getBool('autoAllow', D.DEFAULT_SETTINGS.autoAllow),
           preferAlwaysAllow: getBool('preferAlwaysAllow', D.DEFAULT_SETTINGS.preferAlwaysAllow),
@@ -212,40 +272,57 @@
       });
     }
 
+    function withFocusedWindowId(cb) {
+      if (api && api.windows && typeof api.windows.getLastFocused === 'function') {
+        try {
+          api.windows.getLastFocused((win) => {
+            void (api.runtime && api.runtime.lastError);
+            cb(win && typeof win.id === 'number' ? win.id : null);
+          });
+          return;
+        } catch (_) {}
+      }
+      cb(null);
+    }
+
     function sendToGeminiTabs(message, cb) {
       if (!api || !api.tabs || typeof api.tabs.query !== 'function') {
         if (cb) cb(null, { reason: 'no_tab', tabCount: 0 });
         return;
       }
-      api.tabs.query({ url: 'https://gemini.google.com/*' }, (tabs) => {
-        if (!Array.isArray(tabs) || tabs.length === 0) {
-          if (cb) cb(null, { reason: 'no_tab', tabCount: 0 });
-          return;
-        }
-        // Prefer currently active tab so multi-tab status reflects what the user is looking at
-        const ordered = tabs.slice().sort((a, b) => {
-          const aScore = (a && a.active ? 2 : 0) + (a && a.highlighted ? 1 : 0);
-          const bScore = (b && b.active ? 2 : 0) + (b && b.highlighted ? 1 : 0);
-          return bScore - aScore;
-        });
-
-        queryTabsAndSend(ordered, message, (best) => {
-          if (best) {
-            if (cb) cb(best, { reason: 'ok', tabCount: ordered.length });
+      withFocusedWindowId((focusedWinId) => {
+        api.tabs.query({ url: 'https://gemini.google.com/*' }, (tabs) => {
+          if (!Array.isArray(tabs) || tabs.length === 0) {
+            if (cb) cb(null, { reason: 'no_tab', tabCount: 0 });
             return;
           }
-          // Gemini tab is open but content script isn't injected yet (e.g., tab was open before install/reload)
-          injectIntoTabs(ordered, (injected) => {
-            if (!injected) {
-              if (cb) cb(null, { reason: 'needs_reload', tabCount: ordered.length });
+          // Prefer currently focused window & active tab so multi-browser/multi-tab status reflects what the user is looking at
+          const ordered = tabs.slice().sort((a, b) => {
+            const aWin = focusedWinId !== null && a && a.windowId === focusedWinId ? 4 : 0;
+            const bWin = focusedWinId !== null && b && b.windowId === focusedWinId ? 4 : 0;
+            const aScore = aWin + (a && a.active ? 2 : 0) + (a && a.highlighted ? 1 : 0);
+            const bScore = bWin + (b && b.active ? 2 : 0) + (b && b.highlighted ? 1 : 0);
+            return bScore - aScore;
+          });
+
+          queryTabsAndSend(ordered, message, (best) => {
+            if (best) {
+              if (cb) cb(best, { reason: 'ok', tabCount: ordered.length });
               return;
             }
-            queryTabsAndSend(ordered, message, (retryBest) => {
-              if (retryBest) {
-                if (cb) cb(retryBest, { reason: 'ok', injected: true, tabCount: ordered.length });
-              } else if (cb) {
-                cb(null, { reason: 'needs_reload', tabCount: ordered.length });
+            // Gemini tab is open but content script isn't injected yet (e.g., tab was open before install/reload)
+            injectIntoTabs(ordered, (injected) => {
+              if (!injected) {
+                if (cb) cb(null, { reason: 'needs_reload', tabCount: ordered.length });
+                return;
               }
+              queryTabsAndSend(ordered, message, (retryBest) => {
+                if (retryBest) {
+                  if (cb) cb(retryBest, { reason: 'ok', injected: true, tabCount: ordered.length });
+                } else if (cb) {
+                  cb(null, { reason: 'needs_reload', tabCount: ordered.length });
+                }
+              });
             });
           });
         });
@@ -264,7 +341,7 @@
       }
       if (api && api.storage && api.storage.local) {
         api.storage.local.set({ [D.STORAGE_KEY]: next }, () => {
-          showToast(msg || '设置已保存并同步到 Gemini 页面');
+          showToast(msg || tr('toastSaved'));
           api.storage.local.get([D.STATS_KEY], (res) => {
             renderStats(res && res[D.STATS_KEY], next);
           });
@@ -291,28 +368,53 @@
           }
           renderSettings(settings);
           renderStats(stats, settings);
+          sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
+            renderLiveStatus(state, meta);
+          });
         });
       } else {
         renderSettings(D.DEFAULT_SETTINGS);
         renderStats(D.createEmptyStats(), D.DEFAULT_SETTINGS);
+        sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
+          renderLiveStatus(state, meta);
+        });
       }
-      sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
-        renderLiveStatus(state, meta);
-      });
     }
 
     function bindEvents() {
       const btnSave = byId('btnSave');
       if (btnSave) {
         btnSave.addEventListener('click', () => {
-          saveSettings(null, '已保存设置');
+          saveSettings(null, tr('toastSavedBtn'));
         });
       }
 
       const enabledEl = byId('enabled');
       if (enabledEl) {
         enabledEl.addEventListener('change', () => {
-          saveSettings(null, enabledEl.checked ? '已开启自动助手' : '已暂停自动助手');
+          saveSettings(null, enabledEl.checked ? tr('toastEnabledOn') : tr('toastEnabledOff'));
+        });
+      }
+
+      const langEl = byId('language');
+      if (langEl) {
+        langEl.addEventListener('change', () => {
+          const nextLang = D.resolveLanguage(langEl.value);
+          saveSettings(
+            Object.assign({}, readSettingsFromForm(), { language: nextLang }),
+            D.t(nextLang, 'toastLangChanged')
+          );
+        });
+      }
+
+      const btnToggleTheme = byId('btnToggleTheme');
+      if (btnToggleTheme) {
+        btnToggleTheme.addEventListener('click', () => {
+          const nextTheme = currentSettings.theme === 'light' ? 'dark' : 'light';
+          saveSettings(
+            Object.assign({}, readSettingsFromForm(), { theme: nextTheme }),
+            nextTheme === 'light' ? tr('toastThemeLight') : tr('toastThemeDark')
+          );
         });
       }
 
@@ -333,7 +435,7 @@
         const el = byId(id);
         if (el) {
           el.addEventListener('change', () => {
-            saveSettings(null, '开关已实时同步到 Gemini 页面');
+            saveSettings(null, tr('toastSynced'));
           });
         }
       }
@@ -346,7 +448,7 @@
           if (check) check.checked = nextVal;
           saveSettings(
             Object.assign({}, currentSettings, { stallAlertEnabled: nextVal }),
-            nextVal ? '已开启桌面通知提醒' : '已关闭桌面通知提醒'
+            nextVal ? tr('toastNotifOn') : tr('toastNotifOff')
           );
         });
       }
@@ -355,15 +457,15 @@
       if (btnTestNotif) {
         btnTestNotif.addEventListener('click', () => {
           if (!api || !api.runtime || typeof api.runtime.sendMessage !== 'function') {
-            showToast('当前环境不支持发送桌面通知', true);
+            showToast(tr('toastTestNotifUnsupported'), true);
             return;
           }
           api.runtime.sendMessage({ type: 'GMAH_TEST_NOTIFICATION' }, (resp) => {
             const err = api.runtime && api.runtime.lastError;
             if (err || !resp || !resp.ok) {
-              showToast('通知发送失败，请检查系统与 Chrome 通知权限', true);
+              showToast(tr('toastTestNotifFailed'), true);
             } else {
-              showToast('已发送测试桌面通知，请查看屏幕右下角');
+              showToast(tr('toastTestNotifSent'));
             }
           });
         });
@@ -372,7 +474,11 @@
       const btnDefaults = byId('btnDefaults');
       if (btnDefaults) {
         btnDefaults.addEventListener('click', () => {
-          saveSettings(D.DEFAULT_SETTINGS, '已恢复默认安全设置');
+          const restored = Object.assign({}, D.DEFAULT_SETTINGS, {
+            language: currentSettings.language,
+            theme: currentSettings.theme
+          });
+          saveSettings(restored, D.t(restored.language, 'toastDefaultsRestored'));
         });
       }
 
@@ -382,11 +488,11 @@
           sendToGeminiTabs({ type: 'GMAH_EMERGENCY_STOP' }, (state, meta) => {
             renderLiveStatus(state, meta);
             if (state) {
-              showToast('已向 Gemini 标签页发送紧急停止指令', true);
+              showToast(tr('toastEmergencySent'), true);
             } else if (meta && meta.reason === 'needs_reload') {
-              showToast('检测到 Gemini 页面，请先按 F5 刷新页面后重试', true);
+              showToast(tr('toastNeedsReload'), true);
             } else {
-              showToast('当前未检测到已打开的 Gemini 标签页', true);
+              showToast(tr('toastNoGeminiTab'), true);
             }
           });
         });
@@ -398,11 +504,11 @@
           sendToGeminiTabs({ type: 'GMAH_RESET_BREAKER' }, (state, meta) => {
             renderLiveStatus(state, meta);
             if (state) {
-              showToast('已解除熔断并重置本次任务计数');
+              showToast(tr('toastBreakerReset'));
             } else if (meta && meta.reason === 'needs_reload') {
-              showToast('检测到 Gemini 页面，请先按 F5 刷新页面后重试', true);
+              showToast(tr('toastNeedsReload'), true);
             } else {
-              showToast('当前未检测到已打开的 Gemini 标签页', true);
+              showToast(tr('toastNoGeminiTab'), true);
             }
           });
         });
@@ -415,12 +521,24 @@
           if (api && api.storage && api.storage.local) {
             api.storage.local.set({ [D.STATS_KEY]: fresh }, () => {
               renderStats(fresh, readSettingsFromForm());
-              showToast('今日统计计数已清零');
+              showToast(tr('toastStatsReset'));
               sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
                 renderLiveStatus(state, meta);
               });
             });
           }
+        });
+      }
+
+      const btnResetHudPos = byId('btnResetHudPos');
+      if (btnResetHudPos) {
+        btnResetHudPos.addEventListener('click', () => {
+          if (api && api.storage && api.storage.local && typeof api.storage.local.remove === 'function') {
+            api.storage.local.remove(['gmah_hud_position']);
+          }
+          sendToGeminiTabs({ type: 'GMAH_RESET_HUD_POS' }, () => {
+            showToast(tr('toastHudPosReset'));
+          });
         });
       }
     }

@@ -4,19 +4,19 @@
   <h1>KenEasy Gemini MCP Auto Helper</h1>
 
   <p>
-    专为 <b>Google Gemini</b> 网页端打造的 MCP 工具自动化辅助与智能连续交互扩展：自动点击「始终允许」权限、智能点击「继续 / Yes」追问芯片、全域自由拖拽悬浮窗、一键启停超时桌面提醒，支持切屏后台无休眠运行与 6 层防刷额度熔断保护。
+    专为 <b>Google Gemini</b> 网页端打造的 MCP 工具自动化辅助与智能连续交互扩展：自动点击「始终允许」权限、智能点击「继续 / Yes」追问芯片，支持<b>简体中文 / 繁體中文 / English / 日本語</b>四语言实时切换与<b>黑白深浅双模式</b>、修复按住拖拽悬浮窗、多浏览器与非对话页防误触护卫，内置 6 层防刷额度熔断保护。
   </p>
 
   <p>
     简体中文 · <a href="README.md">English</a>
     ·
-    <a href="#-更新记录">更新记录</a>
+    <a href="CHANGELOG.md">更新记录</a>
     ·
     <a href="https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues">问题反馈</a>
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v0.1_Beta-f59e0b?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v0.2_Beta-3b82f6?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,9 +24,9 @@
 </div>
 
 > [!WARNING]
-> ### ⚠️ Beta 版本说明 (v0.1 Beta Preview)
-> 本扩展目前处于 **公开测试 Beta 阶段（v0.1 Beta）**。
-> 虽然核心自动化引擎、6 层防刷熔断器、自由拖拽 HUD 与桌面通知已通过完整自动化测试套件验证，但由于 Google Gemini 网页端（`gemini.google.com`）界面与 Material Web Components 样式组件会不定期更新，可能存在偶发交互变动或边缘情况：
+> ### ⚠️ Beta 版本说明 (v0.2 Beta Preview)
+> 本扩展目前处于 **公开测试 Beta 阶段（v0.2 Beta）**。
+> 核心自动化引擎、6 层防刷熔断器、按住拖拽 HUD、多语言与黑白模式、多浏览器防误触守卫及桌面通知均已通过完整自动化测试套件验证。由于 Google Gemini 网页端（`gemini.google.com`）界面与 Material Web Components 组件会不定期更新，可能存在偶发交互变动：
 > - 若在使用中遇到未识别的新型确认弹窗、或误触发跳过，欢迎随时在设置面板的「自定义匹配词」中补充关键词，并前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 提交反馈与截图。
 > - 欢迎各位开发者 Star 🌟 与提交 PR，共同完善 Gemini 网页端自动化生态！
 
@@ -56,24 +56,24 @@
 
 ---
 
-## 🎬 核心功能实操演示（v0.1 重点更新）
+## 🎬 核心功能实操演示（v0.2 重点升级）
 
-### 1. 网页全域自由拖拽悬浮窗 (Draggable Floating HUD) 🆕
-> 不再局限于死板的右下角固定位置！鼠标按住顶部标题栏即可在整个网页视口内任意拖曳。内置智能视口边界防溢出算法与 4px 拖动消抖判定，拖拽落位瞬间自动记录坐标至 LocalStorage，跨页面与跨刷新丝滑复位。
+### 1. 按住拖拽悬浮窗 · 修复悬停粘连与折叠响应 🆕
+> 严格左键按住标题栏才启动拖动——鼠标仅仅悬停或经过标题栏时绝不粘连跟随！超过 4px 拖动阈值后才触发指针捕获，标题栏的折叠/主题/语言按钮独立响应无干扰，离开窗口释放自动落位，并在 Popup 面板支持一键「复位悬浮窗」。
 
 <div align="center">
-  <img src="assets/hud-drag-demo.png" alt="自由拖拽悬浮窗演示" width="100%">
+  <img src="assets/hud-drag-demo.png" alt="按住自由拖拽悬浮窗演示" width="100%">
 </div>
 
-### 2. 一键启停桌面提醒通知 · 超时卡死主动预警 (Anti-Stall Desktop Notification) 🆕
-> 当 MCP 外部工具执行异常挂起或 Gemini 生成中途陷入停滞超过设定阈值（默认 5 分钟）时，系统自动弹出 Windows/Chrome 原生桌面通知，并于扩展图标显示红色 `!` 报警角标。支持在页面 HUD 悬浮窗或 Popup 面板上一键静音/启闭，点击通知即刻唤醒并置顶对应的 Gemini 会话标签页。
+### 2. 一键启停桌面提醒通知 · 超时卡死主动预警
+> 当 MCP 外部工具执行异常挂起或 Gemini 生成中途陷入停滞超过设定阈值（默认 5 分钟）时，系统自动弹出对应语言版本的 Windows/Chrome 原生桌面通知，并于扩展图标显示红色 `!` 报警角标。支持在 HUD 与 Popup 一键静音/开启，点击通知即刻唤醒并置顶对应的 Gemini 标签页。
 
 <div align="center">
   <img src="assets/notification-toggle-demo.png" alt="一键启停桌面提醒通知演示" width="100%">
 </div>
 
-### 3. 全功能设置面板全景图 (Extension Popup Overview)
-> 模块化、分层解耦的配置中枢：实时监控今日自动化调用统计、定制「始终允许」优先与回退策略、调整 6 层安全熔断阈值，内置「测试通知」与「紧急停止」开关，掌控自动化每一步。
+### 3. 黑白深浅双模式 + 四语言全功能设定中心 🆕
+> 支持在 **深色夜间模式 (`🌙`)** 与 **浅色白昼模式 (`☀️`)** 之间秒速切换，同时原生内置 **简体中文 / 繁體中文 / English / 日本語** 界面与多语种关键词适配；支持 6 层防刷熔断调优、测试通知、悬浮窗一键复位与紧急停止。
 
 <div align="center">
   <img src="assets/popup-demo.png" alt="完整设置面板全景图" width="100%">
@@ -88,8 +88,10 @@
 | **MCP 权限穿透** | 优先「始终允许」 | 优先寻找并点击 `始终允许 / Always allow`，支持通过 Material Web Components `<slot>` 投影穿透与 `role="menu"` / `role="menuitem"` 下拉菜单定位。 |
 | **单次允许回退** | 安全单次放行 | 可选开启「无始终允许时回退点击允许一次」，严格校验父子上下文与黑名单（绝不误点删除、拒绝、取消等破坏性按钮）。 |
 | **智能继续交互** | 追问芯片点击 | 识别并点击确认类的 `↪ Yes` 追问建议芯片与「继续 / Continue」按钮，严格排除长文本问答芯片、满意度调查与侧边栏历史。 |
-| **自由拖拽悬浮窗** 🆕 | 全域拖曳与记忆 | 页面卡片支持任意位置拖拽（Pointer Events 原生捕获），内置边界碰撞限制算法与 4px 消抖，坐标跨会话持久化保留。 |
-| **桌面停滞通知** 🆕 | 一键启闭与报警 | 检测到 MCP 连接或生成超过阈值（1–60 分钟）无新输出时主动桌面报警；悬浮窗与 Popup 均支持一键秒切静音。 |
+| **按住拖拽悬浮窗** 🆕 | 悬停零粘连修复 | 仅在左键按住标题栏时拖拽（悬停靠近绝不跟随），4px 后延迟捕获指针，点击标题/折叠/主题/语言键即时响应，支持一键复位。 |
+| **多语言 & 黑白模式** 🆕 | 4 语言 + 深浅主题 | 原生支持 简体中文 / 繁體中文 / English / 日本語（含日语、粤语常用确认词）与深色夜间 / 浅色白昼双主题实时联动。 |
+| **多浏览器防误触** 🆕 | 非对话页与旧芯片保护 | 自动跳过 `/gems`、`/extensions`、`/settings` 等非对话路由与 0 回复页，并在第 2 浏览器恢复旧会话时忽略陈旧追问芯片。 |
+| **桌面停滞通知** | 一键启闭与多语言报警 | 检测到 MCP 连接或生成超过阈值（1–60 分钟）无新输出时主动桌面报警；悬浮窗与 Popup 均支持一键秒切静音。 |
 | **后台静默运行** | 最小化/切屏不中断 | MV3 Service Worker 长连接 Port + `chrome.alarms` 心跳保活，配合微任务调度突破 Chrome 后台定时器限速。 |
 | **标签丢弃保护** | 防止内存清理器休眠 | 自动对 Gemini 标签页标记 `autoDiscardable: false`，防止 Chrome 内存节省程序休眠或丢弃活跃后台会话。 |
 | **6 层防刷熔断** | 全方位额度护航 | 包含单次上限、每日限额、流式停稳等待、操作冷却、完工信号识别、空转指纹与报错断路保护。 |
@@ -200,6 +202,22 @@ popup.js, popup.html, popup.css
 
 打开 Popup 设置面板，点击底部的 **「恢复默认」** 按钮，即可将所有配置项与熔断阈值一键复位至官方推荐的安全默认值。
 </details>
+
+---
+
+## 📝 更新记录
+
+### [v0.2.0 (v0.2 Beta)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v0.2.0) - 2026-11-22
+- **修复悬浮窗拖拽粘连与折叠响应**：引入左键按压门控（`isPointerDown`），鼠标悬停靠近绝不粘连跟随；4px 阈值后延迟捕获指针，标题栏折叠、主题、语言按钮独立秒响应；新增离窗释放保持原位与弹窗「复位悬浮窗」按钮。
+- **多浏览器与非对话页防误触守卫**：自动跳过 `/gems`、`/extensions`、`/settings` 等非对话路由与 0 回复首页；移除易误触的 `'开始'`/`'開始'` 默认词；第 2 浏览器或恢复旧会话标签页时自动忽略陈旧历史芯片。
+- **4 语言实时切换**：全面支持 `简体中文`、`繁體中文`、`English`、`日本語` 界面、系统通知与多语种关键词识别。
+- **黑白深浅双模式**：悬浮窗（`☀`/`☾`）与 Popup 弹窗（`🌙`/`☀️`）支持深色夜间 / 浅色白昼主题实时同步。
+- **重制全套 2x 高清宣传图**：以 2x Retina 高清重绘全部 README 演示图与 Chrome 商店截图。
+
+### [v0.1.0 (v0.1 Beta)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v0.1.0) - 2026-11-21
+- 首个公开测试 Beta 版本：支持 MCP「始终允许」自动放行、`↪ Yes` 追问芯片点击、自由拖拽悬浮窗、一键超时桌面通知、后台防休眠保活及 6 层防刷额度熔断。
+
+完整变更历史请查看 [CHANGELOG.md](CHANGELOG.md)。
 
 ---
 

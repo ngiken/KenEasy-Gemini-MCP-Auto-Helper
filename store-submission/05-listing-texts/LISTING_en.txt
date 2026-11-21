@@ -8,30 +8,33 @@ KenEasy Gemini MCP Auto Helper
 ============================================================
 2. Summary / Short Description (max 132 chars)
 ============================================================
-Auto-click Gemini MCP Always Allow & Continue chips with draggable HUD, stall alerts, and 6-layer circuit breaker.
+Auto-click Gemini MCP Always Allow & Continue chips with 4-language UI, Dark/Light mode, hold-to-drag HUD, and 6-layer circuit breaker.
 
 ============================================================
 3. Detailed Description (Paste everything below into description box)
 ============================================================
 KenEasy Gemini MCP Auto Helper is an open-source productivity extension engineered exclusively for Google Gemini (gemini.google.com). 
 
-It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with an industrial-grade 6-layer circuit breaker.
+It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with an industrial-grade 6-layer circuit breaker and multi-window safety guards.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✨ KEY FEATURES (V0.1 BETA)
+✨ KEY FEATURES (V0.2 BETA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⚡ 1. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)
-• Automatically detects and clicks "Always allow / 始终允许" permission confirmation dialogs.
+• Automatically detects and clicks "Always allow / 始终允许 / 常に許可" permission confirmation dialogs.
 • Pierces through Material Web Components Shadow DOM, <slot> projections, and role="menu" dropdown items.
-• Safe fallback: Optionally falls back to clicking single "Allow once" when no "Always allow" option exists.
-• Strict context guard: Never clicks destructive buttons like Deny, Cancel, Delete, or Block.
+• Safe fallback: Optionally falls back to clicking single "Allow once" with strict sibling approval context checks.
+• Strict context guard: Never clicks destructive buttons like Deny, Cancel, Delete, or Block, and skips non-chat routes (/gems, /extensions, /settings) and secondary browser restored-tab stale chips.
 
-🖱️ 2. FREELY DRAGGABLE FLOATING HUD 🆕
-• No longer pinned to the bottom-right corner! Click and drag the HUD header anywhere across the browser viewport.
-• Viewport boundary clamping guarantees the panel always remains accessible and visible on screen.
-• 4px movement deadzone prevents accidental drags when clicking the minimize button or toggles.
-• Position coordinates automatically persist in local storage across page refreshes and chat sessions.
+🖱️ 2. HOLD-TO-DRAG FLOATING HUD 🆕
+• Left-click and hold the HUD header to position it anywhere across the browser viewport — hovering never traps or sticks the HUD!
+• Deferred pointer capture beyond the 4px movement deadzone keeps collapse, theme, and language header buttons immediately clickable.
+• Viewport boundary clamping + one-click Reset HUD Position in the popup.
+
+🌗 3. 4-LANGUAGE UI + DARK & LIGHT DUAL MODES 🆕
+• Instant switching across Simplified Chinese, Traditional Chinese, English, and Japanese (UI, notifications, and keywords).
+• Synchronized Dark Night and Light Daylight themes across both the floating HUD and popup control panel.
 
 🔔 3. ANTI-STALL DESKTOP NOTIFICATIONS 🆕
 • Get instant Windows/macOS native desktop alerts when tool execution or AI response generation stalls longer than your threshold (default 5 minutes).

@@ -4,19 +4,19 @@
   <h1>KenEasy Gemini MCP Auto Helper</h1>
 
   <p>
-    An intelligent automation extension tailored for <b>Google Gemini</b> web UI: auto-approves MCP tool permissions with "Always allow", auto-clicks "Continue / Yes" follow-up chips, features a freely draggable floating HUD and one-click desktop notifications, with background keep-alive and a 6-layer anti-loop circuit breaker.
+    An intelligent automation extension tailored for <b>Google Gemini</b> web UI: auto-approves MCP tool permissions with "Always allow", auto-clicks "Continue / Yes" follow-up chips, supports <b>4 languages (简体/繁體/EN/日本語)</b> and <b>Dark/Light theme modes</b>, features a hold-to-drag floating HUD, one-click desktop notifications, multi-window &amp; non-chat guards, and a 6-layer anti-loop circuit breaker.
   </p>
 
   <p>
     English · <a href="README.zh-CN.md">简体中文</a>
     ·
-    <a href="#-changelog">Changelog</a>
+    <a href="CHANGELOG.md">Changelog</a>
     ·
     <a href="https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues">Issues / Feedback</a>
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v0.1_Beta-f59e0b?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v0.2_Beta-3b82f6?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,9 +24,9 @@
 </div>
 
 > [!WARNING]
-> ### ⚠️ Beta Release Notice (v0.1 Beta Preview)
-> This extension is currently in **Public Beta Preview (v0.1 Beta)**.
-> While the core automation engine, 6-layer circuit breaker, draggable HUD, and desktop notification subsystems have passed 100% of the automated test suites, Google Gemini (`gemini.google.com`) continuously updates its Material Web Components and DOM layouts.
+> ### ⚠️ Beta Release Notice (v0.2 Beta Preview)
+> This extension is currently in **Public Beta Preview (v0.2 Beta)**.
+> While the core automation engine, 6-layer circuit breaker, hold-to-drag HUD, multi-language &amp; dark/light themes, multi-window guards, and desktop notification subsystems have passed 100% of the automated test suites, Google Gemini (`gemini.google.com`) continuously updates its Material Web Components and DOM layouts.
 > - If you encounter unrecognized confirmation dialogs or unexpected behavior, please submit feedback or screenshots on [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues), or add custom terms in the "Custom Keywords" section of the popup settings.
 > - Star 🌟 and PR contributions are warmly welcomed!
 
@@ -56,24 +56,24 @@ To run the latest development build or use the extension offline immediately:
 
 ---
 
-## 🎬 Core Features Walkthrough & Demos (v0.1 Highlights)
+## 🎬 Core Features Walkthrough & Demos (v0.2 Highlights)
 
-### 1. Freely Draggable Floating HUD Anywhere on Screen 🆕
-> No longer stuck in the bottom-right corner! Click and drag the HUD header to position it anywhere within the Gemini web interface. Features native Pointer Events tracking, automatic viewport boundary clamping, 4px click-versus-drag disambiguation, and coordinate persistence across page refreshes via LocalStorage.
+### 1. Hold-to-Drag Floating HUD (Hover-Sticking Fixed) 🆕
+> Left-click and hold the HUD header to drag it smoothly anywhere across the Gemini viewport — simply hovering near the header never moves or traps the HUD! Features deferred pointer capture beyond the 4px movement deadzone, independent header buttons for minimize/theme/language, off-window auto-release, viewport clamping, and one-click position reset in the popup.
 
 <div align="center">
-  <img src="assets/hud-drag-demo.png" alt="Draggable Floating HUD Demo" width="100%">
+  <img src="assets/hud-drag-demo.png" alt="Hold-to-Drag Floating HUD Demo" width="100%">
 </div>
 
-### 2. One-Click Desktop Notification & Anti-Stall Alert 🆕
-> If an MCP tool execution hangs or model output stalls longer than the configured threshold (default 5 minutes), the extension triggers a native OS desktop notification and flags a red `!` badge on the toolbar icon. Easily mute or enable with a single click directly from the on-page HUD or the popup. Clicking the notification instantly brings the Gemini tab and window back to the foreground.
+### 2. One-Click Desktop Notification & Anti-Stall Alert
+> If an MCP tool execution hangs or model output stalls longer than the configured threshold (default 5 minutes), the extension triggers a localized OS desktop notification and flags a red `!` badge on the toolbar icon. Easily mute or enable with a single click directly from the on-page HUD or the popup. Clicking the notification instantly brings the Gemini tab and window back to the foreground.
 
 <div align="center">
   <img src="assets/notification-toggle-demo.png" alt="One-Click Desktop Notification Demo" width="100%">
 </div>
 
-### 3. Full Configuration & Control Panel (Popup Overview)
-> A comprehensive, decoupled control center: view live statistics for daily automated actions, customize "Always allow" priority and single-allow fallback, calibrate the 6-layer circuit breakers, trigger instant notification tests, and activate the emergency kill switch.
+### 3. Dark & Light Dual Themes + 4-Language Control Center (Popup Overview) 🆕
+> Switch effortlessly between **Dark Night** and **Light Daylight** themes (`🌙 / ☀️`) and across **4 languages (`简体中文 / 繁體中文 / English / 日本語`)** in real time from either the popup or HUD. Includes live stats, 6-layer circuit breakers, notification testing, HUD position reset, and emergency kill switch.
 
 <div align="center">
   <img src="assets/popup-demo.png" alt="Extension Popup Overview" width="100%">
@@ -88,8 +88,10 @@ To run the latest development build or use the extension offline immediately:
 | **MCP Auto-Approval** | Always Allow Priority | Prefers and auto-clicks `Always allow / 始终允许`, penetrating Material Web Components `<slot>` projections and `role="menu"` / `role="menuitem"` dropdown options. |
 | **Single Allow Fallback** | Safe Single Click | Optional fallback to click `Allow once / 仅允许一次` when no "Always allow" option exists, strictly guarded by sibling context checks. |
 | **Smart Continuity** | Follow-up Chip Click | Detects and triggers explicit affirmative `↪ Yes` follow-up chips and "Continue" buttons, strictly ignoring general suggestions, surveys, and chat history. |
-| **Draggable Floating HUD** 🆕 | Free Movement & Memory | In-page HUD can be dragged anywhere using Pointer Events, constrained by viewport boundary clamping with persistent LocalStorage coordinates. |
-| **Desktop Notifications** 🆕 | One-Click Anti-Stall Alert | Issues desktop notifications when MCP execution exceeds the stall threshold (1–60 mins); togglable instantly from either the HUD or the popup. |
+| **Hold-to-Drag Floating HUD** 🆕 | Left-Button Press Guard | Requires an active left-button hold on the header to drag (zero hover-sticking); independent header buttons for collapse, theme, and language, plus popup Reset HUD button. |
+| **Multi-Language & Dual Theme** 🆕 | 4 Locales + Dark/Light | Live switching across `简体中文`, `繁體中文`, `English`, and `日本語` (including Japanese/Cantonese keywords) and crisp Dark / Light UI modes synced across HUD & popup. |
+| **Multi-Window & Route Guard** 🆕 | Zero Accidental Clicks | Skips non-chat routes (`/gems`, `/extensions`, `/settings`), 0-turn screens, and stale history chips on restored tabs in secondary browser windows. |
+| **Desktop Notifications** | One-Click Anti-Stall Alert | Issues localized desktop notifications when MCP execution exceeds the stall threshold (1–60 mins); togglable instantly from either the HUD or the popup. |
 | **Background Persistence** | Uninterrupted Execution | MV3 Service Worker keeps Gemini active in minimized or background tabs via long-lived connection ports and `chrome.alarms` heartbeats. |
 | **Tab Discard Protection** | Anti-Memory-Saver Sleep | Sets `autoDiscardable: false` on active Gemini tabs to prevent Chrome Memory Saver from unloading the page. |
 | **6-Layer Circuit Breaker** | Anti-Loop Quota Guard | Enforces per-task limits, daily limits, streaming stabilization settle time, operation cooldown, completion cues, and stagnant output detection. |
@@ -200,6 +202,22 @@ No. The engine applies an explicit exclusion blacklist (blocking terms like dele
 
 Click the **"Restore Defaults"** button at the bottom of the extension popup. This resets all thresholds, cooldowns, and keyword sets to safe official defaults.
 </details>
+
+---
+
+## 📝 Changelog
+
+### [v0.2.0 (v0.2 Beta)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v0.2.0) - 2026-11-22
+- **Hold-to-Drag HUD Fix**: Strict left-button press gating (`isPointerDown`) eliminates hover-sticking; deferred pointer capture after 4px threshold keeps collapse, theme, and language header buttons immediately responsive; added off-window auto-release and popup **Reset HUD** button.
+- **Multi-Window & Non-Chat Guard**: Skips non-chat routes (`/gems`, `/extensions`, `/settings`, etc.) and 0-turn screens; removed overly broad `'开始'`/`'開始'` triggers; ignores stale pre-existing history chips on restored tabs in secondary browser windows.
+- **4-Language Support**: Live UI, desktop notification, and keyword recognition across `简体中文`, `繁體中文`, `English`, and `日本語`.
+- **Dark & Light Dual Themes**: Synchronized Dark Night (`🌙`) and Light Daylight (`☀️`) modes across both the floating HUD and extension popup.
+- **Redesigned 2x Retina Assets**: All promotional banners, walkthrough diagrams, and Chrome Web Store screenshots rebuilt at 2x DPI.
+
+### [v0.1.0 (v0.1 Beta)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v0.1.0) - 2026-11-21
+- Initial Public Beta release with MCP "Always allow" auto-approval, `↪ Yes` follow-up chip clicking, draggable floating HUD, 1-click desktop stall notifications, background keep-alive, and 6-layer anti-loop circuit breaker.
+
+See full details in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

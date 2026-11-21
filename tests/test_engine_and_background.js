@@ -2,7 +2,7 @@
 
 const assert = require('assert');
 const D = require('../defaults.js');
-const { GmahEngine, getAssistantTurns, getElementLabel, defaultClickElement } = require('../content.js');
+const { GmahEngine, getAssistantTurns, getElementLabel, defaultClickElement, isNonChatGeminiUrl } = require('../content.js');
 const { createBackgroundController, isGeminiUrl, ALARM_NAME } = require('../background.js');
 const { createHud } = require('../hud.js');
 const { createPopupController } = require('../popup.js');
@@ -1931,7 +1931,7 @@ function runTests(test) {
       // Beta badge check
       const betaBadge = rootEl.querySelector('.gmah-badge-beta');
       assert.ok(betaBadge, 'HUD must contain .gmah-badge-beta element');
-      assert.strictEqual(betaBadge.textContent, 'v0.1 Beta');
+      assert.strictEqual(betaBadge.textContent, 'v0.2 Beta');
 
       // Restored initial position
       assert.strictEqual(rootEl.style.left, '200px');
@@ -2018,6 +2018,268 @@ function runTests(test) {
       global.window = prevWin;
       global.localStorage = prevLs;
     }
+  });
+
+  // 32. HUD drag regression: hover without mouse-down must NEVER drag, interactive header buttons stay clickable, and buttons=0 auto-releases
+  test('HUD hover never sticks to cursor without pointerdown, header buttons stay clickable, and buttons=0 auto-releases drag', () => {
+    const { doc, win, localStorageMock } = createMockEnv();
+    const prevDoc = global.document;
+    const prevWin = global.window;
+    const prevLs = global.localStorage;
+    global.document = doc;
+    global.window = win;
+    global.localStorage = localStorageMock;
+
+    try {
+      let minimizeToggled = 0;
+      let themeToggled = 0;
+      let langCycled = 0;
+      let posChanged = 0;
+
+      const hud = createHud({
+        initialPosition: { left: 400, top: 300 },
+        onToggleMinimize: () => { minimizeToggled += 1; },
+        onToggleTheme: () => { themeToggled += 1; },
+        onCycleLanguage: () => { langCycled += 1; },
+        onPositionChange: () => { posChanged += 1; }
+      });
+
+      const rootEl = hud.mount();
+      rootEl.rect = { width: 262, height: 290 };
+      const header = rootEl.querySelector('.gmah-header');
+      const title = rootEl.querySelector('.gmah-title');
+      const themeBtn = rootEl.querySelector('.gmah-theme-btn');
+      const langBtn = rootEl.querySelector('.gmah-lang-btn');
+
+      // 1) Hover mouse across header and document WITHOUT pointerdown/mousedown
+      header.dispatchEvent({ type: 'pointermove', clientX: 800, clientY: 600 });
+      header.dispatchEvent({ type: 'mousemove', clientX: 850, clientY: 650 });
+      doc.dispatchEvent({ type: 'pointermove', clientX: 900, clientY: 700 });
+      doc.dispatchEvent({ type: 'mousemove', clientX: 920, clientY: 720 });
+
+      assert.strictEqual(rootEl.style.left, '400px');
+      assert.strictEqual(rootEl.style.top, '300px');
+      assert.strictEqual(rootEl.classList.contains('gmah-dragging'), false);
+      assert.strictEqual(posChanged, 0);
+
+      // 2) Left click on title immediately after hovering MUST toggle minimize (not just release!)
+      header.dispatchEvent({ type: 'pointerdown', clientX: 420, clientY: 315, button: 0, target: title });
+      header.dispatchEvent({ type: 'pointerup', clientX: 420, clientY: 315, button: 0, target: title });
+      title.dispatchEvent({ type: 'click', target: title });
+      assert.strictEqual(minimizeToggled, 1);
+
+      // 3) Clicking theme or language button in header must NOT drag even if mouse slips while pressed
+      header.dispatchEvent({ type: 'pointerdown', clientX: 500, clientY: 315, button: 0, target: themeBtn });
+      header.dispatchEvent({ type: 'pointermove', clientX: 600, clientY: 415 });
+      header.dispatchEvent({ type: 'pointerup', clientX: 600, clientY: 415 });
+      themeBtn.click();
+      langBtn.click();
+      assert.strictEqual(themeToggled, 1);
+      assert.strictEqual(langCycled, 1);
+      assert.strictEqual(rootEl.style.left, '400px');
+      assert.strictEqual(rootEl.style.top, '300px');
+
+      // 4) Active drag auto-releases when pointermove reports buttons: 0 (e.g. released outside browser window)
+      header.dispatchEvent({ type: 'pointerdown', clientX: 100, clientY: 100, button: 0, target: header });
+      header.dispatchEvent({ type: 'pointermove', clientX: 140, clientY: 130, buttons: 1 });
+      assert.strictEqual(rootEl.style.left, '440px');
+      assert.strictEqual(rootEl.style.top, '330px');
+      assert.strictEqual(rootEl.classList.contains('gmah-dragging'), true);
+
+      doc.dispatchEvent({ type: 'pointermove', clientX: 220, clientY: 220, buttons: 0 });
+      assert.strictEqual(rootEl.classList.contains('gmah-dragging'), false);
+      assert.strictEqual(rootEl.style.left, '440px');
+      assert.strictEqual(rootEl.style.top, '330px');
+
+      // Subsequent hover after release must NOT move HUD
+      doc.dispatchEvent({ type: 'pointermove', clientX: 500, clientY: 500 });
+      assert.strictEqual(rootEl.style.left, '440px');
+      assert.strictEqual(rootEl.style.top, '330px');
+
+      hud.unmount();
+    } finally {
+      global.document = prevDoc;
+      global.window = prevWin;
+      global.localStorage = prevLs;
+    }
+  });
+
+  // 33. Non-chat routes, 0-turn pages, standalone generic buttons, and restored-tab stale chip protection
+  test('guards prevent unintended clicks on non-chat pages, 0-turn home screens, standalone generic buttons, and restored tabs', () => {
+    assert.strictEqual(isNonChatGeminiUrl('https://gemini.google.com/gems'), true);
+    assert.strictEqual(isNonChatGeminiUrl('https://gemini.google.com/u/1/extensions'), true);
+    assert.strictEqual(isNonChatGeminiUrl('https://gemini.google.com/settings'), true);
+    assert.strictEqual(isNonChatGeminiUrl('https://gemini.google.com/app'), false);
+    assert.strictEqual(isNonChatGeminiUrl('https://gemini.google.com/app/chat-123'), false);
+    assert.strictEqual(isNonChatGeminiUrl('https://gemini.google.com/gem/coding-partner'), false);
+
+    // 1) Non-chat route (/gems) must never click even if matching buttons exist
+    const nonChatEnv = createMockEnv('https://gemini.google.com/gems');
+    const gemStartBtn = nonChatEnv.doc.createElement('button', { text: '继续' });
+    const gemAllowBtn = nonChatEnv.doc.createElement('button', { text: '始终允许' });
+    nonChatEnv.doc.body.appendChild(gemStartBtn);
+    nonChatEnv.doc.body.appendChild(gemAllowBtn);
+    addTurn(nonChatEnv.doc, '示例');
+
+    const nonChatEngine = new GmahEngine({ doc: nonChatEnv.doc, win: nonChatEnv.win });
+    const rNonChat = nonChatEngine.scanOnce();
+    assert.strictEqual(rNonChat.action, 'noop');
+    assert.strictEqual(rNonChat.reason, 'non_chat_page');
+    assert.strictEqual(gemStartBtn.clickCount, 0);
+    assert.strictEqual(gemAllowBtn.clickCount, 0);
+
+    // 2) Home / empty chat page (0 assistant turns) must NOT click '开始', '继续', 'Yes', or standalone '同意'/'Allow'
+    const homeEnv = createMockEnv('https://gemini.google.com/app');
+    let now = 50000;
+    const startBtn = homeEnv.doc.createElement('button', { text: '开始' });
+    const contBtn = homeEnv.doc.createElement('button', { text: '继续' });
+    const agreeBtn = homeEnv.doc.createElement('button', { text: '同意' });
+    const standaloneYes = homeEnv.doc.createElement('button', { className: 'follow-up-chip', text: '↪ Yes' });
+    homeEnv.doc.body.appendChild(startBtn);
+    homeEnv.doc.body.appendChild(contBtn);
+    homeEnv.doc.body.appendChild(agreeBtn);
+    homeEnv.doc.body.appendChild(standaloneYes);
+
+    const homeEngine = new GmahEngine({ doc: homeEnv.doc, win: homeEnv.win, now: () => now });
+    assert.strictEqual(homeEngine.scanOnce().action, 'noop');
+    assert.strictEqual(startBtn.clickCount, 0);
+    assert.strictEqual(contBtn.clickCount, 0);
+    assert.strictEqual(agreeBtn.clickCount, 0);
+    assert.strictEqual(standaloneYes.clickCount, 0);
+
+    // Even when a turn exists, standalone '开始' and standalone 'Yes' outside turn/chip are ignored
+    contBtn.remove();
+    addTurn(homeEnv.doc, '准备好了吗？');
+    standaloneYes.remove();
+    const randomPageYes = homeEnv.doc.createElement('button', { text: 'Yes' });
+    homeEnv.doc.body.appendChild(randomPageYes);
+    now += 3000;
+    assert.strictEqual(homeEngine.scanOnce().action, 'noop');
+    assert.strictEqual(startBtn.clickCount, 0);
+    assert.strictEqual(randomPageYes.clickCount, 0);
+
+    // 3) Restored-tab / 2nd-browser protection: ignoreStaleInitialContinue ignores pre-existing chips until user prompts
+    const restoredEnv = createMockEnv('https://gemini.google.com/app/restored-chat');
+    let t = 100000;
+    const oldChip = restoredEnv.doc.createElement('button', { className: 'follow-up-chip', text: '↪ Yes' });
+    addTurn(restoredEnv.doc, '昨天的对话内容，要继续吗？', [oldChip]);
+
+    const restoredEngine = new GmahEngine({
+      doc: restoredEnv.doc,
+      win: restoredEnv.win,
+      now: () => t,
+      ignoreStaleInitialContinue: true
+    });
+
+    // First scan during initial restore window suppresses clicking stale chip
+    const rInit = restoredEngine.scanOnce();
+    assert.strictEqual(rInit.action, 'noop');
+    assert.strictEqual(rInit.reason, 'initial_stale_continue_ignored');
+    assert.strictEqual(oldChip.clickCount, 0);
+
+    // Even after 5 seconds, the same pre-existing chip remains ignored
+    t += 5000;
+    assert.strictEqual(restoredEngine.scanOnce().action, 'noop');
+    assert.strictEqual(oldChip.clickCount, 0);
+
+    // After user sends a new prompt and a new chip renders, it clicks normally
+    oldChip.remove();
+    restoredEngine.onUserManualPrompt();
+    const newChip = restoredEnv.doc.createElement('button', { className: 'follow-up-chip', text: '↪ Yes' });
+    addTurn(restoredEnv.doc, '新的任务阶段完成，是否继续下一步？', [newChip]);
+    t += 2500;
+    const rActive = restoredEngine.scanOnce();
+    assert.strictEqual(rActive.action, 'clicked_continue');
+    assert.strictEqual(newChip.clickCount, 1);
+  });
+
+  // 34. Multi-language UI (zh-CN, zh-TW, en, ja) and Light/Dark theme mode in HUD & Popup
+  test('HUD and Popup render multi-language labels and toggle dark/light theme cleanly', () => {
+    const { doc, win } = createMockEnv();
+    const prevDoc = global.document;
+    global.document = doc;
+
+    try {
+      const hud = createHud();
+      const rootEl = hud.mount();
+      const engine = new GmahEngine({
+        doc,
+        win,
+        settings: { language: 'en', theme: 'light' }
+      });
+
+      hud.update(engine.getState());
+      assert.strictEqual(rootEl.classList.contains('gmah-theme-light'), true);
+      assert.ok(rootEl.textContent.includes('MCP Helper'));
+      assert.ok(rootEl.textContent.includes('Active'));
+      assert.ok(rootEl.textContent.includes('E-Stop'));
+
+      engine.updateSettings({ language: 'ja', theme: 'dark' });
+      hud.update(engine.getState());
+      assert.strictEqual(rootEl.classList.contains('gmah-theme-light'), false);
+      assert.ok(rootEl.textContent.includes('MCP ヘルパー'));
+      assert.ok(rootEl.textContent.includes('緊急停止'));
+
+      hud.unmount();
+    } finally {
+      global.document = prevDoc;
+    }
+
+    const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+    const pdoc = popupEnv.doc;
+    const ids = [
+      'enabled', 'autoAllow', 'preferAlwaysAllow', 'fallbackSingleAllow',
+      'autoContinue', 'backgroundMode', 'preventTabDiscard', 'showHud',
+      'maxContinuesPerTask', 'dailyContinueLimit', 'continueCooldownSec', 'idleSettleSec',
+      'stopOnCompletionCues', 'stopOnStagnantOutput', 'stopOnQuotaOrError',
+      'stallAlertEnabled', 'stallAlertMinutes', 'btnToggleNotif', 'btnTestNotif',
+      'language', 'btnToggleTheme', 'btnResetHudPos',
+      'customAlwaysAllowKeywords', 'customContinueKeywords',
+      'statAllow', 'statContinue', 'statLive',
+      'btnEmergency', 'btnResetBreaker', 'btnResetStats', 'btnDefaults', 'btnSave', 'toast'
+    ];
+    for (const id of ids) {
+      pdoc.body.appendChild(pdoc.createElement('input', { id }));
+    }
+
+    const storageState = {
+      [D.STORAGE_KEY]: D.mergeSettings({ language: 'zh-CN', theme: 'dark' }),
+      [D.STATS_KEY]: { date: D.getTodayKey(), allowCount: 0, continueCount: 0 }
+    };
+    let removedKeys = [];
+
+    const mockPopupChrome = {
+      runtime: { lastError: null },
+      storage: {
+        local: {
+          get(_keys, cb) { cb(Object.assign({}, storageState)); },
+          set(obj, cb) { Object.assign(storageState, obj); if (cb) cb(); },
+          remove(keys) { removedKeys = removedKeys.concat(keys); }
+        }
+      },
+      tabs: {
+        query(_q, cb) { cb([{ id: 1, active: true }]); },
+        sendMessage(_tabId, _msg, cb) {
+          cb({ ok: true, state: { settings: storageState[D.STORAGE_KEY], circuitBreaker: { tripped: false } } });
+        }
+      }
+    };
+
+    const popup = createPopupController(pdoc, mockPopupChrome);
+    popup.init();
+
+    assert.strictEqual(pdoc.body.classList.contains('theme-light'), false);
+    pdoc.getElementById('btnToggleTheme').click();
+    assert.strictEqual(storageState[D.STORAGE_KEY].theme, 'light');
+    assert.strictEqual(pdoc.body.classList.contains('theme-light'), true);
+
+    pdoc.getElementById('language').value = 'en';
+    pdoc.getElementById('language').dispatchEvent({ type: 'change', target: pdoc.getElementById('language') });
+    assert.strictEqual(storageState[D.STORAGE_KEY].language, 'en');
+    assert.strictEqual(pdoc.getElementById('statLive').textContent, 'BG Ready');
+
+    pdoc.getElementById('btnResetHudPos').click();
+    assert.ok(removedKeys.includes('gmah_hud_position'));
   });
 }
 

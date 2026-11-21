@@ -1,6 +1,16 @@
 (function (root) {
   'use strict';
 
+  if (!root.GMAH_DEFAULTS && typeof importScripts === 'function') {
+    try {
+      importScripts('defaults.js');
+    } catch (_) {}
+  }
+
+  const D =
+    root.GMAH_DEFAULTS ||
+    (typeof require === 'function' ? require('./defaults.js') : null);
+
   const GEMINI_URL_PATTERN = 'https://gemini.google.com/*';
   const ALARM_NAME = 'gmah_bg_keepalive';
   const STORAGE_KEY = 'gmah_settings_v1';
@@ -17,11 +27,37 @@
     let heartbeatTimer = null;
     let settingsLoaded = false;
     let settings = {
+      language: 'zh-CN',
       enabled: true,
       backgroundMode: true,
       preventTabDiscard: true,
       stallAlertEnabled: true
     };
+
+    function trBg(key, vars, fallback) {
+      if (D && typeof D.t === 'function') {
+        return D.t(settings.language, key, vars);
+      }
+      return fallback || key;
+    }
+
+    function applyRawSettings(raw) {
+      if (!raw || typeof raw !== 'object') return;
+      settings = {
+        language:
+          D && typeof D.resolveLanguage === 'function'
+            ? D.resolveLanguage(raw.language)
+            : typeof raw.language === 'string'
+              ? raw.language
+              : 'zh-CN',
+        enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
+        backgroundMode: typeof raw.backgroundMode === 'boolean' ? raw.backgroundMode : true,
+        preventTabDiscard:
+          typeof raw.preventTabDiscard === 'boolean' ? raw.preventTabDiscard : true,
+        stallAlertEnabled:
+          typeof raw.stallAlertEnabled === 'boolean' ? raw.stallAlertEnabled : true
+      };
+    }
 
     function loadSettings(cb) {
       if (!api || !api.storage || !api.storage.local) {
@@ -31,16 +67,7 @@
       }
       api.storage.local.get([STORAGE_KEY], (res) => {
         const raw = res && res[STORAGE_KEY];
-        if (raw && typeof raw === 'object') {
-          settings = {
-            enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
-            backgroundMode: typeof raw.backgroundMode === 'boolean' ? raw.backgroundMode : true,
-            preventTabDiscard:
-              typeof raw.preventTabDiscard === 'boolean' ? raw.preventTabDiscard : true,
-            stallAlertEnabled:
-              typeof raw.stallAlertEnabled === 'boolean' ? raw.stallAlertEnabled : true
-          };
-        }
+        applyRawSettings(raw);
         settingsLoaded = true;
         if (cb) cb(settings);
       });
@@ -119,8 +146,10 @@
           if (!Array.isArray(tabs)) return;
           for (const tab of tabs) {
             if (!tab || typeof tab.id !== 'number') continue;
+            if (tab.url && !isGeminiUrl(tab.url)) continue;
             applyDiscardProtection(tab.id);
-            if (autoInject && !tab.discarded && !ports.has(tab.id)) {
+            if (tab.discarded) continue;
+            if (autoInject && !ports.has(tab.id)) {
               injectIntoTab(tab.id);
             }
             if (sendTick && settings.enabled && settings.backgroundMode) {
@@ -253,8 +282,12 @@
           {
             type: 'basic',
             iconUrl,
-            title: `Gemini 连接已超过 ${mins} 分钟`,
-            message: `检测到该对话连续连接/等待超过 ${mins} 分钟仍无新进展，点击此处立即切回对应标签页检查。`,
+            title: trBg('bgNotifStallTitle', { mins }, `Gemini 连接已超过 ${mins} 分钟`),
+            message: trBg(
+              'bgNotifStallMsg',
+              { mins },
+              `检测到该对话连续连接/等待超过 ${mins} 分钟仍无新进展，点击此处立即切回对应标签页检查。`
+            ),
             priority: 2,
             requireInteraction: true
           },
@@ -306,8 +339,12 @@
           {
             type: 'basic',
             iconUrl,
-            title: 'KenEasy Gemini MCP 助手 · 桌面通知正常',
-            message: '当 Gemini 连接或等待超时无进展时，系统将弹出此类提醒，点击即可切回对应标签页。',
+            title: trBg('bgNotifTestTitle', null, 'KenEasy Gemini MCP 助手 · 桌面通知正常'),
+            message: trBg(
+              'bgNotifTestMsg',
+              null,
+              '当 Gemini 连接或等待超时无进展时，系统将弹出此类提醒，点击即可切回对应标签页。'
+            ),
             priority: 2
           },
           () => {
@@ -498,15 +535,7 @@
     function handleStorageChanged(changes, area) {
       if (area !== 'local') return;
       if (changes && changes[STORAGE_KEY] && changes[STORAGE_KEY].newValue) {
-        const raw = changes[STORAGE_KEY].newValue;
-        settings = {
-          enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
-          backgroundMode: typeof raw.backgroundMode === 'boolean' ? raw.backgroundMode : true,
-          preventTabDiscard:
-            typeof raw.preventTabDiscard === 'boolean' ? raw.preventTabDiscard : true,
-          stallAlertEnabled:
-            typeof raw.stallAlertEnabled === 'boolean' ? raw.stallAlertEnabled : true
-        };
+        applyRawSettings(changes[STORAGE_KEY].newValue);
         if (!settings.enabled || !settings.stallAlertEnabled) {
           clearAllStallNotifications();
         }

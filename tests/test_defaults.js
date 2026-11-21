@@ -58,15 +58,31 @@ function runTests(test) {
     assert.ok(r1.settings.alwaysAllowKeywords.includes('always allow for this conversation'));
     assert.deepStrictEqual(r1.settings.customContinueKeywords, ['自定义词']);
 
-    // Already v2 config with user custom limits must NOT be overwritten
-    const v2Custom = Object.assign({}, r1.settings, {
+    // Already v3 config with user custom limits must NOT be overwritten
+    const v3Custom = Object.assign({}, r1.settings, {
       maxContinuesPerTask: 25,
       dailyContinueLimit: 50
     });
-    const r2 = D.migrateStoredSettings(v2Custom);
+    const r2 = D.migrateStoredSettings(v3Custom);
     assert.strictEqual(r2.migrated, false);
     assert.strictEqual(r2.settings.maxContinuesPerTask, 25);
     assert.strictEqual(r2.settings.dailyContinueLimit, 50);
+
+    // v2 -> v3 migration preserves user limits and strips stale broad '开始'/'開始' defaults
+    const v2Stored = {
+      settingsVersion: 2,
+      maxContinuesPerTask: 15,
+      dailyContinueLimit: 20,
+      continueKeywords: ['继续', '开始', '開始']
+    };
+    const r3 = D.migrateStoredSettings(v2Stored);
+    assert.strictEqual(r3.migrated, true);
+    assert.strictEqual(r3.settings.settingsVersion, D.SETTINGS_VERSION);
+    assert.strictEqual(r3.settings.maxContinuesPerTask, 15);
+    assert.strictEqual(r3.settings.dailyContinueLimit, 20);
+    assert.ok(!r3.settings.continueKeywords.includes('开始'));
+    assert.ok(!r3.settings.continueKeywords.includes('開始'));
+    assert.ok(r3.settings.continueKeywords.includes('続ける'));
   });
 
   test('parseKeywordInput splits by newline, commas, semicolons and deduplicates case-insensitively', () => {
@@ -159,6 +175,36 @@ function runTests(test) {
     assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 0 }).stallAlertMinutes, 1);
     assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 61 }).stallAlertMinutes, 60);
     assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 100 }).stallAlertMinutes, 60);
+  });
+
+  test('multi-language i18n, theme validation, and Japanese/Cantonese keywords work properly', () => {
+    const def = D.mergeSettings(null);
+    assert.strictEqual(def.language, 'zh-CN');
+    assert.strictEqual(def.theme, 'dark');
+    assert.ok(!def.continueKeywords.includes('开始'));
+    assert.ok(!def.continueKeywords.includes('開始'));
+    assert.ok(def.alwaysAllowKeywords.includes('常に許可'));
+    assert.ok(def.continueKeywords.includes('続ける'));
+
+    assert.strictEqual(D.mergeSettings({ language: 'en', theme: 'light' }).language, 'en');
+    assert.strictEqual(D.mergeSettings({ language: 'en', theme: 'light' }).theme, 'light');
+    assert.strictEqual(D.mergeSettings({ language: 'invalid', theme: 'purple' }).language, 'zh-CN');
+    assert.strictEqual(D.mergeSettings({ language: 'invalid', theme: 'purple' }).theme, 'dark');
+
+    const baseKeys = Object.keys(D.UI_I18N['zh-CN']);
+    for (const lang of D.SUPPORTED_LANGUAGES) {
+      assert.ok(D.UI_I18N[lang], `Missing UI_I18N locale: ${lang}`);
+      for (const k of baseKeys) {
+        assert.ok(
+          typeof D.UI_I18N[lang][k] === 'string' && D.UI_I18N[lang][k].length > 0,
+          `Missing UI_I18N.${lang}.${k}`
+        );
+      }
+    }
+    assert.strictEqual(D.t('en', 'hudTitle'), 'MCP Helper');
+    assert.strictEqual(D.t('ja', 'hudTitle'), 'MCP ヘルパー');
+    assert.strictEqual(D.t('zh-TW', 'btnEmergency'), '緊急停止');
+    assert.ok(D.t('en', 'bgNotifStallTitle', { mins: 7 }).includes('7'));
   });
 }
 
