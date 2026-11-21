@@ -40,12 +40,15 @@ The extension has been submitted for Chrome Web Store security review. Once appr
 
 👉 **[Get KenEasy Gemini MCP Auto Helper on Chrome Web Store (Coming Soon)](https://chromewebstore.google.com/)**
 
-### Option 2: Manual Installation (Developer Mode - Recommended)
+### Option 2: Manual Installation (Developer Mode - One-Click Direct Download)
 
-To run the latest development build or use the extension offline immediately:
+Click either link below to **immediately download the `.zip` package with one click**:
 
-1. Download the latest source package from the [GitHub Releases](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases) page (or clone the repository using `git clone`).
-2. Extract the downloaded zip file into your desired local directory (e.g. `E:\code\gemini-mcp-auto-helper`).
+- 📦 **[Direct Download: Manual Install Bundle (`KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.2.0/KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-manual-install.zip)** (Recommended — extracts to `KenEasy-Gemini-MCP-Auto-Helper/` folder with docs)
+- 🏪 **[Direct Download: Clean Extension Zip (`KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.2.0/KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-store.zip)** (Clean root containing `manifest.json`)
+
+Installation steps:
+1. Click a link above to download the `.zip` file and extract it into your local directory (e.g. `E:\code\KenEasy-Gemini-MCP-Auto-Helper`).
 3. Open Google Chrome or Microsoft Edge and navigate to:
    - **Chrome**: `chrome://extensions/`
    - **Edge**: `edge://extensions/`

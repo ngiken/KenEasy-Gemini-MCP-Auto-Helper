@@ -40,12 +40,15 @@
 
 👉 **[前往 Chrome Web Store 官方商店安装 KenEasy Gemini MCP Auto Helper（审核中敬请期待）](https://chromewebstore.google.com/)**
 
-### 方式二：本地开发者模式手动安装（推荐）
+### 方式二：本地开发者模式手动安装（推荐 · 一键直接下载）
 
-在商店上架审核期间，或需要随时体验最新 GitHub 开发版功能，可按以下标准步骤手动加载：
+直接点击下方任意一个下载链接即可**一键自动下载 `.zip` 安装包**：
 
-1. 到 [GitHub Releases](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases) 页面下载最新的源码包（或直接通过 `git clone` 下载仓库）。
-2. 解压压缩包到本地指定目录（例如 `E:\code\gemini-mcp-auto-helper`）。
+- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.2.0/KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
+- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.2.0/KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-store.zip)**（解压即根目录 `manifest.json`）
+
+安装步骤：
+1. 点击上方链接下载 `.zip` 压缩包并解压到本地目录（例如 `E:\code\KenEasy-Gemini-MCP-Auto-Helper`）。
 3. 打开 Chrome 或 Edge 浏览器，在地址栏输入：
    - **Chrome 浏览器**：`chrome://extensions/`
    - **Edge 浏览器**：`edge://extensions/`
