@@ -1,0 +1,33 @@
+================================================================================
+Chrome Web Store - Data Usage & Privacy Declaration Guide
+(Chrome 开发者后台「隐私权规范 / Privacy practices」选项填写指引)
+================================================================================
+
+【第 1 部分：单一用途说明 (Single purpose)】
+请在文本框中粘贴：
+Automates permission approval dialogs and continuation confirmation chips for MCP (Model Context Protocol) tools on Google Gemini web application, providing hands-free continuous AI interaction and multi-layer quota protection.
+
+
+【第 2 部分：数据使用声明 (Data usage / Data collection)】
+问：Do you collect or use user data in this extension? (你是否在此扩展中收集或使用用户数据？)
+答：
+🔘 勾选：【I am not collecting or using data】(我不收集或使用任何数据)
+
+说明：本扩展所有逻辑完全在本地运行，零服务器通信，不收集任何用户隐私、账号信息或网页内容。
+
+
+【第 3 部分：隐私政策网址 (Privacy policy URL)】
+请在输入框中粘贴：
+https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/blob/main/PRIVACY.md
+
+
+【第 4 部分：开发者认证勾选 (Developer certifications)】
+在页面底部，请将以下 3 项全部勾选：
+☑ 1. The developer has disclosed that it will not collect or use your data
+(开发者已声明不会收集或使用您的数据)
+
+☑ 2. The developer has disclosed that your data is not being sold to third parties, outside of the approved use cases
+(开发者已声明您的数据不会出售给第三方)
+
+☑ 3. The developer has disclosed that your data is not being used or transferred for purposes that are unrelated to the item's core functionality
+(开发者已声明您的数据不会用于与扩展核心功能无关的目的)

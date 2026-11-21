@@ -1,0 +1,72 @@
+[Chrome Web Store Store Listing - English (en)]
+
+============================================================
+1. Extension Title (max 45 chars)
+============================================================
+KenEasy Gemini MCP Auto Helper
+
+============================================================
+2. Summary / Short Description (max 132 chars)
+============================================================
+Auto-click Gemini MCP Always Allow & Continue chips with draggable HUD, stall alerts, and 6-layer circuit breaker.
+
+============================================================
+3. Detailed Description (Paste everything below into description box)
+============================================================
+KenEasy Gemini MCP Auto Helper is an open-source productivity extension engineered exclusively for Google Gemini (gemini.google.com). 
+
+It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with an industrial-grade 6-layer circuit breaker.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✨ KEY FEATURES (V0.1 BETA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ 1. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)
+• Automatically detects and clicks "Always allow / 始终允许" permission confirmation dialogs.
+• Pierces through Material Web Components Shadow DOM, <slot> projections, and role="menu" dropdown items.
+• Safe fallback: Optionally falls back to clicking single "Allow once" when no "Always allow" option exists.
+• Strict context guard: Never clicks destructive buttons like Deny, Cancel, Delete, or Block.
+
+🖱️ 2. FREELY DRAGGABLE FLOATING HUD 🆕
+• No longer pinned to the bottom-right corner! Click and drag the HUD header anywhere across the browser viewport.
+• Viewport boundary clamping guarantees the panel always remains accessible and visible on screen.
+• 4px movement deadzone prevents accidental drags when clicking the minimize button or toggles.
+• Position coordinates automatically persist in local storage across page refreshes and chat sessions.
+
+🔔 3. ANTI-STALL DESKTOP NOTIFICATIONS 🆕
+• Get instant Windows/macOS native desktop alerts when tool execution or AI response generation stalls longer than your threshold (default 5 minutes).
+• Browser action icon badge updates to a red "!" warning badge.
+• 1-Click mute toggle available directly on the HUD (5th pill button) and inside the popup settings panel.
+• Disabling notifications immediately revokes and clears all pending desktop alerts.
+• Clicking the notification brings your Gemini tab into focus instantly.
+
+🤖 4. AUTOMATIC CONTINUE & YES CHIP CLICKING
+• Automatically clicks confirmation follow-up chips (such as "↪ Yes") and bottom "Continue" generation buttons.
+• Intelligently ignores satisfaction surveys, questionnaires, long prompt chips, and sidebar history.
+
+🛡️ 5. INDUSTRIAL 6-LAYER CIRCUIT BREAKER PROTECTION
+Prevents runaway infinite loops, token waste, and accidental quota burnout:
+• Layer 1 (Immediate Error Trip): Instantly halts on quota exhaustion, rate limit, or server error cues.
+• Layer 2 (Per-Task Limit): Caps consecutive continue clicks per conversation task (default 10).
+• Layer 3 (Output Settle Guard): Waits for streaming tokens to settle (1.8s) followed by a debounce cooldown (4s).
+• Layer 4 (Daily Continue Limit): Configurable daily continue cap, automatically resets at midnight.
+• Layer 5 (Completion Semantics): Pauses on cues like "Task completed" unless explicit truncation occurred.
+• Layer 6 (Stagnant & Duplicate Breaker): Computes turn content hashes and trips if output stagnates or loops.
+
+💻 6. BACKGROUND & MINIMIZED OPERATION
+• Keeps Gemini active when minimized or running in background tabs through port heartbeats and discard prevention.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔒 PRIVACY & SECURITY COMMITMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 100% Client-Side: Runs entirely inside your local browser.
+• Zero Telemetry: No user data, prompt contents, or analytics are ever collected or transmitted.
+• Open Source: Fully auditable under the permissive MIT License.
+• GitHub Repository: https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📖 HOW TO USE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Install the extension and navigate to Google Gemini (https://gemini.google.com/).
+2. The HUD overlay appears on the page, ready to be dragged anywhere you prefer.
+3. Click the extension toolbar icon to customize cooldown intervals, safety caps, or custom approval keywords.

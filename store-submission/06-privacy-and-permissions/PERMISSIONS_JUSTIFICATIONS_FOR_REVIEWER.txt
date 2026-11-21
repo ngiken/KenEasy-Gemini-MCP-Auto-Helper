@@ -1,0 +1,43 @@
+================================================================================
+Chrome Web Store Reviewer - Permissions Justifications
+(直接复制每一项后面的英文文本粘贴到 Chrome 开发者后台对应权限说明输入框)
+================================================================================
+
+1. Single Purpose Description (单一用途说明):
+--------------------------------------------------------------------------------
+Automates permission approval dialogs and continuation confirmation chips for MCP (Model Context Protocol) tools on Google Gemini web application, providing hands-free continuous AI interaction and multi-layer quota protection.
+
+
+2. Host Permissions Justification (主机权限说明 - https://gemini.google.com/*):
+--------------------------------------------------------------------------------
+The extension exclusively interacts with Google Gemini (https://gemini.google.com/*) to detect MCP approval dialogs, inspect tool confirmation buttons, and provide an on-page draggable status HUD. The extension requests no access to any other website or domain.
+
+
+3. Permission: storage (存储权限):
+--------------------------------------------------------------------------------
+Required to persist user preferences (such as cooldown intervals, breaker thresholds, HUD position coordinates, and custom keyword lists) locally on the device using chrome.storage.local.
+
+
+4. Permission: tabs (标签页权限):
+--------------------------------------------------------------------------------
+Required to detect whether the user is currently viewing a Google Gemini tab, query tab status for the popup control panel, and bring the Gemini tab into focus when the user clicks a desktop stall alert notification.
+
+
+5. Permission: alarms (定时器/闹钟权限):
+--------------------------------------------------------------------------------
+Required to maintain periodic keepalive heartbeats in the Manifest V3 service worker so that automated background tasks do not stall or terminate prematurely when the browser window is minimized or inactive.
+
+
+6. Permission: scripting (脚本注入权限):
+--------------------------------------------------------------------------------
+Required to dynamically inject content scripts into already-opened Google Gemini tabs when the extension is updated or reloaded by the user, avoiding the need for a full browser restart.
+
+
+7. Permission: notifications (桌面通知权限):
+--------------------------------------------------------------------------------
+Required solely to display native desktop alert notifications when an MCP tool execution or Gemini text generation hangs or stalls longer than the user-configured timeout threshold (default 5 minutes).
+
+
+8. Remote Code Execution Declaration (远程代码执行声明):
+--------------------------------------------------------------------------------
+The extension does NOT use or execute any remote code. All JavaScript files, CSS stylesheets, and HTML documents are fully bundled locally within the extension zip package, in strict compliance with Chrome Web Store Manifest V3 security guidelines.
