@@ -21,10 +21,12 @@ function runTests(test) {
     const manifestPath = path.join(ROOT, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.strictEqual(manifest.manifest_version, 3);
+    assert.strictEqual(manifest.version, '0.1.0', "manifest.json version must be '0.1.0'");
     assert.ok(manifest.permissions.includes('storage'));
     assert.ok(manifest.permissions.includes('tabs'));
     assert.ok(manifest.permissions.includes('alarms'));
     assert.ok(manifest.permissions.includes('scripting'));
+    assert.ok(manifest.permissions.includes('notifications'));
     assert.ok(manifest.host_permissions.includes('https://gemini.google.com/*'));
     assert.strictEqual(manifest.background.service_worker, 'background.js');
     assert.strictEqual(manifest.action.default_popup, 'popup.html');
@@ -82,6 +84,10 @@ function runTests(test) {
       'stopOnCompletionCues',
       'stopOnStagnantOutput',
       'stopOnQuotaOrError',
+      'stallAlertEnabled',
+      'stallAlertMinutes',
+      'btnToggleNotif',
+      'btnTestNotif',
       'customAlwaysAllowKeywords',
       'customContinueKeywords',
       'statAllow',
@@ -96,6 +102,50 @@ function runTests(test) {
     ];
     for (const id of expectedIds) {
       assert.ok(html.includes(`id="${id}"`), `popup.html missing id="${id}"`);
+    }
+  });
+
+  test('version is 0.1.0 and marked as Beta in manifest, popup, and HUD', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
+    assert.strictEqual(manifest.version, '0.1.0', "manifest.json must have version '0.1.0'");
+
+    const popupHtml = fs.readFileSync(path.join(ROOT, 'popup.html'), 'utf8');
+    assert.ok(popupHtml.includes('v0.1 Beta'), 'popup.html must clearly display v0.1 Beta badge');
+    assert.ok(/Beta Preview|测试.*Beta|公开测试/i.test(popupHtml), 'popup.html must contain Beta preview designation');
+
+    const hudJs = fs.readFileSync(path.join(ROOT, 'hud.js'), 'utf8');
+    assert.ok(hudJs.includes('v0.1 Beta'), 'hud.js must contain v0.1 Beta badge');
+    assert.ok(/Beta Preview|测试/i.test(hudJs), 'hud.js must indicate Beta preview version');
+  });
+
+  test('all asset images referenced in README.md and README.zh-CN.md exist in assets/ and have valid non-empty sizes', () => {
+    const readmes = ['README.md', 'README.zh-CN.md'];
+    const assetRegex = /assets\/[a-zA-Z0-9_\-\.]+\.(?:png|jpg|jpeg|gif|svg|webp)/g;
+    const allReferenced = new Set();
+
+    for (const relReadme of readmes) {
+      const absPath = path.join(ROOT, relReadme);
+      assert.ok(fs.existsSync(absPath), `${relReadme} must exist`);
+      const content = fs.readFileSync(absPath, 'utf8');
+      const matches = content.match(assetRegex) || [];
+      assert.ok(matches.length > 0, `${relReadme} must reference demo/promotional graphics in assets/`);
+      for (const m of matches) {
+        allReferenced.add(m);
+      }
+    }
+
+    assert.ok(allReferenced.size >= 4, `Expected at least 4 unique asset references, found: ${allReferenced.size}`);
+
+    for (const relAsset of allReferenced) {
+      const absAsset = path.join(ROOT, relAsset);
+      assert.ok(fs.existsSync(absAsset), `Referenced asset does not exist: ${relAsset}`);
+      const stat = fs.statSync(absAsset);
+      assert.ok(stat.size > 1024, `Asset ${relAsset} has suspiciously small size (${stat.size} bytes)`);
+
+      if (relAsset.toLowerCase().endsWith('.png')) {
+        const info = readPngSize(absAsset);
+        assert.ok(info.width > 0 && info.height > 0, `PNG dimensions must be non-zero for ${relAsset}`);
+      }
     }
   });
 }

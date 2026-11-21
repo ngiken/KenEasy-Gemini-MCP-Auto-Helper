@@ -5,6 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gemini MCP Auto Helper</title>
   <link rel="stylesheet" href="popup.css" />
+  <style>
+    .brand-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-beta {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      color: #8ab4f8;
+      background: rgba(138, 180, 248, 0.16);
+      border: 1px solid rgba(138, 180, 248, 0.4);
+      border-radius: 999px;
+      padding: 1px 6px;
+      line-height: 1.2;
+    }
+    .beta-notice {
+      font-size: 10px;
+      color: #fbbc04;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+    .card-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .card-header-row h2 {
+      margin-bottom: 0;
+    }
+  </style>
 </head>
 <body>
   <div class="popup-wrap">
@@ -12,8 +46,12 @@
       <div class="brand">
         <img src="icons/icon48.png" alt="icon" class="logo" />
         <div>
-          <h1>Gemini MCP 助手</h1>
-          <p class="subtitle">自动允许 · 后台保活 · 防刷额度熔断</p>
+          <div class="brand-title-row">
+            <h1>Gemini MCP 助手</h1>
+            <span class="badge-beta" id="popupBetaBadge">v0.1 Beta</span>
+          </div>
+          <p class="subtitle">自动允许 · 后台保活 · 自由悬浮 · 防刷熔断</p>
+          <div class="beta-notice">⚠️ 公开测试预览版 (Beta Preview)</div>
         </div>
       </div>
       <label class="switch" title="总开关">
@@ -101,14 +139,23 @@
         <span>检测到限流 / 额度 / 报错提示时立刻熔断</span>
         <input type="checkbox" id="stopOnQuotaOrError" />
       </label>
+    <section class="card">
+      <div class="card-header-row">
+        <h2>桌面通知提醒 (连接超时 / 卡死)</h2>
+        <button type="button" id="btnToggleNotif" class="btn secondary btn-sm">一键开启/关闭</button>
+      </div>
       <label class="toggle-row">
         <span>连接 / 卡死超时发送电脑桌面通知</span>
         <input type="checkbox" id="stallAlertEnabled" />
       </label>
-      <label class="field">
-        <span>连接超时提醒阈值 (分钟)</span>
-        <input type="number" id="stallAlertMinutes" min="1" max="60" step="1" />
-      </label>
+      <div class="inline-field">
+        <label class="field">
+          <span>连接超时提醒阈值 (分钟)</span>
+          <input type="number" id="stallAlertMinutes" min="1" max="60" step="1" />
+        </label>
+        <button type="button" id="btnTestNotif" class="btn secondary btn-sm">测试通知</button>
+      </div>
+    </section>
     </section>
 
     <section class="card">

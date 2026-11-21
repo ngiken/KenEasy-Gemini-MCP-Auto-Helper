@@ -7,6 +7,17 @@
   font-size: 12px;
   color: #e8eaed;
   user-select: none;
+  touch-action: none;
+}
+
+#gmah-hud.gmah-dragging {
+  opacity: 0.94;
+  user-select: none;
+}
+
+#gmah-hud.gmah-dragging .gmah-card {
+  transition: none !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
 }
 
 #gmah-hud .gmah-card {
@@ -30,6 +41,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  cursor: grab;
+}
+
+#gmah-hud .gmah-header:active,
+#gmah-hud.gmah-dragging .gmah-header {
+  cursor: grabbing;
 }
 
 #gmah-hud .gmah-title {
@@ -41,6 +58,17 @@
   cursor: pointer;
 }
 
+#gmah-hud .gmah-badge-beta {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8ab4f8;
+  background: rgba(138, 180, 248, 0.15);
+  border: 1px solid rgba(138, 180, 248, 0.35);
+  border-radius: 999px;
+  padding: 1px 5px;
+  line-height: 1.2;
+}
+
 #gmah-hud .gmah-dot {
   width: 8px;
   height: 8px;
@@ -50,8 +78,13 @@
 }
 
 #gmah-hud .gmah-dot.active { background: #34a853; box-shadow: 0 0 6px #34a853; }
-#gmah-hud .gmah-dot.warn { background: #fbbc04; box-shadow: 0 0 6px #fbbc04; }
+#gmah-hud .gmah-dot.warn { background: #fbbc04; box-shadow: 0 0 6px #fbbc04; animation: gmah-pulse 1.5s ease-in-out infinite; }
 #gmah-hud .gmah-dot.stopped { background: #ea4335; box-shadow: 0 0 6px #ea4335; }
+
+@keyframes gmah-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
 
 #gmah-hud .gmah-icon-btn {
   background: transparent;
@@ -174,4 +207,11 @@
 
 #gmah-hud .gmah-inspect-btn:hover {
   background: rgba(138, 180, 248, 0.3);
+}
+
+#gmah-hud .gmah-inspect-btn:disabled {
+  background: rgba(52, 168, 83, 0.2);
+  border-color: rgba(52, 168, 83, 0.55);
+  color: #81c995;
+  cursor: default;
 }

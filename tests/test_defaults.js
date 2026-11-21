@@ -14,6 +14,8 @@ function runTests(test) {
     assert.strictEqual(def.dailyContinueLimit, 0);
     assert.strictEqual(def.continueCooldownMs, 4000);
     assert.strictEqual(def.idleSettleMs, 1800);
+    assert.strictEqual(def.stallAlertEnabled, true);
+    assert.strictEqual(def.stallAlertMinutes, 5);
 
     const clamped = D.mergeSettings({
       maxContinuesPerTask: 9999,
@@ -21,6 +23,8 @@ function runTests(test) {
       continueCooldownMs: 100,
       allowCooldownMs: 999999,
       idleSettleMs: 'not-a-number',
+      stallAlertEnabled: false,
+      stallAlertMinutes: 999,
       enabled: false,
       hudMinimized: true
     });
@@ -29,6 +33,9 @@ function runTests(test) {
     assert.strictEqual(clamped.continueCooldownMs, 1000);
     assert.strictEqual(clamped.allowCooldownMs, 30000);
     assert.strictEqual(clamped.idleSettleMs, 1800);
+    assert.strictEqual(clamped.stallAlertEnabled, false);
+    assert.strictEqual(clamped.stallAlertMinutes, 60);
+    assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 0 }).stallAlertMinutes, 1);
     assert.strictEqual(clamped.enabled, false);
     assert.strictEqual(clamped.hudMinimized, true);
   });
@@ -131,6 +138,27 @@ function runTests(test) {
 
     const rolled = D.normalizeStats({ date: '2026-11-19', allowCount: 99, continueCount: 30 }, today);
     assert.deepStrictEqual(rolled, { date: '2026-11-20', allowCount: 0, continueCount: 0 });
+  });
+
+  test('stall alert notification settings are validated and clamped in mergeSettings', () => {
+    assert.strictEqual(D.DEFAULT_SETTINGS.stallAlertEnabled, true);
+    assert.strictEqual(D.DEFAULT_SETTINGS.stallAlertMinutes, 5);
+
+    // Explicit false and custom minutes
+    const s1 = D.mergeSettings({ stallAlertEnabled: false, stallAlertMinutes: 15 });
+    assert.strictEqual(s1.stallAlertEnabled, false);
+    assert.strictEqual(s1.stallAlertMinutes, 15);
+
+    // Non-boolean falls back to default, invalid number falls back to default
+    const s2 = D.mergeSettings({ stallAlertEnabled: 'invalid', stallAlertMinutes: 'not-a-number' });
+    assert.strictEqual(s2.stallAlertEnabled, true);
+    assert.strictEqual(s2.stallAlertMinutes, 5);
+
+    // Clamping boundaries (min 1, max 60)
+    assert.strictEqual(D.mergeSettings({ stallAlertMinutes: -10 }).stallAlertMinutes, 1);
+    assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 0 }).stallAlertMinutes, 1);
+    assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 61 }).stallAlertMinutes, 60);
+    assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 100 }).stallAlertMinutes, 60);
   });
 }
 

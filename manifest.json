@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KenEasy Gemini MCP Auto Helper",
-  "version": "1.2.0",
+  "version": "0.1.0",
   "description": "自动点击 Google Gemini 的 MCP 权限允许按钮与“继续 / Yes”按钮，支持切屏/后台静默运行、连接超时电脑通知，内置 6 层防刷额度熔断保护。",
   "permissions": ["storage", "tabs", "alarms", "scripting", "notifications"],
   "host_permissions": ["https://gemini.google.com/*"],

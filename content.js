@@ -12,6 +12,7 @@
   const INTERACTIVE_SELECTOR = [
     'button',
     '[role="button"]',
+    '[role="menuitem"]',
     'a[role="button"]',
     'mat-chip',
     'mat-chip-option',
@@ -116,9 +117,70 @@
     'mat-snack-bar-container'
   ];
 
+  const CONNECTING_STATUS_SELECTORS = [
+    '[role="status"]',
+    '[role="progressbar"]',
+    '.tool-call',
+    '.mcp-status',
+    '.connecting',
+    '.loading-text',
+    '[data-test-id*="tool"]',
+    '[data-test-id*="mcp"]',
+    '[data-test-id*="connect"]',
+    '[data-test-id*="progress"]',
+    '[data-test-id*="loading"]'
+  ];
+
+  const CONNECTING_KEYWORDS = [
+    'connecting',
+    'reconnecting',
+    'calling tool',
+    'running tool',
+    'executing tool',
+    'waiting for tool',
+    'waiting for mcp',
+    'loading mcp',
+    '正在连接',
+    '重新连接',
+    '连接中',
+    '連接中',
+    '正在連接',
+    '正在调用',
+    '正在調用',
+    '正在运行工具',
+    '正在执行工具',
+    '等待响应',
+    '等待工具'
+  ];
+
+  const STRONG_FOLLOWUP_PROMPT_CUES = [
+    '点下方',
+    '点击下方',
+    '點下方',
+    '點擊下方',
+    '是否继续',
+    '要我继续',
+    '要不要',
+    '继续下一步',
+    '下一步',
+    '需要我',
+    '确认没问题',
+    '確認沒問題',
+    'would you like',
+    'shall i',
+    'should i',
+    'want me to',
+    'ready to',
+    'proceed',
+    'confirm'
+  ];
+
+  const FOLLOWUP_PROMPT_OVERRIDE_CUES = ['?', '？'].concat(STRONG_FOLLOWUP_PROMPT_CUES);
+
   const STOP_BUTTON_COMBINED_SELECTOR = STOP_BUTTON_SELECTORS.join(',');
   const LOADING_COMBINED_SELECTOR = LOADING_SELECTORS.join(',');
   const ALERT_COMBINED_SELECTOR = ALERT_SELECTORS.join(',');
+  const CONNECTING_STATUS_COMBINED_SELECTOR = CONNECTING_STATUS_SELECTORS.join(',');
 
   function formatTime(date) {
     const d = date instanceof Date ? date : new Date();
@@ -192,7 +254,7 @@
     return hasAncestorRoleOrTag(el, ['dialog', 'alertdialog'], ['DIALOG', 'MAT-DIALOG-CONTAINER']);
   }
 
-  function isElementVisible(el, win, doc) {
+  function isElementVisible(el, win, doc, opts) {
     if (!el || el.nodeType !== 1) return false;
     if (el.disabled === true || el.hidden === true) return false;
     if (el.getAttribute) {
@@ -203,8 +265,15 @@
     const w = win || (typeof window !== 'undefined' ? window : null);
     const d = doc || (el.ownerDocument || (typeof document !== 'undefined' ? document : null));
 
-    // Walk element & ancestors so hidden parents (display:none / visibility:hidden / hidden) are always caught,
-    // including when the browser window is minimized or in a background tab.
+    // In background tabs or minimized windows (document.hidden === true), Chrome suspends CSS
+    // fade-in transitions (leaving newly mounted buttons at opacity:0) and defers layout (0x0 rect)
+    // until the tab regains focus. Only relax these for interactive clickables (relaxHiddenLayout:true);
+    // keep strict opacity/rect checks for generating/loading indicators unless window is minimized,
+    // so faded-out spinners in background tabs never falsely block Auto-Continue.
+    const isPageHidden = Boolean(d && d.hidden === true);
+    const isWindowMinimized = Boolean(isPageHidden && w && w.innerWidth === 0 && w.innerHeight === 0);
+    const relaxHiddenLayout = Boolean(opts && opts.relaxHiddenLayout && isPageHidden);
+
     let selfDisplay = '';
     let cur = el;
     while (cur && cur.nodeType === 1) {
@@ -216,7 +285,7 @@
           if (style) {
             if (cur === el) selfDisplay = style.display || '';
             if (style.display === 'none' || style.visibility === 'hidden') return false;
-            if (style.opacity !== '' && parseFloat(style.opacity) === 0) return false;
+            if (!relaxHiddenLayout && style.opacity !== '' && parseFloat(style.opacity) === 0) return false;
             if (cur === el && style.pointerEvents === 'none') return false;
           }
         } catch (_) {
@@ -226,13 +295,7 @@
       cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
     }
 
-    // When the window is minimized on some OSes, innerWidth/innerHeight can report 0 and
-    // getBoundingClientRect() may return 0x0 even for genuinely interactive elements.
-    const isWindowMinimized = Boolean(
-      d && d.hidden === true && w && w.innerWidth === 0 && w.innerHeight === 0
-    );
-
-    if (!isWindowMinimized && selfDisplay !== 'contents' && typeof el.getBoundingClientRect === 'function') {
+    if (!relaxHiddenLayout && !isWindowMinimized && selfDisplay !== 'contents' && typeof el.getBoundingClientRect === 'function') {
       try {
         const rect = el.getBoundingClientRect();
         if (rect && rect.width === 0 && rect.height === 0) return false;
@@ -356,31 +419,48 @@
   }
 
   /**
-   * Collects all elements matching a selector across light DOM and open shadow roots.
+   * Collects the root node plus all nested open ShadowRoots once per scan pass.
    */
-  function queryAllDeep(rootNode, selector, out) {
-    const results = out || [];
-    if (!rootNode) return results;
-
+  function collectSearchRoots(rootNode, out) {
+    const roots = out || [];
+    if (!rootNode) return roots;
+    roots.push(rootNode);
     if (typeof rootNode.querySelectorAll === 'function') {
-      const matched = rootNode.querySelectorAll(selector);
-      for (let i = 0; i < matched.length; i++) {
-        results.push(matched[i]);
-      }
-      // Traverse open shadow roots
       const allNodes = rootNode.querySelectorAll('*');
       for (let i = 0; i < allNodes.length; i++) {
         const node = allNodes[i];
         if (node && node.shadowRoot) {
-          queryAllDeep(node.shadowRoot, selector, results);
+          collectSearchRoots(node.shadowRoot, roots);
         }
+      }
+    }
+    return roots;
+  }
+
+  function queryAllFromRoots(roots, selector, out) {
+    const results = out || [];
+    if (!Array.isArray(roots)) return results;
+    for (let r = 0; r < roots.length; r++) {
+      const rootNode = roots[r];
+      if (!rootNode || typeof rootNode.querySelectorAll !== 'function') continue;
+      const matched = rootNode.querySelectorAll(selector);
+      for (let i = 0; i < matched.length; i++) {
+        results.push(matched[i]);
       }
     }
     return results;
   }
 
-  function collectClickableElements(doc, win) {
-    const raw = queryAllDeep(doc.body || doc, INTERACTIVE_SELECTOR, []);
+  /**
+   * Collects all elements matching a selector across light DOM and open shadow roots.
+   */
+  function queryAllDeep(rootNode, selector, out) {
+    return queryAllFromRoots(collectSearchRoots(rootNode, []), selector, out);
+  }
+
+  function collectClickableElements(doc, win, searchRoots) {
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
+    const raw = queryAllFromRoots(roots, INTERACTIVE_SELECTOR, []);
     const seen = new Set();
     const valid = [];
 
@@ -388,7 +468,7 @@
       if (!el || seen.has(el)) continue;
       seen.add(el);
       if (isIgnoredAncestor(el)) continue;
-      if (!isElementVisible(el, win, doc)) continue;
+      if (!isElementVisible(el, win, doc, { relaxHiddenLayout: true })) continue;
       const label = getElementLabel(el);
       if (!label) continue;
       valid.push({ el, label });
@@ -494,24 +574,58 @@
     return false;
   }
 
+  function isFollowUpChipElement(el, rawLabel) {
+    if (typeof rawLabel === 'string' && /^\s*[↪↳↵↩]/.test(rawLabel)) {
+      return true;
+    }
+    let cur = el;
+    for (let depth = 0; depth < 3 && cur && cur.nodeType === 1; depth++) {
+      const tag = (cur.tagName || '').toUpperCase();
+      if (tag === 'MAT-CHIP' || tag === 'MAT-ACTION-CHIP' || tag === 'MAT-CHIP-OPTION') {
+        return true;
+      }
+      const cls =
+        typeof cur.className === 'string'
+          ? cur.className
+          : (cur.getAttribute && cur.getAttribute('class')) || '';
+      if (/\b(follow-up-chip|suggestion-chip|mat-mdc-chip|mdc-evolution-chip)\b/i.test(cls)) {
+        return true;
+      }
+      const testId = (cur.getAttribute && cur.getAttribute('data-test-id') || '').toLowerCase();
+      if (testId.includes('chip') || testId.includes('follow-up') || testId.includes('suggestion')) {
+        return true;
+      }
+      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    }
+    return false;
+  }
+
   function hasNegativeSiblingInGroup(el) {
     let container =
       el.parentElement ||
       el.parentNode ||
       (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
-    for (let depth = 0; depth < 4 && container; depth++) {
+    // Check only immediate button group (depth < 2) so a solo "Yes" follow-up chip never climbs
+    // into <model-response> and hits unrelated message action bar buttons.
+    for (let depth = 0; depth < 2 && container; depth++) {
       const tag = (container.tagName || '').toUpperCase();
-      if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
+      if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN' || tag === 'MODEL-RESPONSE') break;
       if (typeof container.querySelectorAll === 'function') {
         const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
-        if (siblings.length > 8) break;
+        if (siblings.length > 6) break;
         let otherCount = 0;
         for (let i = 0; i < siblings.length; i++) {
           const sib = siblings[i];
           if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
           otherCount += 1;
           const sibLabel = getElementLabel(sib);
-          if (sibLabel && sibLabel.length <= 40 && D.containsKeyword(sibLabel, DIALOG_OR_SURVEY_NEGATIVE_SIBLINGS)) {
+          if (
+            sibLabel &&
+            D.matchButtonLabel(sibLabel, DIALOG_OR_SURVEY_NEGATIVE_SIBLINGS, {
+              maxLen: 20,
+              mode: 'exact'
+            })
+          ) {
             return true;
           }
         }
@@ -525,10 +639,11 @@
     return false;
   }
 
-  function getAssistantTurns(doc) {
+  function getAssistantTurns(doc, searchRoots) {
     if (!doc) return [];
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
     for (const sel of TURN_SELECTORS) {
-      const nodes = queryAllDeep(doc.body || doc, sel, []);
+      const nodes = queryAllFromRoots(roots, sel, []);
       if (nodes.length === 0) continue;
       const seen = new Set();
       const filtered = [];
@@ -606,19 +721,21 @@
 
   function defaultClickElement(el, win) {
     const w = win || (typeof window !== 'undefined' ? window : null);
-    const eventOpts = { bubbles: true, cancelable: true, composed: true };
+    const baseOpts = { bubbles: true, cancelable: true, composed: true, button: 0 };
+    const downOpts = Object.assign({ buttons: 1 }, baseOpts);
+    const upOpts = Object.assign({ buttons: 0 }, baseOpts);
     try {
       if (w && typeof w.PointerEvent === 'function') {
-        el.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ pointerId: 1, isPrimary: true }, eventOpts)));
+        el.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ pointerId: 1, isPrimary: true }, downOpts)));
       }
       if (w && typeof w.MouseEvent === 'function') {
-        el.dispatchEvent(new w.MouseEvent('mousedown', eventOpts));
+        el.dispatchEvent(new w.MouseEvent('mousedown', downOpts));
       }
       if (w && typeof w.PointerEvent === 'function') {
-        el.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ pointerId: 1, isPrimary: true }, eventOpts)));
+        el.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ pointerId: 1, isPrimary: true }, upOpts)));
       }
       if (w && typeof w.MouseEvent === 'function') {
-        el.dispatchEvent(new w.MouseEvent('mouseup', eventOpts));
+        el.dispatchEvent(new w.MouseEvent('mouseup', upOpts));
       }
     } catch (_) {
       // Fallback to plain click
@@ -626,7 +743,7 @@
     if (typeof el.click === 'function') {
       el.click();
     } else if (w && typeof w.MouseEvent === 'function') {
-      el.dispatchEvent(new w.MouseEvent('click', eventOpts));
+      el.dispatchEvent(new w.MouseEvent('click', upOpts));
     }
   }
 
@@ -640,6 +757,8 @@
       this.onStateChange = typeof opts.onStateChange === 'function' ? opts.onStateChange : null;
       this.onStatsSave = typeof opts.onStatsSave === 'function' ? opts.onStatsSave : null;
       this.onSettingsSave = typeof opts.onSettingsSave === 'function' ? opts.onSettingsSave : null;
+      this.onStallAlert = typeof opts.onStallAlert === 'function' ? opts.onStallAlert : null;
+      this.onStallResolved = typeof opts.onStallResolved === 'function' ? opts.onStallResolved : null;
 
       this.settings = D.mergeSettings(opts.settings);
       this.stats = D.normalizeStats(opts.stats, D.getTodayKey(new Date(this.now())));
@@ -655,6 +774,11 @@
       this.lastUrl = this.win && this.win.location ? this.win.location.href : '';
       this.lastStatusText = '监控中';
       this.isGenerating = false;
+
+      // Connection / waiting stall timer state
+      this.stallStartAt = 0;
+      this.stallFingerprint = null;
+      this.stallAlertActive = false;
 
       this.circuitBreaker = {
         tripped: false,
@@ -684,6 +808,7 @@
         stats: this.stats,
         taskContinueCount: this.taskContinueCount,
         isGenerating: this.isGenerating,
+        stallAlertActive: this.stallAlertActive,
         lastStatusText: this.lastStatusText,
         circuitBreaker: Object.assign({}, this.circuitBreaker),
         logs: this.logs.slice()
@@ -696,8 +821,35 @@
       }
     }
 
+    resetStallMonitor(notifyIfActive, resolvedLog) {
+      const wasActive = this.stallAlertActive;
+      this.stallStartAt = 0;
+      this.stallFingerprint = null;
+      this.stallAlertActive = false;
+      if (wasActive) {
+        if (this.lastStatusText && this.lastStatusText.startsWith('⚠️')) {
+          this.lastStatusText = '监控中';
+        }
+        if (resolvedLog) {
+          this.addLog(resolvedLog);
+        }
+        if (notifyIfActive && this.onStallResolved) {
+          this.onStallResolved();
+        }
+      }
+    }
+
     updateSettings(partial, persist) {
+      const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
       this.settings = D.mergeSettings(Object.assign({}, this.settings, partial));
+      if (!this.settings.enabled || !this.settings.stallAlertEnabled) {
+        this.resetStallMonitor(true);
+      }
+      if (prevStallAlert && !this.settings.stallAlertEnabled) {
+        if (this.onStallResolved) {
+          this.onStallResolved();
+        }
+      }
       if (persist && this.onSettingsSave) {
         this.onSettingsSave(this.settings);
       }
@@ -723,6 +875,7 @@
       if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === reasonCode) {
         return;
       }
+      this.resetStallMonitor(true);
       this.circuitBreaker = {
         tripped: true,
         reasonCode,
@@ -739,6 +892,7 @@
 
     clearBreaker(logMsg) {
       const prevCode = this.circuitBreaker.reasonCode;
+      this.resetStallMonitor(true);
       this.circuitBreaker = {
         tripped: false,
         reasonCode: null,
@@ -756,6 +910,7 @@
     }
 
     onUserManualPrompt() {
+      this.resetStallMonitor(true);
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
       this.lastContinueFingerprint = null;
@@ -775,6 +930,7 @@
     }
 
     onConversationChange(newUrl) {
+      this.resetStallMonitor(true);
       this.lastUrl = newUrl;
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
@@ -791,16 +947,18 @@
       }
     }
 
-    detectGenerating() {
+    detectGenerating(searchRoots) {
       if (!this.doc) return false;
-      const rootNode = this.doc.body || this.doc;
-      const stopNodes = queryAllDeep(rootNode, STOP_BUTTON_COMBINED_SELECTOR, []);
+      const roots = Array.isArray(searchRoots)
+        ? searchRoots
+        : collectSearchRoots(this.doc.body || this.doc, []);
+      const stopNodes = queryAllFromRoots(roots, STOP_BUTTON_COMBINED_SELECTOR, []);
       for (const n of stopNodes) {
         if (!isIgnoredAncestor(n) && isElementVisible(n, this.win, this.doc)) {
           return true;
         }
       }
-      const loadingNodes = queryAllDeep(rootNode, LOADING_COMBINED_SELECTOR, []);
+      const loadingNodes = queryAllFromRoots(roots, LOADING_COMBINED_SELECTOR, []);
       for (const n of loadingNodes) {
         if (!isIgnoredAncestor(n) && isElementVisible(n, this.win, this.doc)) {
           return true;
@@ -809,11 +967,90 @@
       return false;
     }
 
-    detectQuotaOrError(turns) {
+    detectConnectingStatus(searchRoots) {
+      if (!this.doc) return null;
+      const roots = Array.isArray(searchRoots)
+        ? searchRoots
+        : collectSearchRoots(this.doc.body || this.doc, []);
+      const nodes = queryAllFromRoots(roots, CONNECTING_STATUS_COMBINED_SELECTOR, []);
+      for (const n of nodes) {
+        if (isIgnoredAncestor(n) || !isElementVisible(n, this.win, this.doc)) continue;
+        const txt = (n.innerText || n.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!txt || txt.length > 140) continue;
+        if (D.containsKeyword(txt, CONNECTING_KEYWORDS)) {
+          return txt;
+        }
+      }
+      return null;
+    }
+
+    computeStallProgressFingerprint(turns, connectingText) {
+      const turnFp = computeResponseFingerprint(turns) || '';
+      // Strip volatile digits / animated ellipsis from status indicators (e.g. "Connecting (12s)...")
+      const stableStatus = connectingText
+        ? D.normalizeText(connectingText)
+            .replace(/\d+/g, '#')
+            .replace(/[.。…]+/g, '')
+            .trim()
+            .slice(0, 100)
+        : '';
+      return `${turnFp}|a:${this.stats.allowCount}|c:${this.stats.continueCount}|s:${stableStatus}`;
+    }
+
+    updateStallMonitor(now, turns, isWaiting, connectingText) {
+      if (!this.settings.enabled || !this.settings.stallAlertEnabled) {
+        this.resetStallMonitor(true);
+        return false;
+      }
+
+      if (!isWaiting) {
+        this.resetStallMonitor(true, '✅ 连接/生成已恢复正常，已清除超时提醒');
+        return false;
+      }
+
+      const fp = this.computeStallProgressFingerprint(turns, connectingText);
+      if (this.stallStartAt === 0 || fp !== this.stallFingerprint) {
+        this.stallStartAt = now;
+        this.stallFingerprint = fp;
+        if (this.stallAlertActive) {
+          this.stallAlertActive = false;
+          if (this.lastStatusText && this.lastStatusText.startsWith('⚠️')) {
+            this.lastStatusText = '监控中';
+          }
+          this.addLog('✅ 检测到新输出进展，已清除连接超时提醒');
+          if (this.onStallResolved) this.onStallResolved();
+        }
+        return false;
+      }
+
+      const thresholdMs = Math.max(1, this.settings.stallAlertMinutes) * 60 * 1000;
+      const elapsedMs = now - this.stallStartAt;
+      if (!this.stallAlertActive && elapsedMs >= thresholdMs) {
+        this.stallAlertActive = true;
+        const mins = Math.max(1, Math.floor(elapsedMs / 60000));
+        this.lastStatusText = `⚠️ 连接/等待已超过 ${mins} 分钟无进展`;
+        this.addLog(`🔔 检测到连接/等待连续超过 ${mins} 分钟无新进展，已发送桌面通知`);
+        if (this.onStallAlert) {
+          this.onStallAlert({
+            minutes: mins,
+            elapsedMs,
+            url: this.lastUrl
+          });
+        }
+        this.emitState();
+        return true;
+      }
+      return false;
+    }
+
+    detectQuotaOrError(turns, searchRoots) {
       if (!this.settings.stopOnQuotaOrError) return null;
 
       // 1. Check visible alert/toast banners
-      const alertNodes = queryAllDeep(this.doc.body || this.doc, ALERT_COMBINED_SELECTOR, []);
+      const roots = Array.isArray(searchRoots)
+        ? searchRoots
+        : collectSearchRoots(this.doc.body || this.doc, []);
+      const alertNodes = queryAllFromRoots(roots, ALERT_COMBINED_SELECTOR, []);
       for (const n of alertNodes) {
         if (isIgnoredAncestor(n) || !isElementVisible(n, this.win, this.doc)) continue;
         const txt = (n.innerText || n.textContent || '').trim();
@@ -924,8 +1161,13 @@
         });
         if (mDefault) {
           const matchedKey = D.stripEdgePunctuation(mDefault.keyword);
-          // Protect generic affirmative words ("Yes", "确认", "好的") from clicking survey or delete confirmation dialogs
-          if (GENERIC_AFFIRMATIVE_CONTINUE_SET.has(matchedKey) && hasNegativeSiblingInGroup(item.el)) {
+          // Protect generic affirmative words ("Yes", "确认", "好的") from clicking survey or delete confirmation dialogs,
+          // while allowing explicit Gemini follow-up chips (e.g. "↪ Yes", mat-chip, .follow-up-chip) cleanly.
+          if (
+            GENERIC_AFFIRMATIVE_CONTINUE_SET.has(matchedKey) &&
+            !isFollowUpChipElement(item.el, item.label) &&
+            hasNegativeSiblingInGroup(item.el)
+          ) {
             continue;
           }
           matches.push({ item, match: mDefault });
@@ -997,22 +1239,27 @@
       }
 
       this.ensureTodayStats();
-      this.isGenerating = this.detectGenerating();
+      const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
+      this.isGenerating = this.detectGenerating(searchRoots);
 
       if (!this.settings.enabled) {
+        this.resetStallMonitor(true);
         this.emitState();
         return { action: 'noop', reason: 'disabled' };
       }
 
       // Emergency stop blocks EVERYTHING (both Allow & Continue)
       if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
+        this.resetStallMonitor(true);
         this.emitState();
         return { action: 'blocked', reason: 'emergency_stop' };
       }
 
       const now = this.now();
-      const clickables = collectClickableElements(this.doc, this.win);
-      const turns = getAssistantTurns(this.doc);
+      const clickables = collectClickableElements(this.doc, this.win, searchRoots);
+      const turns = getAssistantTurns(this.doc, searchRoots);
+      const connectingText = this.detectConnectingStatus(searchRoots);
+      const isWaiting = Boolean(this.isGenerating || connectingText);
 
       // Prune clicked elements that are no longer visible/mounted so Angular-recycled
       // DOM buttons can be clicked again in subsequent prompts without double-clicking live ones.
@@ -1033,6 +1280,7 @@
             this.clickedElements.add(allowHit.item.el);
             this.lastAllowClickAt = now;
             this.stats.allowCount += 1;
+            this.resetStallMonitor(true);
             if (this.onStatsSave) this.onStatsSave(this.stats);
             this.clickFn(allowHit.item.el, this.win);
             const tag = allowHit.tier === 'always' ? '始终允许' : '允许';
@@ -1049,6 +1297,9 @@
         }
       }
 
+      // Track connection / generation stall timeout (triggers desktop notification if stuck >= N mins)
+      this.updateStallMonitor(now, turns, isWaiting, connectingText);
+
       // 2. Check Auto-Continue (strictly guarded by 6-layer anti-quota-burn circuit breaker)
       if (!this.settings.autoContinue) {
         this.emitState();
@@ -1061,7 +1312,7 @@
       }
 
       // Layer A: Quota / Rate-limit / Error Detection
-      const quotaHit = this.detectQuotaOrError(turns);
+      const quotaHit = this.detectQuotaOrError(turns, searchRoots);
       if (quotaHit) {
         this.tripBreaker('quota_error', `检测到额度/错误提示（「${quotaHit}」）`);
         return { action: 'tripped', reason: 'quota_error', keyword: quotaHit };
@@ -1108,14 +1359,19 @@
         return { action: 'wait', reason: 'cooldown' };
       }
 
-      // Layer F: Completion cue guard
+      // Layer F: Completion cue guard (overridden by truncation cues or explicit follow-up prompt cues)
       if (this.settings.stopOnCompletionCues) {
         const latestText = getLatestResponseText(turns);
         if (latestText) {
           const tail = latestText.slice(-500);
           const doneCue = D.containsKeyword(tail, this.settings.completionCueKeywords);
           const truncCue = D.containsKeyword(tail, this.settings.truncationCueKeywords);
-          if (doneCue && !truncCue) {
+          const isFollowUpChip = isFollowUpChipElement(contHit.item.el, contHit.item.label);
+          const hasFollowupOverride = Boolean(
+            D.containsKeyword(tail, STRONG_FOLLOWUP_PROMPT_CUES) ||
+              (isFollowUpChip && D.containsKeyword(tail, FOLLOWUP_PROMPT_OVERRIDE_CUES))
+          );
+          if (doneCue && !truncCue && !hasFollowupOverride) {
             this.clickedElements.add(contHit.item.el);
             this.lastStatusText = `检测到完工信号「${doneCue}」，已跳过继续`;
             this.addLog(`🛡️ 检测到完工信号「${doneCue}」，跳过点击「${contHit.item.label}」`);
@@ -1145,6 +1401,7 @@
       this.lastContinueContentFingerprint = contentFp;
       this.taskContinueCount += 1;
       this.stats.continueCount += 1;
+      this.resetStallMonitor(true);
       if (this.onStatsSave) this.onStatsSave(this.stats);
 
       this.clickFn(contHit.item.el, this.win);
@@ -1171,6 +1428,7 @@
     getAssistantTurns,
     isIgnoredAncestor,
     isElementVisible,
+    isFollowUpChipElement,
     getElementLabel,
     computeResponseFingerprint,
     computeContentFingerprint,
@@ -1239,11 +1497,40 @@
       }
     };
 
+    function sendToBackground(msg) {
+      if (!isContextAlive()) return;
+      if (bgPort) {
+        try {
+          bgPort.postMessage(msg);
+          return;
+        } catch (_) {
+          bgPort = null;
+        }
+      }
+      if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+        try {
+          const res = chrome.runtime.sendMessage(msg, () => {
+            void (chrome.runtime && chrome.runtime.lastError);
+          });
+          if (res && typeof res.catch === 'function') res.catch(() => {});
+        } catch (_) {
+          isContextAlive();
+        }
+      }
+    }
+
     const engine = new GmahEngine({
       doc: document,
       win: window,
       onSettingsSave: saveSettings,
       onStatsSave: saveStats,
+      onStallAlert: (payload) => {
+        sendToBackground(Object.assign({ type: 'GMAH_STALL_ALERT' }, payload || {}));
+      },
+      onStallResolved: () => {
+        sendToBackground({ type: 'GMAH_STALL_CLEAR' });
+        sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
+      },
       onStateChange: (state) => {
         if (hud && !contextInvalidated) hud.update(state);
       }
@@ -1276,6 +1563,25 @@
             engine.settings.backgroundMode ? '🌙 后台静默运行已开启' : '🌙 后台静默运行已关闭'
           );
           engine.emitState();
+        },
+        onToggleNotification: () => {
+          if (!isContextAlive()) return;
+          const nextVal = !engine.settings.stallAlertEnabled;
+          engine.updateSettings({ stallAlertEnabled: nextVal }, true);
+          if (!nextVal) {
+            sendToBackground({ type: 'GMAH_STALL_CLEAR' });
+            sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
+          }
+          engine.addLog(nextVal ? '🔔 桌面通知提醒已开启' : '🔕 桌面通知提醒已关闭');
+          engine.emitState();
+        },
+        onPositionChange: (pos) => {
+          if (!isContextAlive()) return;
+          try {
+            if (hasChromeStorage) {
+              chrome.storage.local.set({ gmah_hud_position: pos });
+            }
+          } catch (_) {}
         },
         onEmergencyStop: () => {
           if (!isContextAlive()) return;
@@ -1314,7 +1620,22 @@
         chrome.storage.onChanged.addListener((changes, area) => {
           if (!isContextAlive() || area !== 'local') return;
           if (changes[D.STORAGE_KEY] && changes[D.STORAGE_KEY].newValue) {
+            const oldAlert = engine.settings ? engine.settings.stallAlertEnabled : true;
             engine.settings = D.mergeSettings(changes[D.STORAGE_KEY].newValue);
+            if (!engine.settings.enabled || !engine.settings.stallAlertEnabled) {
+              engine.resetStallMonitor(true);
+              if (oldAlert && !engine.settings.stallAlertEnabled) {
+                sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
+              }
+            }
+          }
+          if (
+            changes.gmah_hud_position &&
+            changes.gmah_hud_position.newValue &&
+            hud &&
+            typeof hud.setPosition === 'function'
+          ) {
+            hud.setPosition(changes.gmah_hud_position.newValue);
           }
           if (changes[D.STATS_KEY] && changes[D.STATS_KEY].newValue) {
             engine.stats = D.normalizeStats(changes[D.STATS_KEY].newValue);
@@ -1350,9 +1671,11 @@
     function handleKeydown(ev) {
       if (!isContextAlive() || !ev.isTrusted) return;
       if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) {
-        const t = ev.target;
+        const path = typeof ev.composedPath === 'function' ? ev.composedPath() : null;
+        const t = (path && path.length > 0 ? path[0] : null) || ev.target;
         if (
           t &&
+          t.nodeType === 1 &&
           (t.tagName === 'TEXTAREA' ||
             (t.getAttribute && t.getAttribute('contenteditable') === 'true') ||
             (t.closest && t.closest('[contenteditable="true"]')))
@@ -1364,10 +1687,37 @@
 
     function handleClick(ev) {
       if (!isContextAlive() || !ev.isTrusted) return;
-      const btn = ev.target && ev.target.closest ? ev.target.closest('button, [role="button"]') : null;
+      let btn = null;
+      if (typeof ev.composedPath === 'function') {
+        const path = ev.composedPath();
+        for (let i = 0; i < path.length; i++) {
+          const node = path[i];
+          if (!node || node.nodeType !== 1) continue;
+          const tag = (node.tagName || '').toUpperCase();
+          const role = (node.getAttribute && node.getAttribute('role') || '').toLowerCase();
+          if (tag === 'BUTTON' || role === 'button') {
+            btn = node;
+            break;
+          }
+        }
+      }
+      if (!btn) {
+        btn = ev.target && ev.target.closest ? ev.target.closest('button, [role="button"]') : null;
+      }
       if (!btn || isIgnoredAncestor(btn)) return;
       const lbl = D.normalizeText(getElementLabel(btn));
       const testId = (btn.getAttribute && btn.getAttribute('data-test-id') || '').toLowerCase();
+      const cls = typeof btn.className === 'string' ? btn.className : '';
+      // Never mistake the "Stop generating" toggle (e.g. `.send-button.stop`) for sending a new prompt
+      if (
+        /\bstop\b/i.test(cls) ||
+        testId.includes('stop') ||
+        lbl.includes('stop') ||
+        lbl.includes('停止') ||
+        lbl.includes('取消生成')
+      ) {
+        return;
+      }
       if (
         lbl === 'send' ||
         lbl === 'send message' ||
@@ -1380,7 +1730,7 @@
         lbl === '傳送訊息' ||
         lbl === '提交' ||
         testId.includes('send') ||
-        (btn.className && String(btn.className).includes('send-button'))
+        /\bsend-button\b/i.test(cls)
       ) {
         engine.onUserManualPrompt();
       }
@@ -1539,7 +1889,11 @@
             }, 3000);
           }
         });
-        bgPort.postMessage({ type: 'GMAH_TAB_HELLO', url: window.location.href });
+        bgPort.postMessage({
+          type: 'GMAH_TAB_HELLO',
+          url: window.location.href,
+          stallAlertActive: Boolean(engine.stallAlertActive)
+        });
       } catch (_) {
         bgPort = null;
         isContextAlive();

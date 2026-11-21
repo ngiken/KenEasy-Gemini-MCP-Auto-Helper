@@ -192,11 +192,46 @@ class MockNode {
     this._listeners.get(type).push(fn);
   }
 
+  removeEventListener(type, fn) {
+    const list = this._listeners.get(type) || [];
+    const idx = list.indexOf(fn);
+    if (idx >= 0) list.splice(idx, 1);
+  }
+
   dispatchEvent(ev) {
     this.dispatchedEvents.push(ev.type);
-    const list = this._listeners.get(ev.type) || [];
+    const list = (this._listeners.get(ev.type) || []).slice();
     for (const fn of list) fn(ev);
     return true;
+  }
+
+  closest(selector) {
+    let cur = this;
+    while (cur && cur.nodeType === 1) {
+      if (matchesSelectorList(cur, selector)) return cur;
+      cur = cur.parentNode;
+    }
+    return null;
+  }
+
+  get classList() {
+    const self = this;
+    return {
+      contains(cls) {
+        return String(self.className || '').split(/\s+/).includes(cls);
+      },
+      add(cls) {
+        const parts = String(self.className || '').split(/\s+/).filter(Boolean);
+        if (!parts.includes(cls)) {
+          parts.push(cls);
+          self.className = parts.join(' ');
+        }
+      },
+      remove(cls) {
+        const parts = String(self.className || '').split(/\s+/).filter((c) => c && c !== cls);
+        self.className = parts.join(' ');
+      }
+    };
   }
 
   click() {
@@ -206,13 +241,28 @@ class MockNode {
 }
 
 function createMockEnv(url) {
+  const docListeners = new Map();
   const doc = {
     hidden: false,
     body: null,
     documentElement: null,
     createElement(tag, opts) { return new MockNode(tag, doc, opts); },
     getElementById(id) { return doc.body ? doc.body.querySelector(`#${id}`) : null; },
-    querySelectorAll(sel) { return doc.body ? doc.body.querySelectorAll(sel) : []; }
+    querySelectorAll(sel) { return doc.body ? doc.body.querySelectorAll(sel) : []; },
+    addEventListener(type, fn) {
+      if (!docListeners.has(type)) docListeners.set(type, []);
+      docListeners.get(type).push(fn);
+    },
+    removeEventListener(type, fn) {
+      const list = docListeners.get(type) || [];
+      const idx = list.indexOf(fn);
+      if (idx >= 0) list.splice(idx, 1);
+    },
+    dispatchEvent(ev) {
+      const list = (docListeners.get(ev.type) || []).slice();
+      for (const fn of list) fn(ev);
+      return true;
+    }
   };
   doc.documentElement = new MockNode('html', doc);
   doc.body = new MockNode('body', doc);
@@ -225,18 +275,27 @@ function createMockEnv(url) {
     }
   }
 
+  const mockStorage = new Map();
+  const localStorageMock = {
+    getItem(k) { return mockStorage.has(String(k)) ? mockStorage.get(String(k)) : null; },
+    setItem(k, v) { mockStorage.set(String(k), String(v)); },
+    removeItem(k) { mockStorage.delete(String(k)); },
+    clear() { mockStorage.clear(); }
+  };
+
   const win = {
     innerWidth: 1440,
     innerHeight: 900,
     location: { href: url || 'https://gemini.google.com/app/chat-1' },
     PointerEvent: MockEvent,
     MouseEvent: MockEvent,
+    localStorage: localStorageMock,
     getComputedStyle(el) {
       return el.style || { display: '', visibility: '', opacity: '', pointerEvents: '' };
     }
   };
 
-  return { doc, win };
+  return { doc, win, localStorageMock };
 }
 
 function addTurn(doc, text, extraChildren) {
@@ -1406,6 +1465,558 @@ function runTests(test) {
       hud.unmount();
     } finally {
       global.document = prevDoc;
+    }
+  });
+
+  // 25. Connection / generation stall timeout fires alert after threshold and auto-clears on recovery
+  test('stall timeout fires onStallAlert after threshold, ignores animated timer digits, and clears on progress or recovery', () => {
+    const { doc, win } = createMockEnv();
+    let now = 1000000;
+    const alerts = [];
+    let resolvedCount = 0;
+
+    const statusNode = doc.createElement('div', {
+      attrs: { role: 'status' },
+      text: '正在连接 Desktop Commander (1s)...'
+    });
+    doc.body.appendChild(statusNode);
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      settings: { stallAlertEnabled: true, stallAlertMinutes: 5 },
+      onStallAlert: (payload) => alerts.push(payload),
+      onStallResolved: () => { resolvedCount += 1; }
+    });
+
+    // t = 0: starts stall timer
+    engine.scanOnce();
+    assert.strictEqual(engine.stallAlertActive, false);
+    assert.strictEqual(alerts.length, 0);
+
+    // t = 3 min: status text digits & ellipsis animate -> must NOT reset stall timer
+    now += 3 * 60 * 1000;
+    statusNode.textContent = '正在连接 Desktop Commander (180s)......';
+    engine.scanOnce();
+    assert.strictEqual(engine.stallAlertActive, false);
+    assert.strictEqual(alerts.length, 0);
+
+    // t = 5 min: threshold reached -> fires exactly once
+    now += 2 * 60 * 1000;
+    engine.scanOnce();
+    assert.strictEqual(engine.stallAlertActive, true);
+    assert.strictEqual(engine.getState().stallAlertActive, true);
+    assert.strictEqual(alerts.length, 1);
+    assert.strictEqual(alerts[0].minutes, 5);
+
+    // Subsequent scan while still stuck must NOT spam duplicate notifications
+    now += 60 * 1000;
+    engine.scanOnce();
+    assert.strictEqual(alerts.length, 1);
+
+    // New output arrives -> clears stall alert automatically
+    addTurn(doc, '工具返回结果，继续生成中...');
+    now += 5000;
+    engine.scanOnce();
+    assert.strictEqual(engine.stallAlertActive, false);
+    assert.strictEqual(resolvedCount, 1);
+
+    // Stuck again for 5 minutes -> alerts again, then status node disappears -> clears
+    now += 5 * 60 * 1000;
+    engine.scanOnce();
+    assert.strictEqual(engine.stallAlertActive, true);
+    assert.strictEqual(alerts.length, 2);
+
+    statusNode.remove();
+    now += 2000;
+    engine.scanOnce();
+    assert.strictEqual(engine.stallAlertActive, false);
+    assert.strictEqual(resolvedCount, 2);
+  });
+
+  // 26. Layer F completion cue is overridden by explicit follow-up prompt + ↪ Yes chip, and role="menuitem" Always Allow works
+  test('layer F allows ↪ Yes follow-up chip when reply asks to proceed despite completion cue, and clicks role="menuitem" Always Allow', () => {
+    const { doc, win } = createMockEnv();
+    let now = 500000;
+
+    // 1) Completion cue + follow-up confirmation prompt with ↪ Yes chip -> MUST click
+    const yesChip = doc.createElement('button', { className: 'follow-up-chip', text: '↪ Yes' });
+    addTurn(doc, '所有测试均已通过！全部完成。需要我继续下一步把改动推送到远程仓库吗？', [yesChip]);
+
+    const engine = new GmahEngine({ doc, win, now: () => now });
+    const r1 = engine.scanOnce();
+    assert.strictEqual(r1.action, 'clicked_continue');
+    assert.strictEqual(r1.element, yesChip);
+    assert.strictEqual(yesChip.clickCount, 1);
+
+    // 2) role="menuitem" inside role="menu" for Always Allow -> MUST click
+    const menu = doc.createElement('div', { attrs: { role: 'menu' } });
+    const menuItem = doc.createElement('div', { attrs: { role: 'menuitem' }, text: '始终允许此工具' });
+    menu.appendChild(menuItem);
+    doc.body.appendChild(menu);
+
+    now += 2000;
+    const r2 = engine.scanOnce();
+    assert.strictEqual(r2.action, 'clicked_allow');
+    assert.strictEqual(r2.tier, 'always');
+    assert.strictEqual(r2.element, menuItem);
+    assert.strictEqual(menuItem.clickCount, 1);
+  });
+
+  // 27. Background stall notifications, badge, minimized window restore, test notification, and storage disable cleanup
+  test('background.js creates stall notifications, restores minimized window on click, handles test notif and cleanup', () => {
+    const createdNotifs = [];
+    const clearedNotifs = [];
+    const badgeUpdates = [];
+    const windowUpdates = [];
+    const tabUpdates = [];
+
+    const mockChrome = {
+      runtime: {
+        lastError: null,
+        getURL: (p) => `chrome-extension://id/${p}`,
+        onConnect: { addListener() {} },
+        onMessage: { addListener() {} },
+        onInstalled: { addListener() {} },
+        onStartup: { addListener() {} }
+      },
+      storage: {
+        local: { get(_k, cb) { cb({}); } },
+        onChanged: { addListener() {} }
+      },
+      action: {
+        setBadgeText(opts, cb) { badgeUpdates.push(opts); if (cb) cb(); },
+        setBadgeBackgroundColor(_opts, cb) { if (cb) cb(); }
+      },
+      notifications: {
+        create(id, opts, cb) { createdNotifs.push({ id, opts }); if (cb) cb(id); },
+        clear(id, cb) { clearedNotifs.push(id); if (cb) cb(true); },
+        onClicked: { addListener() {} }
+      },
+      windows: {
+        get(winId, cb) { cb({ id: winId, state: 'minimized' }); },
+        update(winId, props, cb) { windowUpdates.push({ winId, props }); if (cb) cb(); }
+      },
+      tabs: {
+        get(tabId, cb) { cb({ id: tabId, windowId: 77 }); },
+        update(tabId, props, cb) { tabUpdates.push({ tabId, props }); if (cb) cb(); },
+        query(_q, cb) { cb([]); },
+        onUpdated: { addListener() {} },
+        onRemoved: { addListener() {} }
+      },
+      alarms: {
+        create() {},
+        clear() {},
+        onAlarm: { addListener() {} }
+      }
+    };
+
+    const bg = createBackgroundController(mockChrome);
+    bg.init();
+
+    // Runtime stall alert creates notification + sets "!" badge
+    let alertResp = null;
+    bg.handleRuntimeMessage({ type: 'GMAH_STALL_ALERT', minutes: 6 }, { tab: { id: 88 } }, (r) => { alertResp = r; });
+    assert.deepStrictEqual(alertResp, { ok: true });
+    assert.strictEqual(createdNotifs.length, 1);
+    assert.strictEqual(createdNotifs[0].id, `${bg.STALL_NOTIF_PREFIX}88`);
+    assert.ok(createdNotifs[0].opts.title.includes('6 分钟'));
+    assert.ok(badgeUpdates.some((b) => b.tabId === 88 && b.text === '!'));
+
+    // Clicking notification clears notification/badge, restores minimized window, and activates tab
+    bg.handleNotificationClicked(`${bg.STALL_NOTIF_PREFIX}88`);
+    assert.ok(clearedNotifs.includes(`${bg.STALL_NOTIF_PREFIX}88`));
+    assert.ok(badgeUpdates.some((b) => b.tabId === 88 && b.text === ''));
+    assert.deepStrictEqual(windowUpdates[0], { winId: 77, props: { focused: true, state: 'normal' } });
+    assert.ok(tabUpdates.some((u) => u.tabId === 88 && u.props.active === true));
+
+    // Disabling stallAlertEnabled in storage clears active alerts
+    bg.handleRuntimeMessage({ type: 'GMAH_STALL_ALERT', minutes: 5 }, { tab: { id: 89 } });
+    bg.handleStorageChanged(
+      { [D.STORAGE_KEY]: { newValue: { enabled: true, backgroundMode: true, preventTabDiscard: true, stallAlertEnabled: false } } },
+      'local'
+    );
+    assert.ok(clearedNotifs.includes(`${bg.STALL_NOTIF_PREFIX}89`));
+
+    // Test notification button handler
+    let testNotifResp = null;
+    bg.handleRuntimeMessage({ type: 'GMAH_TEST_NOTIFICATION' }, {}, (r) => { testNotifResp = r; });
+    assert.deepStrictEqual(testNotifResp, { ok: true });
+    assert.ok(createdNotifs.some((n) => n.id.startsWith('gmah_test_')));
+  });
+
+  // 28. Popup live toggle auto-sync, stallAlertActive rendering, and test notification button
+  test('popup.js auto-syncs checkboxes, displays stallAlertActive status, and triggers test notification', () => {
+    const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+    const pdoc = popupEnv.doc;
+    const ids = [
+      'enabled', 'autoAllow', 'preferAlwaysAllow', 'fallbackSingleAllow',
+      'autoContinue', 'backgroundMode', 'preventTabDiscard', 'showHud',
+      'maxContinuesPerTask', 'dailyContinueLimit', 'continueCooldownSec', 'idleSettleSec',
+      'stopOnCompletionCues', 'stopOnStagnantOutput', 'stopOnQuotaOrError',
+      'stallAlertEnabled', 'stallAlertMinutes', 'btnTestNotif',
+      'customAlwaysAllowKeywords', 'customContinueKeywords',
+      'statAllow', 'statContinue', 'statLive',
+      'btnEmergency', 'btnResetBreaker', 'btnResetStats', 'btnDefaults', 'btnSave', 'toast'
+    ];
+    for (const id of ids) {
+      pdoc.body.appendChild(pdoc.createElement('input', { id }));
+    }
+
+    const storageState = {
+      [D.STORAGE_KEY]: D.mergeSettings({ enabled: true, stallAlertEnabled: true, stallAlertMinutes: 5 }),
+      [D.STATS_KEY]: { date: D.getTodayKey(), allowCount: 0, continueCount: 0 }
+    };
+    const runtimeMsgs = [];
+
+    const mockPopupChrome = {
+      runtime: {
+        lastError: null,
+        sendMessage(msg, cb) {
+          runtimeMsgs.push(msg);
+          if (cb) cb({ ok: true });
+        }
+      },
+      storage: {
+        local: {
+          get(_keys, cb) { cb(Object.assign({}, storageState)); },
+          set(obj, cb) { Object.assign(storageState, obj); if (cb) cb(); }
+        }
+      },
+      tabs: {
+        query(_q, cb) { cb([{ id: 3, active: true }]); },
+        sendMessage(_tabId, _msg, cb) {
+          cb({
+            ok: true,
+            state: {
+              settings: storageState[D.STORAGE_KEY],
+              stallAlertActive: true,
+              circuitBreaker: { tripped: false }
+            }
+          });
+        }
+      }
+    };
+
+    const popup = createPopupController(pdoc, mockPopupChrome);
+    popup.init();
+
+    assert.strictEqual(pdoc.getElementById('statLive').textContent, '连接超时');
+    assert.strictEqual(pdoc.getElementById('stallAlertMinutes').value, '5');
+
+    // Toggling a checkbox immediately persists to storage without clicking btnSave
+    const stallCheck = pdoc.getElementById('stallAlertEnabled');
+    stallCheck.checked = false;
+    stallCheck.dispatchEvent({ type: 'change', target: stallCheck });
+    assert.strictEqual(storageState[D.STORAGE_KEY].stallAlertEnabled, false);
+
+    // Clicking btnTestNotif sends GMAH_TEST_NOTIFICATION to background
+    pdoc.getElementById('btnTestNotif').click();
+    assert.ok(runtimeMsgs.some((m) => m.type === 'GMAH_TEST_NOTIFICATION'));
+    assert.ok(pdoc.getElementById('toast').textContent.includes('测试桌面通知'));
+  });
+
+  // 29. HUD one-click desktop notification toggle updates state and invokes clearAllStallNotifications on background
+  test('HUD one-click notification toggle in HUD updates stallAlertEnabled and clears background stall notifications when disabled', () => {
+    const { doc, win } = createMockEnv();
+    const prevDoc = global.document;
+    const prevWin = global.window;
+    global.document = doc;
+    global.window = win;
+
+    try {
+      // Setup background with active notifications
+      const clearedNotifs = [];
+      const badgeUpdates = [];
+      const mockBgChrome = {
+        runtime: {
+          lastError: null,
+          getURL: (p) => `chrome-extension://id/${p}`,
+          onConnect: { addListener() {} },
+          onMessage: { addListener() {} }
+        },
+        storage: {
+          local: { get(_k, cb) { cb({}); } },
+          onChanged: { addListener() {} }
+        },
+        action: {
+          setBadgeText(opts, cb) { badgeUpdates.push(opts); if (cb) cb(); },
+          setBadgeBackgroundColor(_opts, cb) { if (cb) cb(); }
+        },
+        notifications: {
+          create(_id, _opts, cb) { if (cb) cb(); },
+          clear(id, cb) { clearedNotifs.push(id); if (cb) cb(true); }
+        },
+        windows: { get(_id, cb) { cb({}); }, update(_id, _p, cb) { if (cb) cb(); } },
+        tabs: {
+          get(_id, cb) { cb({}); },
+          update(_id, _p, cb) { if (cb) cb(); },
+          query(_q, cb) { cb([]); }
+        },
+        alarms: { create() {}, clear() {} }
+      };
+
+      const bg = createBackgroundController(mockBgChrome);
+      bg.init();
+
+      // Trigger a stall notification on tab 101
+      bg.handleRuntimeMessage({ type: 'GMAH_STALL_ALERT', minutes: 5 }, { tab: { id: 101 } });
+      assert.ok(badgeUpdates.some((b) => b.tabId === 101 && b.text === '!'));
+
+      let toggleNotifCalls = 0;
+      let engineSettings = D.mergeSettings({ stallAlertEnabled: true });
+
+      const engine = new GmahEngine({
+        doc,
+        win,
+        settings: engineSettings
+      });
+
+      const hud = createHud({
+        onToggleNotification: () => {
+          toggleNotifCalls += 1;
+          const nextVal = !engine.settings.stallAlertEnabled;
+          engine.updateSettings({ stallAlertEnabled: nextVal }, false);
+          if (!nextVal) {
+            bg.handleRuntimeMessage({ type: 'GMAH_STALL_CLEAR' }, { tab: { id: 101 } });
+            bg.handleRuntimeMessage({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
+          }
+          hud.update(engine.getState());
+        }
+      });
+
+      const rootEl = hud.mount();
+      assert.ok(rootEl && doc.getElementById('gmah-hud'));
+
+      // Check the 5th row: 桌面通知
+      const rows = rootEl.querySelectorAll('.gmah-row');
+      assert.strictEqual(rows.length, 5, 'HUD must have 5 control rows including desktop notifications');
+      const notifRow = rows[4];
+      assert.ok(notifRow.textContent.includes('桌面通知'));
+      const notifPill = notifRow.querySelector('.gmah-pill');
+      assert.ok(notifPill);
+
+      hud.update(engine.getState());
+      assert.strictEqual(notifPill.textContent, '已开启');
+      assert.ok(notifPill.className.includes('on'));
+
+      // Click the pill to toggle off
+      notifPill.click();
+      assert.strictEqual(toggleNotifCalls, 1);
+      assert.strictEqual(engine.settings.stallAlertEnabled, false);
+      assert.strictEqual(notifPill.textContent, '已关闭');
+      assert.ok(!notifPill.className.includes('on'));
+
+      // Background notifications must be cleared immediately
+      assert.ok(clearedNotifs.includes(`${bg.STALL_NOTIF_PREFIX}101`));
+      assert.ok(badgeUpdates.some((b) => b.tabId === 101 && b.text === ''));
+
+      // Click again to re-enable
+      notifPill.click();
+      assert.strictEqual(toggleNotifCalls, 2);
+      assert.strictEqual(engine.settings.stallAlertEnabled, true);
+      assert.strictEqual(notifPill.textContent, '已开启');
+      assert.ok(notifPill.className.includes('on'));
+
+      hud.unmount();
+    } finally {
+      global.document = prevDoc;
+      global.window = prevWin;
+    }
+  });
+
+  // 30. Popup one-click notification toggle button (btnToggleNotif) toggles stallAlertEnabled and clears notifications
+  test('Popup one-click notification toggle button toggles stallAlertEnabled, updates UI, and clears background stall notifications', () => {
+    const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+    const pdoc = popupEnv.doc;
+    const ids = [
+      'enabled', 'autoAllow', 'preferAlwaysAllow', 'fallbackSingleAllow',
+      'autoContinue', 'backgroundMode', 'preventTabDiscard', 'showHud',
+      'maxContinuesPerTask', 'dailyContinueLimit', 'continueCooldownSec', 'idleSettleSec',
+      'stopOnCompletionCues', 'stopOnStagnantOutput', 'stopOnQuotaOrError',
+      'stallAlertEnabled', 'stallAlertMinutes', 'btnToggleNotif', 'btnTestNotif',
+      'customAlwaysAllowKeywords', 'customContinueKeywords',
+      'statAllow', 'statContinue', 'statLive',
+      'btnEmergency', 'btnResetBreaker', 'btnResetStats', 'btnDefaults', 'btnSave', 'toast'
+    ];
+    for (const id of ids) {
+      pdoc.body.appendChild(pdoc.createElement('input', { id }));
+    }
+
+    const storageState = {
+      [D.STORAGE_KEY]: D.mergeSettings({ enabled: true, stallAlertEnabled: true, stallAlertMinutes: 5 }),
+      [D.STATS_KEY]: { date: D.getTodayKey(), allowCount: 0, continueCount: 0 }
+    };
+    const runtimeMsgs = [];
+
+    const mockPopupChrome = {
+      runtime: {
+        lastError: null,
+        sendMessage(msg, cb) {
+          runtimeMsgs.push(msg);
+          if (cb) cb({ ok: true });
+        }
+      },
+      storage: {
+        local: {
+          get(_keys, cb) { cb(Object.assign({}, storageState)); },
+          set(obj, cb) { Object.assign(storageState, obj); if (cb) cb(); }
+        }
+      },
+      tabs: {
+        query(_q, cb) { cb([{ id: 10, active: true }]); },
+        sendMessage(_tabId, _msg, cb) {
+          cb({
+            ok: true,
+            state: {
+              settings: storageState[D.STORAGE_KEY],
+              stallAlertActive: false,
+              circuitBreaker: { tripped: false }
+            }
+          });
+        }
+      }
+    };
+
+    const popup = createPopupController(pdoc, mockPopupChrome);
+    popup.init();
+
+    const btnToggleNotif = pdoc.getElementById('btnToggleNotif');
+    const checkStall = pdoc.getElementById('stallAlertEnabled');
+    assert.strictEqual(btnToggleNotif.textContent, '桌面通知：开启');
+    assert.ok(btnToggleNotif.className.includes('primary'));
+    assert.strictEqual(checkStall.checked, true);
+
+    // Click btnToggleNotif to turn off notifications
+    btnToggleNotif.click();
+    assert.strictEqual(storageState[D.STORAGE_KEY].stallAlertEnabled, false);
+    assert.strictEqual(checkStall.checked, false);
+    assert.strictEqual(btnToggleNotif.textContent, '桌面通知：关闭');
+    assert.ok(btnToggleNotif.className.includes('secondary'));
+    // GMAH_CLEAR_ALL_STALL_NOTIFICATIONS message must be sent to background
+    assert.ok(runtimeMsgs.some((m) => m.type === 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS'));
+
+    // Click btnToggleNotif again to re-enable notifications
+    btnToggleNotif.click();
+    assert.strictEqual(storageState[D.STORAGE_KEY].stallAlertEnabled, true);
+    assert.strictEqual(checkStall.checked, true);
+    assert.strictEqual(btnToggleNotif.textContent, '桌面通知：开启');
+    assert.ok(btnToggleNotif.className.includes('primary'));
+  });
+
+  // 31. Draggable floating HUD initialization, boundary clamping, threshold vs click, and position persistence
+  test('Draggable HUD: initialization, position clamping, drag vs click threshold, and storage save/restore', () => {
+    const { doc, win, localStorageMock } = createMockEnv();
+    const prevDoc = global.document;
+    const prevWin = global.window;
+    const prevLs = global.localStorage;
+    global.document = doc;
+    global.window = win;
+    global.localStorage = localStorageMock;
+
+    try {
+      let minimizeToggled = 0;
+      let posChanged = null;
+
+      const hud = createHud({
+        initialPosition: { left: 200, top: 150 },
+        onToggleMinimize: () => { minimizeToggled += 1; },
+        onPositionChange: (pos) => { posChanged = pos; }
+      });
+
+      const rootEl = hud.mount();
+      rootEl.rect = { width: 248, height: 280 };
+
+      // Beta badge check
+      const betaBadge = rootEl.querySelector('.gmah-badge-beta');
+      assert.ok(betaBadge, 'HUD must contain .gmah-badge-beta element');
+      assert.strictEqual(betaBadge.textContent, 'v0.1 Beta');
+
+      // Restored initial position
+      assert.strictEqual(rootEl.style.left, '200px');
+      assert.strictEqual(rootEl.style.top, '150px');
+      assert.deepStrictEqual(hud.getPosition(), { left: 200, top: 150 });
+
+      // Viewport bounds clamping:
+      // Viewport is 1440 x 900. With 248 x 280, maxLeft = 1440 - 248 = 1192, maxTop = 900 - 280 = 620
+      const clampedNegative = hud.setPosition({ left: -80, top: -40 });
+      assert.strictEqual(clampedNegative.left, 0);
+      assert.strictEqual(clampedNegative.top, 0);
+      assert.strictEqual(rootEl.style.left, '0px');
+      assert.strictEqual(rootEl.style.top, '0px');
+
+      const clampedOverflow = hud.setPosition({ left: 3000, top: 2000 });
+      assert.strictEqual(clampedOverflow.left, 1192);
+      assert.strictEqual(clampedOverflow.top, 620);
+      assert.strictEqual(rootEl.style.left, '1192px');
+      assert.strictEqual(rootEl.style.top, '620px');
+
+      // Valid position inside bounds
+      hud.setPosition({ left: 320, top: 180 });
+      assert.strictEqual(rootEl.style.left, '320px');
+      assert.strictEqual(rootEl.style.top, '180px');
+
+      // Test drag handle and distinction between dragging and clicking:
+      const header = rootEl.querySelector('.gmah-header');
+      const title = rootEl.querySelector('.gmah-title');
+      assert.ok(header);
+      assert.ok(title);
+
+      // Sub-threshold movement (<= 4px): does NOT drag, triggers click
+      header.dispatchEvent({ type: 'pointerdown', clientX: 100, clientY: 100, button: 0, target: header });
+      header.dispatchEvent({ type: 'pointermove', clientX: 102, clientY: 101 });
+      header.dispatchEvent({ type: 'pointerup', clientX: 102, clientY: 101 });
+      title.dispatchEvent({ type: 'click', target: title });
+      assert.strictEqual(minimizeToggled, 1, 'Sub-threshold click should trigger minimize');
+
+      // Reset position to (300, 200) for drag test
+      hud.setPosition({ left: 300, top: 200 });
+
+      // Above-threshold movement (> 4px): drags HUD, suppresses click
+      header.dispatchEvent({ type: 'pointerdown', clientX: 100, clientY: 100, button: 0, target: header });
+      header.dispatchEvent({ type: 'pointermove', clientX: 150, clientY: 140 }); // moved dx=50, dy=40
+      assert.strictEqual(rootEl.style.left, '350px');
+      assert.strictEqual(rootEl.style.top, '240px');
+
+      // Subsequent movement dispatched on doc while dragging is active
+      doc.dispatchEvent({ type: 'pointermove', clientX: 160, clientY: 150 });
+      assert.strictEqual(rootEl.style.left, '360px');
+      assert.strictEqual(rootEl.style.top, '250px');
+
+      doc.dispatchEvent({ type: 'pointerup', clientX: 160, clientY: 150 });
+      // Synthesize click event immediately following drag
+      title.dispatchEvent({ type: 'click', target: title });
+      assert.strictEqual(minimizeToggled, 1, 'Drag must intercept and suppress title click');
+      assert.deepStrictEqual(posChanged, { left: 360, top: 250 });
+
+      // Verify position was saved to localStorage
+      const savedRaw = localStorageMock.getItem('gmah_hud_position');
+      assert.ok(savedRaw);
+      assert.deepStrictEqual(JSON.parse(savedRaw), { left: 360, top: 250 });
+
+      // Reset position restores defaults and clears style coordinates
+      hud.resetPosition();
+      assert.strictEqual(rootEl.style.left, '');
+      assert.strictEqual(rootEl.style.top, '');
+      assert.strictEqual(rootEl.style.right, '18px');
+      assert.strictEqual(rootEl.style.bottom, '84px');
+
+      // Next HUD mount restores saved position from localStorage
+      localStorageMock.setItem('gmah_hud_position', JSON.stringify({ left: 450, top: 280 }));
+      hud.unmount();
+
+      const hud2 = createHud();
+      const root2 = hud2.mount();
+      root2.rect = { width: 248, height: 280 };
+      assert.strictEqual(root2.style.left, '450px');
+      assert.strictEqual(root2.style.top, '280px');
+
+      hud2.unmount();
+    } finally {
+      global.document = prevDoc;
+      global.window = prevWin;
+      global.localStorage = prevLs;
     }
   });
 }

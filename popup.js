@@ -40,7 +40,8 @@
         'showHud',
         'stopOnCompletionCues',
         'stopOnStagnantOutput',
-        'stopOnQuotaOrError'
+        'stopOnQuotaOrError',
+        'stallAlertEnabled'
       ];
       for (const id of boolIds) {
         const el = byId(id);
@@ -55,8 +56,15 @@
       setVal('dailyContinueLimit', s.dailyContinueLimit);
       setVal('continueCooldownSec', Number((s.continueCooldownMs / 1000).toFixed(1)));
       setVal('idleSettleSec', Number((s.idleSettleMs / 1000).toFixed(1)));
+      setVal('stallAlertMinutes', s.stallAlertMinutes);
       setVal('customAlwaysAllowKeywords', (s.customAlwaysAllowKeywords || []).join('\n'));
       setVal('customContinueKeywords', (s.customContinueKeywords || []).join('\n'));
+
+      const btnToggleNotif = byId('btnToggleNotif');
+      if (btnToggleNotif) {
+        btnToggleNotif.textContent = s.stallAlertEnabled ? '桌面通知：开启' : '桌面通知：关闭';
+        btnToggleNotif.className = s.stallAlertEnabled ? 'btn primary btn-sm' : 'btn secondary btn-sm';
+      }
     }
 
     function renderStats(stats, settings) {
@@ -87,6 +95,9 @@
         liveEl.className = 'badge-stop';
       } else if (!tabState.settings || !tabState.settings.enabled) {
         liveEl.textContent = '已暂停';
+        liveEl.className = 'badge-warn';
+      } else if (tabState.stallAlertActive) {
+        liveEl.textContent = '连接超时';
         liveEl.className = 'badge-warn';
       } else {
         liveEl.textContent = tabState.settings.backgroundMode ? '后台就绪' : '监控中';
@@ -130,6 +141,8 @@
           stopOnCompletionCues: getBool('stopOnCompletionCues', D.DEFAULT_SETTINGS.stopOnCompletionCues),
           stopOnStagnantOutput: getBool('stopOnStagnantOutput', D.DEFAULT_SETTINGS.stopOnStagnantOutput),
           stopOnQuotaOrError: getBool('stopOnQuotaOrError', D.DEFAULT_SETTINGS.stopOnQuotaOrError),
+          stallAlertEnabled: getBool('stallAlertEnabled', D.DEFAULT_SETTINGS.stallAlertEnabled),
+          stallAlertMinutes: getNum('stallAlertMinutes', D.DEFAULT_SETTINGS.stallAlertMinutes),
           customAlwaysAllowKeywords: D.parseKeywordInput(getStr('customAlwaysAllowKeywords')),
           customContinueKeywords: D.parseKeywordInput(getStr('customContinueKeywords'))
         })
@@ -242,6 +255,13 @@
     function saveSettings(customSettings, msg) {
       const next = customSettings ? D.mergeSettings(customSettings) : readSettingsFromForm();
       renderSettings(next);
+      if (!next.stallAlertEnabled && api && api.runtime && typeof api.runtime.sendMessage === 'function') {
+        try {
+          api.runtime.sendMessage({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' }, () => {
+            void (api.runtime && api.runtime.lastError);
+          });
+        } catch (_) {}
+      }
       if (api && api.storage && api.storage.local) {
         api.storage.local.set({ [D.STORAGE_KEY]: next }, () => {
           showToast(msg || '设置已保存并同步到 Gemini 页面');
@@ -293,6 +313,59 @@
       if (enabledEl) {
         enabledEl.addEventListener('change', () => {
           saveSettings(null, enabledEl.checked ? '已开启自动助手' : '已暂停自动助手');
+        });
+      }
+
+      const autoSyncToggleIds = [
+        'autoAllow',
+        'preferAlwaysAllow',
+        'fallbackSingleAllow',
+        'autoContinue',
+        'backgroundMode',
+        'preventTabDiscard',
+        'showHud',
+        'stopOnCompletionCues',
+        'stopOnStagnantOutput',
+        'stopOnQuotaOrError',
+        'stallAlertEnabled'
+      ];
+      for (const id of autoSyncToggleIds) {
+        const el = byId(id);
+        if (el) {
+          el.addEventListener('change', () => {
+            saveSettings(null, '开关已实时同步到 Gemini 页面');
+          });
+        }
+      }
+
+      const btnToggleNotif = byId('btnToggleNotif');
+      if (btnToggleNotif) {
+        btnToggleNotif.addEventListener('click', () => {
+          const nextVal = !currentSettings.stallAlertEnabled;
+          const check = byId('stallAlertEnabled');
+          if (check) check.checked = nextVal;
+          saveSettings(
+            Object.assign({}, currentSettings, { stallAlertEnabled: nextVal }),
+            nextVal ? '已开启桌面通知提醒' : '已关闭桌面通知提醒'
+          );
+        });
+      }
+
+      const btnTestNotif = byId('btnTestNotif');
+      if (btnTestNotif) {
+        btnTestNotif.addEventListener('click', () => {
+          if (!api || !api.runtime || typeof api.runtime.sendMessage !== 'function') {
+            showToast('当前环境不支持发送桌面通知', true);
+            return;
+          }
+          api.runtime.sendMessage({ type: 'GMAH_TEST_NOTIFICATION' }, (resp) => {
+            const err = api.runtime && api.runtime.lastError;
+            if (err || !resp || !resp.ok) {
+              showToast('通知发送失败，请检查系统与 Chrome 通知权限', true);
+            } else {
+              showToast('已发送测试桌面通知，请查看屏幕右下角');
+            }
+          });
         });
       }
 
