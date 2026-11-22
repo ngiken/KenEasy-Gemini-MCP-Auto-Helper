@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v0.2_Beta-3b82f6?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v0.3_Beta-3b82f6?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,9 +24,9 @@
 </div>
 
 > [!WARNING]
-> ### ⚠️ Beta 版本说明 (v0.2 Beta Preview)
-> 本扩展目前处于 **公开测试 Beta 阶段（v0.2 Beta）**。
-> 核心自动化引擎、6 层防刷熔断器、按住拖拽 HUD、多语言与黑白模式、多浏览器防误触守卫及桌面通知均已通过完整自动化测试套件验证。由于 Google Gemini 网页端（`gemini.google.com`）界面与 Material Web Components 组件会不定期更新，可能存在偶发交互变动：
+> ### ⚠️ Beta 版本说明 (v0.3 Beta Preview)
+> 本扩展目前处于 **公开测试 Beta 阶段（v0.3 Beta）**。
+> 核心自动化引擎、MV3 永不断线后台保活与智能点击重试、6 层防刷熔断器、按住拖拽 HUD、多语言与黑白模式、多浏览器防误触守卫及桌面通知均已通过 64 项自动化与端到端沙盒测试验证（64/64）。由于 Google Gemini 网页端（`gemini.google.com`）界面与 Material Web Components 组件会不定期更新，可能存在偶发交互变动：
 > - 若在使用中遇到未识别的新型确认弹窗、或误触发跳过，欢迎随时在设置面板的「自定义匹配词」中补充关键词，并前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 提交反馈与截图。
 > - 欢迎各位开发者 Star 🌟 与提交 PR，共同完善 Gemini 网页端自动化生态！
 
@@ -44,8 +44,8 @@
 
 直接点击下方任意一个下载链接即可**一键自动下载 `.zip` 安装包**：
 
-- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.2.0/KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
-- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.2.0/KenEasy-Gemini-MCP-Auto-Helper-v0.2.0-store.zip)**（解压即根目录 `manifest.json`）
+- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.3.0/KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
+- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.3.0/KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-store.zip)**（解压即根目录 `manifest.json`）
 
 安装步骤：
 1. 点击上方链接下载 `.zip` 压缩包并解压到本地目录（例如 `E:\code\KenEasy-Gemini-MCP-Auto-Helper`）。
@@ -59,7 +59,7 @@
 
 ---
 
-## 🎬 核心功能实操演示（v0.2 重点升级）
+## 🎬 核心功能实操演示（v0.3 重点升级）
 
 ### 1. 按住拖拽悬浮窗 · 修复悬停粘连与折叠响应 🆕
 > 严格左键按住标题栏才启动拖动——鼠标仅仅悬停或经过标题栏时绝不粘连跟随！超过 4px 拖动阈值后才触发指针捕获，标题栏的折叠/主题/语言按钮独立响应无干扰，离开窗口释放自动落位，并在 Popup 面板支持一键「复位悬浮窗」。
@@ -209,6 +209,12 @@ popup.js, popup.html, popup.css
 ---
 
 ## 📝 更新记录
+
+### [v0.3.0 (v0.3 Beta)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v0.3.0) - 2026-11-22
+- **MV3 永不断线后台引擎**：新增 ~19.5 秒 Service Worker 保活、4 分钟无感 Port 轮换、不受后台定时器限速的 SW 延迟停稳/冷却回拨（`GMAH_SCHEDULE_TICK`），以及切分页/切应用即时唤醒，彻底解决切去后台或其他应用后停止自动点击的问题。
+- **后台智能重试与 Shadow DOM 监听**：后台点击未生效时自动安全重试并穿透 `@material/web` 内部原生 `<button>`；支持递归监听动态 Shadow DOM 并过滤波纹/Tooltip 杂讯；修复最小化窗口隐藏 Spinner 导致 `isGenerating` 永久锁死的问题。
+- **HUD、Popup 与安全全面加固**：修复 Windows 最小化（`0×0` 视窗）导致悬浮窗飞去左上角 `(0, 0)`；展开面板自动贴边防出框；修复 `/app` → `/app/<id>` 新建对话误拦截首次继续；全语种拦截 Cookie/通知/摄像头/定位按钮；4 语言动态状态栏与熔断文案 100% 对齐；Popup 数值与关键词自动保存并即时解除熔断。
+- **64/64 全量、端到端与 30 分钟压力测试**：覆盖 30 分钟后台冻结定时器马拉松（7+ 次 Port 轮换 + SW 崩溃恢复）、20+ 危险按钮零误触矩阵与双标签并发统计合并。
 
 ### [v0.2.0 (v0.2 Beta)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v0.2.0) - 2026-11-22
 - **修复悬浮窗拖拽粘连与折叠响应**：引入左键按压门控（`isPointerDown`），鼠标悬停靠近绝不粘连跟随；4px 阈值后延迟捕获指针，标题栏折叠、主题、语言按钮独立秒响应；新增离窗释放保持原位与弹窗「复位悬浮窗」按钮。

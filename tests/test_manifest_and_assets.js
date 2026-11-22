@@ -21,7 +21,7 @@ function runTests(test) {
     const manifestPath = path.join(ROOT, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.strictEqual(manifest.manifest_version, 3);
-    assert.strictEqual(manifest.version, '0.2.0', "manifest.json version must be '0.2.0'");
+    assert.strictEqual(manifest.version, '0.3.0', "manifest.json version must be '0.3.0'");
     assert.ok(manifest.permissions.includes('storage'));
     assert.ok(manifest.permissions.includes('tabs'));
     assert.ok(manifest.permissions.includes('alarms'));
@@ -108,18 +108,18 @@ function runTests(test) {
     }
   });
 
-  test('version is 0.2.0 and marked as Beta in manifest, popup, and HUD', () => {
+  test('version is 0.3.0 and marked as Beta in manifest, popup, and HUD', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
-    assert.strictEqual(manifest.version, '0.2.0', "manifest.json must have version '0.2.0'");
+    assert.strictEqual(manifest.version, '0.3.0', "manifest.json must have version '0.3.0'");
 
     const popupHtml = fs.readFileSync(path.join(ROOT, 'popup.html'), 'utf8');
-    assert.ok(popupHtml.includes('v0.2 Beta'), 'popup.html must clearly display v0.2 Beta badge');
+    assert.ok(popupHtml.includes('v0.3 Beta'), 'popup.html must clearly display v0.3 Beta badge');
     assert.ok(/Beta Preview|测试.*Beta|公开测试/i.test(popupHtml), 'popup.html must contain Beta preview designation');
 
     const defaultsJs = fs.readFileSync(path.join(ROOT, 'defaults.js'), 'utf8');
     const hudJs = fs.readFileSync(path.join(ROOT, 'hud.js'), 'utf8');
-    assert.ok(defaultsJs.includes('v0.2 Beta') && hudJs.includes("tr('betaBadge')"), 'HUD must display v0.2 Beta badge from defaults');
-    assert.ok(/Beta Preview|测试|v0\.2 Beta/i.test(defaultsJs), 'defaults.js must indicate Beta preview version');
+    assert.ok(defaultsJs.includes('v0.3 Beta') && hudJs.includes("tr('betaBadge')"), 'HUD must display v0.3 Beta badge from defaults');
+    assert.ok(/Beta Preview|测试|v0\.3 Beta/i.test(defaultsJs), 'defaults.js must indicate Beta preview version');
   });
 
   test('all asset images referenced in README.md and README.zh-CN.md exist in assets/ and have valid non-empty sizes', () => {

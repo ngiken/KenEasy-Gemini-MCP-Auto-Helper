@@ -3,7 +3,9 @@
 const suites = [
   { name: 'Manifest & Assets', mod: require('./test_manifest_and_assets.js') },
   { name: 'Defaults & Keyword Matching', mod: require('./test_defaults.js') },
-  { name: 'Engine, Breakers, Background Mode, HUD & Popup', mod: require('./test_engine_and_background.js') }
+  { name: 'Engine, Breakers, Background Mode, HUD & Popup', mod: require('./test_engine_and_background.js') },
+  { name: 'v0.3 Background Persistence, Click Retries, E2E Sandbox & UI Reliability', mod: require('./test_v03_background_and_reliability.js') },
+  { name: 'v0.3 Stress Marathon, Adversarial Safety, i18n Parity & Multi-Tab Audit', mod: require('./test_v03_stress_and_adversarial.js') }
 ];
 
 let passed = 0;

@@ -1931,7 +1931,7 @@ function runTests(test) {
       // Beta badge check
       const betaBadge = rootEl.querySelector('.gmah-badge-beta');
       assert.ok(betaBadge, 'HUD must contain .gmah-badge-beta element');
-      assert.strictEqual(betaBadge.textContent, 'v0.2 Beta');
+      assert.strictEqual(betaBadge.textContent, 'v0.3 Beta');
 
       // Restored initial position
       assert.strictEqual(rootEl.style.left, '200px');

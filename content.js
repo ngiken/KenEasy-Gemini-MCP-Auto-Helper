@@ -74,7 +74,20 @@
     '承認'
   ]);
 
+  const EXPLICIT_TRUNCATION_CONTINUE_SET = new Set([
+    '继续生成',
+    '繼續生成',
+    '点击继续',
+    '點擊繼續',
+    'continue generating',
+    'continue generation',
+    'click to continue',
+    '生成を続ける',
+    'クリックして続行'
+  ]);
+
   const NON_CHAT_PATH_RE = /^\/(?:u\/\d+\/)?(?:gems|extensions|saved-info|plugins|updates|sharing|settings|faq|advanced|pricing|about)(?:\/|$)/i;
+  const FRESH_CHAT_LANDING_PATH_RE = /^\/(?:u\/\d+\/)?(?:app\/?)?$/i;
 
   function isNonChatGeminiUrl(url) {
     if (typeof url !== 'string' || !url) return false;
@@ -85,6 +98,16 @@
       return /gemini\.google\.com\/(?:u\/\d+\/)?(?:gems|extensions|saved-info|plugins|updates|sharing|settings|faq|advanced|pricing|about)(?:\/|$|\?|#)/i.test(
         url
       );
+    }
+  }
+
+  function isFreshChatLandingUrl(url) {
+    if (typeof url !== 'string' || !url) return false;
+    try {
+      const parsed = new URL(url, 'https://gemini.google.com');
+      return FRESH_CHAT_LANDING_PATH_RE.test(parsed.pathname || '');
+    } catch (_) {
+      return /gemini\.google\.com\/(?:u\/\d+\/)?(?:app\/?)?(?:\?|#|$)/i.test(url);
     }
   }
 
@@ -308,6 +331,15 @@
     while (cur && cur.nodeType === 1) {
       if (cur.hidden === true) return false;
       if (cur.getAttribute && cur.getAttribute('aria-hidden') === 'true') return false;
+      if (!relaxHiddenLayout) {
+        const curCls =
+          typeof cur.className === 'string'
+            ? cur.className
+            : (cur.getAttribute && cur.getAttribute('class')) || '';
+        if (/\b(ng-hide|cdk-visually-hidden|visually-hidden|display-none|d-none|invisible)\b/i.test(curCls)) {
+          return false;
+        }
+      }
       if (w && typeof w.getComputedStyle === 'function') {
         try {
           const style = w.getComputedStyle(cur);
@@ -315,6 +347,14 @@
             if (cur === el) selfDisplay = style.display || '';
             if (style.display === 'none' || style.visibility === 'hidden') return false;
             if (!relaxHiddenLayout && style.opacity !== '' && parseFloat(style.opacity) === 0) return false;
+            if (!relaxHiddenLayout && cur === el) {
+              if (
+                (style.width === '0px' && style.height === '0px') ||
+                (typeof style.transform === 'string' && /scale\(\s*0(?:\s*,\s*0)?\s*\)/i.test(style.transform))
+              ) {
+                return false;
+              }
+            }
             if (cur === el && style.pointerEvents === 'none') return false;
           }
         } catch (_) {
@@ -368,6 +408,18 @@
     return false;
   }
 
+  function appendLabelChunk(acc, part) {
+    const cleanPart = typeof part === 'string' ? part.replace(/[\u200B-\u200D\uFEFF]/g, '') : '';
+    if (!cleanPart) return acc;
+    if (!acc) return cleanPart;
+    // Insert a single space when adjacent inline tags split ASCII words (e.g. <span>Always</span><span>allow</span>)
+    // without inserting artificial spaces between CJK characters (e.g. <span>始终</span><span>允许</span>).
+    if (/[a-z0-9]$/i.test(acc) && /^[a-z0-9]/i.test(cleanPart)) {
+      return acc + ' ' + cleanPart;
+    }
+    return acc + cleanPart;
+  }
+
   function extractVisibleLabelText(node, isRoot) {
     if (!node) return '';
     if (!isRoot && isIconOrDecorativeNode(node)) return '';
@@ -390,9 +442,9 @@
           const item = assigned[i];
           if (!item) continue;
           if (item.nodeType === 3) {
-            slotOut += item.nodeValue || item.textContent || '';
+            slotOut = appendLabelChunk(slotOut, item.nodeValue || item.textContent || '');
           } else if (item.nodeType === 1 && !isIconOrDecorativeNode(item)) {
-            slotOut += extractVisibleLabelText(item, false);
+            slotOut = appendLabelChunk(slotOut, extractVisibleLabelText(item, false));
           }
         }
         return slotOut.replace(/\s+/g, ' ').trim();
@@ -405,10 +457,10 @@
         const child = node.childNodes[i];
         if (!child) continue;
         if (child.nodeType === 3) {
-          out += child.nodeValue || child.textContent || '';
+          out = appendLabelChunk(out, child.nodeValue || child.textContent || '');
         } else if (child.nodeType === 1) {
           if (isIconOrDecorativeNode(child)) continue;
-          out += extractVisibleLabelText(child, false);
+          out = appendLabelChunk(out, extractVisibleLabelText(child, false));
         }
       }
       const cleaned = out.replace(/\s+/g, ' ').trim();
@@ -421,7 +473,7 @@
       for (let i = 0; i < node.children.length; i++) {
         const child = node.children[i];
         if (!child || isIconOrDecorativeNode(child)) continue;
-        out += extractVisibleLabelText(child, false);
+        out = appendLabelChunk(out, extractVisibleLabelText(child, false));
       }
       const cleaned = out.replace(/\s+/g, ' ').trim();
       if (cleaned) return cleaned;
@@ -537,8 +589,11 @@
   const SIBLING_BUTTON_SELECTOR =
     'button, [role="button"], md-filled-button, md-outlined-button, md-text-button, md-tonal-button, md-elevated-button, mwc-button';
 
-  function hasClickedSiblingButton(el, clickedElements) {
-    if (!clickedElements || clickedElements.size === 0) return false;
+  function hasClickedSiblingButton(el, clickedElements, clickAttempts) {
+    const hasTracked =
+      (clickedElements && clickedElements.size > 0) ||
+      (clickAttempts && clickAttempts.size > 0);
+    if (!hasTracked) return false;
     let container =
       el.parentElement ||
       el.parentNode ||
@@ -554,7 +609,10 @@
           const sib = siblings[i];
           if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
           otherCount += 1;
-          if (clickedElements.has(sib)) {
+          if (
+            (clickedElements && clickedElements.has(sib)) ||
+            (clickAttempts && clickAttempts.has(sib))
+          ) {
             return true;
           }
         }
@@ -748,31 +806,111 @@
     return (latest.innerText || latest.textContent || '').trim();
   }
 
-  function defaultClickElement(el, win) {
+  const BG_ALLOW_RETRY_DELAY_MS = 2500;
+  const BG_CONTINUE_RETRY_DELAY_MS = 3500;
+  const MAX_BG_CLICK_ATTEMPTS = 2;
+
+  function isBackgroundOrUnfocused(doc) {
+    if (!doc) return false;
+    if (doc.hidden === true) return true;
+    if (typeof doc.hasFocus === 'function') {
+      try {
+        return !doc.hasFocus();
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  function isNoisyMutationTarget(node) {
+    let cur = node;
+    if (cur && cur.nodeType !== 1) {
+      cur = cur.parentElement || cur.parentNode || null;
+      if (cur && cur.nodeType === 11 && cur.host) cur = cur.host;
+    }
+    for (let depth = 0; depth < 3 && cur && cur.nodeType === 1; depth++) {
+      if (isIconOrDecorativeNode(cur)) return true;
+      const role = cur.getAttribute ? (cur.getAttribute('role') || '').toLowerCase() : '';
+      if (role === 'tooltip') return true;
+      const cls =
+        typeof cur.className === 'string'
+          ? cur.className
+          : (cur.getAttribute && cur.getAttribute('class')) || '';
+      if (
+        /\b(mat-ripple|mat-mdc-ripple-element|mat-ripple-element|cdk-overlay-backdrop|mdc-tooltip|mat-mdc-tooltip)\b/i.test(
+          cls
+        )
+      ) {
+        return true;
+      }
+      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    }
+    return false;
+  }
+
+  function resolveClickTarget(el, attempt) {
+    if (!el || attempt < 2) return el;
+    // On retry, pierce custom Material Web Components (<md-filled-button>, etc.) to click the inner native <button>
+    if (el.shadowRoot && typeof el.shadowRoot.querySelector === 'function') {
+      const inner = el.shadowRoot.querySelector('button, [role="button"]');
+      if (inner && !inner.disabled) return inner;
+    }
+    return el;
+  }
+
+  function defaultClickElement(el, win, attempt) {
     const w = win || (typeof window !== 'undefined' ? window : null);
-    const baseOpts = { bubbles: true, cancelable: true, composed: true, button: 0 };
+    const target = resolveClickTarget(el, attempt || 1);
+    let coords = {};
+    if (typeof target.getBoundingClientRect === 'function') {
+      try {
+        const rect = target.getBoundingClientRect();
+        if (rect && rect.width > 0 && rect.height > 0) {
+          coords = {
+            clientX: Math.round((rect.left || 0) + rect.width / 2),
+            clientY: Math.round((rect.top || 0) + rect.height / 2)
+          };
+        }
+      } catch (_) {}
+    }
+
+    const baseOpts = Object.assign(
+      { bubbles: true, cancelable: true, composed: true, button: 0 },
+      coords
+    );
     const downOpts = Object.assign({ buttons: 1 }, baseOpts);
     const upOpts = Object.assign({ buttons: 0 }, baseOpts);
+
+    // Safe non-scrolling focus on retry attempts helps background Angular/MWC components register interaction
+    if ((attempt || 1) >= 2 && typeof target.focus === 'function') {
+      try {
+        target.focus({ preventScroll: true });
+      } catch (_) {
+        try {
+          target.focus();
+        } catch (_) {}
+      }
+    }
+
     try {
       if (w && typeof w.PointerEvent === 'function') {
-        el.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ pointerId: 1, isPrimary: true }, downOpts)));
+        target.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ pointerId: 1, isPrimary: true }, downOpts)));
       }
       if (w && typeof w.MouseEvent === 'function') {
-        el.dispatchEvent(new w.MouseEvent('mousedown', downOpts));
+        target.dispatchEvent(new w.MouseEvent('mousedown', downOpts));
       }
       if (w && typeof w.PointerEvent === 'function') {
-        el.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ pointerId: 1, isPrimary: true }, upOpts)));
+        target.dispatchEvent(new w.PointerEvent('pointerup', Object.assign({ pointerId: 1, isPrimary: true }, upOpts)));
       }
       if (w && typeof w.MouseEvent === 'function') {
-        el.dispatchEvent(new w.MouseEvent('mouseup', upOpts));
+        target.dispatchEvent(new w.MouseEvent('mouseup', upOpts));
       }
     } catch (_) {
       // Fallback to plain click
     }
-    if (typeof el.click === 'function') {
-      el.click();
+    if (typeof target.click === 'function') {
+      target.click();
     } else if (w && typeof w.MouseEvent === 'function') {
-      el.dispatchEvent(new w.MouseEvent('click', upOpts));
+      target.dispatchEvent(new w.MouseEvent('click', upOpts));
     }
   }
 
@@ -793,6 +931,7 @@
       this.stats = D.normalizeStats(opts.stats, D.getTodayKey(new Date(this.now())));
 
       this.clickedElements = new Set();
+      this.clickAttempts = new Map(); // el -> { kind, count, lastAttemptAt, label, tier }
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
       this.lastContinueFingerprint = null;
@@ -801,7 +940,9 @@
       this.lastContinueClickAt = 0;
       this.lastMutationAt = 0;
       this.lastUrl = this.win && this.win.location ? this.win.location.href : '';
-      this.lastStatusText = '监控中';
+      this.statusKey = 'hudStatusMonitoring';
+      this.statusVars = null;
+      this.lastStatusText = this.tr('hudStatusMonitoring');
       this.isGenerating = false;
       this.isNonChatPage = isNonChatGeminiUrl(this.lastUrl);
       this.ignoreStaleInitialContinue = Boolean(opts.ignoreStaleInitialContinue);
@@ -815,11 +956,36 @@
       this.circuitBreaker = {
         tripped: false,
         reasonCode: null,
+        reasonKey: null,
+        reasonVars: null,
         reason: ''
       };
 
       this.logs = [];
       this.maxLogs = 40;
+    }
+
+    tr(key, vars) {
+      const lang = this.settings && this.settings.language;
+      return D.t(lang, key, vars);
+    }
+
+    setStatus(key, vars) {
+      this.statusKey = key;
+      this.statusVars = vars || null;
+      this.lastStatusText = this.tr(key, vars);
+    }
+
+    refreshLocalizedTexts() {
+      if (this.circuitBreaker.tripped && this.circuitBreaker.reasonKey) {
+        this.circuitBreaker.reason = this.tr(
+          this.circuitBreaker.reasonKey,
+          this.circuitBreaker.reasonVars
+        );
+        this.lastStatusText = this.tr('hudStatusBreaker', { reason: this.circuitBreaker.reason });
+      } else if (this.statusKey) {
+        this.lastStatusText = this.tr(this.statusKey, this.statusVars);
+      }
     }
 
     addLog(message) {
@@ -860,8 +1026,8 @@
       this.stallFingerprint = null;
       this.stallAlertActive = false;
       if (wasActive) {
-        if (this.lastStatusText && this.lastStatusText.startsWith('⚠️')) {
-          this.lastStatusText = '监控中';
+        if (this.statusKey === 'hudStatusStallMinutes' || (this.lastStatusText && this.lastStatusText.startsWith('⚠️'))) {
+          this.setStatus('hudStatusMonitoring');
         }
         if (resolvedLog) {
           this.addLog(resolvedLog);
@@ -872,9 +1038,30 @@
       }
     }
 
+    reconcileBreakerWithSettings() {
+      if (!this.circuitBreaker.tripped) return false;
+      if (
+        this.circuitBreaker.reasonCode === 'daily_limit' &&
+        (this.settings.dailyContinueLimit === 0 ||
+          this.stats.continueCount < this.settings.dailyContinueLimit)
+      ) {
+        this.clearBreaker('今日计数已清零或上限已放开，自动解除每日熔断');
+        return true;
+      }
+      if (
+        this.circuitBreaker.reasonCode === 'task_limit' &&
+        this.taskContinueCount < this.settings.maxContinuesPerTask
+      ) {
+        this.clearBreaker('单次任务上限已提高，自动解除任务熔断');
+        return true;
+      }
+      return false;
+    }
+
     updateSettings(partial, persist) {
       const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
       this.settings = D.mergeSettings(Object.assign({}, this.settings, partial));
+      this.refreshLocalizedTexts();
       if (!this.settings.enabled || !this.settings.stallAlertEnabled) {
         this.resetStallMonitor(true);
       }
@@ -886,7 +1073,9 @@
       if (persist && this.onSettingsSave) {
         this.onSettingsSave(this.settings);
       }
-      this.emitState();
+      if (!this.reconcileBreakerWithSettings()) {
+        this.emitState();
+      }
     }
 
     ensureTodayStats() {
@@ -904,23 +1093,28 @@
       this.lastMutationAt = this.now();
     }
 
-    tripBreaker(reasonCode, reason) {
+    tripBreaker(reasonCode, reason, reasonKey, reasonVars) {
       if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === reasonCode) {
         return;
       }
       this.resetStallMonitor(true);
+      const resolvedReason = reasonKey ? this.tr(reasonKey, reasonVars) : reason;
       this.circuitBreaker = {
         tripped: true,
         reasonCode,
-        reason
+        reasonKey: reasonKey || null,
+        reasonVars: reasonVars || null,
+        reason: resolvedReason
       };
-      this.lastStatusText = `熔断: ${reason}`;
-      this.addLog(`🛑 熔断触发: ${reason}`);
+      this.statusKey = null;
+      this.statusVars = null;
+      this.lastStatusText = this.tr('hudStatusBreaker', { reason: resolvedReason });
+      this.addLog(`🛑 熔断触发: ${resolvedReason}`);
       this.emitState();
     }
 
     emergencyStop() {
-      this.tripBreaker('emergency_stop', '用户手动紧急停止');
+      this.tripBreaker('emergency_stop', null, 'breakerReasonEmergency');
     }
 
     clearBreaker(logMsg) {
@@ -929,6 +1123,8 @@
       this.circuitBreaker = {
         tripped: false,
         reasonCode: null,
+        reasonKey: null,
+        reasonVars: null,
         reason: ''
       };
       if (prevCode === 'task_limit' || prevCode === 'stagnant_output' || prevCode === 'emergency_stop') {
@@ -937,7 +1133,7 @@
         this.lastContinueFingerprint = null;
         this.lastContinueContentFingerprint = null;
       }
-      this.lastStatusText = '监控中';
+      this.setStatus('hudStatusMonitoring');
       this.addLog(logMsg || '✅ 已解除熔断并重置本次任务计数');
       this.emitState();
     }
@@ -949,6 +1145,7 @@
       this.stagnantCount = 0;
       this.lastContinueFingerprint = null;
       this.lastContinueContentFingerprint = null;
+      this.clickAttempts.clear();
       this.lastMutationAt = this.now();
 
       if (
@@ -964,14 +1161,19 @@
     }
 
     onConversationChange(newUrl) {
+      const prevUrl = this.lastUrl;
       this.resetStallMonitor(true);
       this.lastUrl = newUrl;
       this.isNonChatPage = isNonChatGeminiUrl(newUrl);
-      this.suppressInitialContinueUntil = this.ignoreStaleInitialContinue ? this.now() + 2000 : 0;
+      // Do NOT suppress continue when transitioning from fresh /app landing page into a brand-new /app/<id> chat
+      const isFreshChatCreation = isFreshChatLandingUrl(prevUrl) && !this.isNonChatPage && !isFreshChatLandingUrl(newUrl);
+      this.suppressInitialContinueUntil =
+        this.ignoreStaleInitialContinue && !isFreshChatCreation ? this.now() + 2000 : 0;
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
       this.lastContinueFingerprint = null;
       this.lastContinueContentFingerprint = null;
+      this.clickAttempts.clear();
       if (
         this.circuitBreaker.tripped &&
         this.circuitBreaker.reasonCode !== 'emergency_stop' &&
@@ -1050,8 +1252,8 @@
         this.stallFingerprint = fp;
         if (this.stallAlertActive) {
           this.stallAlertActive = false;
-          if (this.lastStatusText && this.lastStatusText.startsWith('⚠️')) {
-            this.lastStatusText = '监控中';
+          if (this.statusKey === 'hudStatusStallMinutes' || (this.lastStatusText && this.lastStatusText.startsWith('⚠️'))) {
+            this.setStatus('hudStatusMonitoring');
           }
           this.addLog('✅ 检测到新输出进展，已清除连接超时提醒');
           if (this.onStallResolved) this.onStallResolved();
@@ -1064,7 +1266,7 @@
       if (!this.stallAlertActive && elapsedMs >= thresholdMs) {
         this.stallAlertActive = true;
         const mins = Math.max(1, Math.floor(elapsedMs / 60000));
-        this.lastStatusText = `⚠️ 连接/等待已超过 ${mins} 分钟无进展`;
+        this.setStatus('hudStatusStallMinutes', { mins });
         this.addLog(`🔔 检测到连接/等待连续超过 ${mins} 分钟无新进展，已发送桌面通知`);
         if (this.onStallAlert) {
           this.onStallAlert({
@@ -1114,8 +1316,28 @@
 
       for (const item of clickables) {
         if (this.clickedElements.has(item.el)) continue;
-        if (hasClickedSiblingButton(item.el, this.clickedElements)) continue;
+        if (hasClickedSiblingButton(item.el, this.clickedElements, this.clickAttempts)) continue;
         if (D.containsKeyword(item.label, denyKws)) continue;
+
+        const lower = D.normalizeText(item.label);
+        if (
+          lower.includes('cookie') ||
+          lower.includes('クッキー') ||
+          lower.includes('notification') ||
+          lower.includes('通知') ||
+          lower.includes('microphone') ||
+          lower.includes('マイク') ||
+          lower.includes('camera') ||
+          lower.includes('カメラ') ||
+          lower.includes('location') ||
+          lower.includes('位置') ||
+          lower.includes('麦克风') ||
+          lower.includes('麥克風') ||
+          lower.includes('摄像头') ||
+          lower.includes('攝影機')
+        ) {
+          continue;
+        }
 
         const mAlways =
           D.matchButtonLabel(item.label, defaultAlways, {
@@ -1141,20 +1363,6 @@
         });
 
         if (mSingle) {
-          const lower = D.normalizeText(item.label);
-          if (
-            lower.includes('cookie') ||
-            lower.includes('notification') ||
-            lower.includes('通知') ||
-            lower.includes('microphone') ||
-            lower.includes('camera') ||
-            lower.includes('location') ||
-            lower.includes('麦克风') ||
-            lower.includes('摄像头') ||
-            lower.includes('位置')
-          ) {
-            continue;
-          }
           // Non-exact or generic single-word allow (e.g. "Allow", "同意", "允许", "Allow Desktop Commander")
           // requires sibling approval context (e.g. Deny / Cancel / Always Allow nearby)
           const singleKey = D.stripEdgePunctuation(mSingle.keyword);
@@ -1178,6 +1386,35 @@
         return singleMatches[singleMatches.length - 1];
       }
       return null;
+    }
+
+    findBgRetryCandidate(kind, visibleSet, now) {
+      if (!isBackgroundOrUnfocused(this.doc) || this.clickAttempts.size === 0) return null;
+      const delay = kind === 'allow' ? BG_ALLOW_RETRY_DELAY_MS : BG_CONTINUE_RETRY_DELAY_MS;
+      for (const [el, entry] of this.clickAttempts.entries()) {
+        if (!entry || entry.kind !== kind) continue;
+        if (entry.count >= MAX_BG_CLICK_ATTEMPTS) continue;
+        if (!visibleSet.has(el)) continue;
+        if (now - entry.lastAttemptAt >= delay) {
+          return { el, entry };
+        }
+      }
+      return null;
+    }
+
+    getNextBgRetryDelayMs(visibleSet, now) {
+      if (!isBackgroundOrUnfocused(this.doc) || this.clickAttempts.size === 0) return 0;
+      let minRemaining = 0;
+      for (const [el, entry] of this.clickAttempts.entries()) {
+        if (!entry || entry.count >= MAX_BG_CLICK_ATTEMPTS) continue;
+        if (!visibleSet.has(el)) continue;
+        const delay = entry.kind === 'allow' ? BG_ALLOW_RETRY_DELAY_MS : BG_CONTINUE_RETRY_DELAY_MS;
+        const rem = Math.max(100, delay - (now - entry.lastAttemptAt));
+        if (minRemaining === 0 || rem < minRemaining) {
+          minRemaining = rem;
+        }
+      }
+      return minRemaining;
     }
 
     findContinueCandidate(clickables, turns) {
@@ -1336,6 +1573,7 @@
 
       const now = this.now();
       const clickables = collectClickableElements(this.doc, this.win, searchRoots);
+      const visibleSet = new Set(clickables.map((c) => c.el));
       const turns = getAssistantTurns(this.doc, searchRoots);
       const connectingText = this.detectConnectingStatus(searchRoots);
       const isWaiting = Boolean(this.isGenerating || connectingText);
@@ -1343,34 +1581,85 @@
       // Prune clicked elements that are no longer visible/mounted so Angular-recycled
       // DOM buttons can be clicked again in subsequent prompts without double-clicking live ones.
       if (this.clickedElements.size > 0) {
-        const visibleSet = new Set(clickables.map((c) => c.el));
         for (const prevEl of Array.from(this.clickedElements)) {
           if (!visibleSet.has(prevEl)) {
             this.clickedElements.delete(prevEl);
           }
         }
       }
+      if (this.clickAttempts.size > 0) {
+        for (const prevEl of Array.from(this.clickAttempts.keys())) {
+          if (!visibleSet.has(prevEl)) {
+            this.clickAttempts.delete(prevEl);
+          }
+        }
+      }
 
       // 1. Check MCP Permission Allow first (works even while Gemini turn is paused mid-generation!)
       if (this.settings.autoAllow) {
-        if (now - this.lastAllowClickAt >= this.settings.allowCooldownMs) {
+        const allowElapsed = now - this.lastAllowClickAt;
+        if (allowElapsed >= this.settings.allowCooldownMs) {
           const allowHit = this.findAllowCandidate(clickables);
           if (allowHit) {
             this.clickedElements.add(allowHit.item.el);
+            this.clickAttempts.set(allowHit.item.el, {
+              kind: 'allow',
+              count: 1,
+              lastAttemptAt: now,
+              label: allowHit.item.label,
+              tier: allowHit.tier
+            });
             this.lastAllowClickAt = now;
             this.stats.allowCount += 1;
             this.resetStallMonitor(true);
-            if (this.onStatsSave) this.onStatsSave(this.stats);
-            this.clickFn(allowHit.item.el, this.win);
+            if (this.onStatsSave) this.onStatsSave(this.stats, { allow: 1 });
+            this.clickFn(allowHit.item.el, this.win, 1);
             const tag = allowHit.tier === 'always' ? '始终允许' : '允许';
-            this.lastStatusText = `已自动点击「${allowHit.item.label}」`;
+            this.setStatus('hudStatusClickedAllow', { label: allowHit.item.label });
             this.addLog(`✅ 自动点击[${tag}]：「${allowHit.item.label}」`);
             this.emitState();
             return {
               action: 'clicked_allow',
               tier: allowHit.tier,
               label: allowHit.item.label,
-              element: allowHit.item.el
+              element: allowHit.item.el,
+              pendingRetryInMs: isBackgroundOrUnfocused(this.doc) ? BG_ALLOW_RETRY_DELAY_MS : 0
+            };
+          }
+
+          // Background click safety retry: if a previously clicked permission button failed to dismiss while hidden
+          const allowRetry = this.findBgRetryCandidate('allow', visibleSet, now);
+          if (allowRetry) {
+            allowRetry.entry.count += 1;
+            allowRetry.entry.lastAttemptAt = now;
+            this.lastAllowClickAt = now;
+            this.resetStallMonitor(true);
+            this.clickFn(allowRetry.el, this.win, allowRetry.entry.count);
+            this.setStatus('hudStatusRetryClick', {
+              label: allowRetry.entry.label,
+              attempt: allowRetry.entry.count,
+              max: MAX_BG_CLICK_ATTEMPTS
+            });
+            this.addLog(
+              `🔁 后台重试点击允许：「${allowRetry.entry.label}」 (${allowRetry.entry.count}/${MAX_BG_CLICK_ATTEMPTS})`
+            );
+            this.emitState();
+            return {
+              action: 'retried_allow',
+              tier: allowRetry.entry.tier,
+              label: allowRetry.entry.label,
+              attempt: allowRetry.entry.count,
+              element: allowRetry.el
+            };
+          }
+        } else {
+          const pendingAllow = this.findAllowCandidate(clickables);
+          if (pendingAllow) {
+            this.emitState();
+            return {
+              action: 'wait',
+              reason: 'allow_cooldown',
+              retryInMs: Math.max(100, this.settings.allowCooldownMs - allowElapsed)
             };
           }
         }
@@ -1382,7 +1671,11 @@
       // 2. Check Auto-Continue (strictly guarded by 6-layer anti-quota-burn circuit breaker)
       if (!this.settings.autoContinue) {
         this.emitState();
-        return { action: 'noop', reason: 'auto_continue_off' };
+        return {
+          action: 'noop',
+          reason: 'auto_continue_off',
+          pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
+        };
       }
 
       if (this.circuitBreaker.tripped) {
@@ -1393,25 +1686,70 @@
       // Layer A: Quota / Rate-limit / Error Detection
       const quotaHit = this.detectQuotaOrError(turns, searchRoots);
       if (quotaHit) {
-        this.tripBreaker('quota_error', `检测到额度/错误提示（「${quotaHit}」）`);
+        this.tripBreaker('quota_error', null, 'breakerReasonQuotaError', { kw: quotaHit });
         return { action: 'tripped', reason: 'quota_error', keyword: quotaHit };
       }
 
       // Layer B: Wait for streaming to finish + DOM settle
       if (this.isGenerating) {
         this.emitState();
-        return { action: 'wait', reason: 'generating' };
+        return {
+          action: 'wait',
+          reason: 'generating',
+          pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
+        };
       }
       if (this.lastMutationAt > 0 && now - this.lastMutationAt < this.settings.idleSettleMs) {
         this.emitState();
-        return { action: 'wait', reason: 'settling' };
+        return {
+          action: 'wait',
+          reason: 'settling',
+          retryInMs: Math.max(150, this.settings.idleSettleMs - (now - this.lastMutationAt))
+        };
+      }
+
+      // Background click safety retry for Continue button that failed to dismiss while tab was hidden
+      const currentFp = computeResponseFingerprint(turns);
+      for (const [prevEl, entry] of Array.from(this.clickAttempts.entries())) {
+        if (entry && entry.kind === 'continue' && entry.fingerprint && currentFp && currentFp !== entry.fingerprint) {
+          // Previous continue click produced new output; clear retry record (and recycled DOM node marker)
+          this.clickAttempts.delete(prevEl);
+          this.clickedElements.delete(prevEl);
+        }
+      }
+      const contRetry = this.findBgRetryCandidate('continue', visibleSet, now);
+      if (contRetry) {
+        contRetry.entry.count += 1;
+        contRetry.entry.lastAttemptAt = now;
+        this.lastContinueClickAt = now;
+        this.resetStallMonitor(true);
+        this.clickFn(contRetry.el, this.win, contRetry.entry.count);
+        this.setStatus('hudStatusRetryClick', {
+          label: contRetry.entry.label,
+          attempt: contRetry.entry.count,
+          max: MAX_BG_CLICK_ATTEMPTS
+        });
+        this.addLog(
+          `🔁 后台重试点击继续：「${contRetry.entry.label}」 (${contRetry.entry.count}/${MAX_BG_CLICK_ATTEMPTS})`
+        );
+        this.emitState();
+        return {
+          action: 'retried_continue',
+          label: contRetry.entry.label,
+          attempt: contRetry.entry.count,
+          element: contRetry.el
+        };
       }
 
       // Find candidate first so we don't prematurely trip limits when there is no continue button!
       const contHit = this.findContinueCandidate(clickables, turns);
       if (!contHit) {
         this.emitState();
-        return { action: 'noop', reason: 'no_continue_candidate' };
+        return {
+          action: 'noop',
+          reason: 'no_continue_candidate',
+          pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
+        };
       }
 
       if (this.suppressInitialContinueUntil > 0 && now < this.suppressInitialContinueUntil) {
@@ -1422,43 +1760,51 @@
 
       // Layer C: Per-task cap
       if (this.taskContinueCount >= this.settings.maxContinuesPerTask) {
-        this.tripBreaker(
-          'task_limit',
-          `已达单次任务继续上限 (${this.taskContinueCount}/${this.settings.maxContinuesPerTask})`
-        );
+        this.tripBreaker('task_limit', null, 'breakerReasonTaskLimit', {
+          task: this.taskContinueCount,
+          max: this.settings.maxContinuesPerTask
+        });
         return { action: 'tripped', reason: 'task_limit' };
       }
 
       // Layer D: Daily cap (0 = unlimited, user can set a positive cap at any time)
       if (this.settings.dailyContinueLimit > 0 && this.stats.continueCount >= this.settings.dailyContinueLimit) {
-        this.tripBreaker(
-          'daily_limit',
-          `已达今日继续总上限 (${this.stats.continueCount}/${this.settings.dailyContinueLimit})`
-        );
+        this.tripBreaker('daily_limit', null, 'breakerReasonDailyLimit', {
+          daily: this.stats.continueCount,
+          cap: this.settings.dailyContinueLimit
+        });
         return { action: 'tripped', reason: 'daily_limit' };
       }
 
       // Layer E: Cooldown
       if (this.lastContinueClickAt > 0 && now - this.lastContinueClickAt < this.settings.continueCooldownMs) {
         this.emitState();
-        return { action: 'wait', reason: 'cooldown' };
+        return {
+          action: 'wait',
+          reason: 'cooldown',
+          retryInMs: Math.max(150, this.settings.continueCooldownMs - (now - this.lastContinueClickAt))
+        };
       }
 
-      // Layer F: Completion cue guard (overridden by truncation cues or explicit follow-up prompt cues)
+      // Layer F: Completion cue guard (overridden by truncation cues, explicit continue-generating button, or follow-up prompt cues)
       if (this.settings.stopOnCompletionCues) {
         const latestText = getLatestResponseText(turns);
         if (latestText) {
           const tail = latestText.slice(-500);
           const doneCue = D.containsKeyword(tail, this.settings.completionCueKeywords);
           const truncCue = D.containsKeyword(tail, this.settings.truncationCueKeywords);
+          const isExplicitTruncBtn = EXPLICIT_TRUNCATION_CONTINUE_SET.has(
+            D.stripEdgePunctuation(contHit.item.label)
+          );
           const isFollowUpChip = isFollowUpChipElement(contHit.item.el, contHit.item.label);
           const hasFollowupOverride = Boolean(
-            D.containsKeyword(tail, STRONG_FOLLOWUP_PROMPT_CUES) ||
+            isExplicitTruncBtn ||
+              D.containsKeyword(tail, STRONG_FOLLOWUP_PROMPT_CUES) ||
               (isFollowUpChip && D.containsKeyword(tail, FOLLOWUP_PROMPT_OVERRIDE_CUES))
           );
           if (doneCue && !truncCue && !hasFollowupOverride) {
             this.clickedElements.add(contHit.item.el);
-            this.lastStatusText = `检测到完工信号「${doneCue}」，已跳过继续`;
+            this.setStatus('hudStatusSkippedCompletion', { cue: doneCue });
             this.addLog(`🛡️ 检测到完工信号「${doneCue}」，跳过点击「${contHit.item.label}」`);
             this.emitState();
             return { action: 'skipped', reason: 'completion_cue', keyword: doneCue };
@@ -1475,22 +1821,32 @@
       );
       if (this.settings.stopOnStagnantOutput && (isDomUnchanged || isRepeatedReply)) {
         this.stagnantCount += 1;
-        this.tripBreaker('stagnant_output', '连续输出无新进展，疑似死循环');
+        this.tripBreaker('stagnant_output', null, 'breakerReasonStagnant');
         return { action: 'tripped', reason: 'stagnant_output' };
       }
 
       // Safe to click continue!
       this.clickedElements.add(contHit.item.el);
+      this.clickAttempts.set(contHit.item.el, {
+        kind: 'continue',
+        count: 1,
+        lastAttemptAt: now,
+        label: contHit.item.label,
+        fingerprint: fp
+      });
       this.lastContinueClickAt = now;
       this.lastContinueFingerprint = fp;
       this.lastContinueContentFingerprint = contentFp;
       this.taskContinueCount += 1;
       this.stats.continueCount += 1;
       this.resetStallMonitor(true);
-      if (this.onStatsSave) this.onStatsSave(this.stats);
+      if (this.onStatsSave) this.onStatsSave(this.stats, { continue: 1 });
 
-      this.clickFn(contHit.item.el, this.win);
-      this.lastStatusText = `已点击继续 (${this.taskContinueCount}/${this.settings.maxContinuesPerTask})`;
+      this.clickFn(contHit.item.el, this.win, 1);
+      this.setStatus('hudStatusClickedContinue', {
+        task: this.taskContinueCount,
+        max: this.settings.maxContinuesPerTask
+      });
       this.addLog(
         `▶️ 自动点击继续：「${contHit.item.label}」 (${this.taskContinueCount}/${this.settings.maxContinuesPerTask})`
       );
@@ -1501,7 +1857,8 @@
         label: contHit.item.label,
         element: contHit.item.el,
         taskContinueCount: this.taskContinueCount,
-        dailyContinueCount: this.stats.continueCount
+        dailyContinueCount: this.stats.continueCount,
+        pendingRetryInMs: isBackgroundOrUnfocused(this.doc) ? BG_CONTINUE_RETRY_DELAY_MS : 0
       };
     }
   }
@@ -1512,12 +1869,16 @@
     collectClickableElements,
     getAssistantTurns,
     isIgnoredAncestor,
+    isNoisyMutationTarget,
+    isBackgroundOrUnfocused,
     isElementVisible,
     isFollowUpChipElement,
     isNonChatGeminiUrl,
+    isFreshChatLandingUrl,
     getElementLabel,
     computeResponseFingerprint,
     computeContentFingerprint,
+    resolveClickTarget,
     defaultClickElement
   };
   if (typeof module !== 'undefined' && module.exports) {
@@ -1575,10 +1936,63 @@
         teardownStaleContext();
       }
     };
-    const saveStats = (stats) => {
+    let statsFlushInFlight = false;
+    let pendingStatsDelta = { allow: 0, continue: 0, date: null };
+
+    function flushPendingStatsDelta() {
+      if (statsFlushInFlight || !isContextAlive() || !hasChromeStorage) return;
+      if (pendingStatsDelta.allow === 0 && pendingStatsDelta.continue === 0) return;
+      const batch = {
+        allow: pendingStatsDelta.allow,
+        continue: pendingStatsDelta.continue,
+        date: pendingStatsDelta.date || D.getTodayKey()
+      };
+      pendingStatsDelta.allow = 0;
+      pendingStatsDelta.continue = 0;
+      statsFlushInFlight = true;
+      try {
+        chrome.storage.local.get([D.STATS_KEY], (res) => {
+          if (!isContextAlive()) {
+            statsFlushInFlight = false;
+            return;
+          }
+          const stored = D.normalizeStats(res && res[D.STATS_KEY], batch.date);
+          const merged = {
+            date: batch.date,
+            allowCount: stored.allowCount + batch.allow,
+            continueCount: stored.continueCount + batch.continue
+          };
+          engine.stats = Object.assign({}, merged);
+          engine.emitState();
+          try {
+            chrome.storage.local.set({ [D.STATS_KEY]: Object.assign({}, merged) }, () => {
+              statsFlushInFlight = false;
+              if (pendingStatsDelta.allow > 0 || pendingStatsDelta.continue > 0) {
+                flushPendingStatsDelta();
+              }
+            });
+          } catch (_) {
+            statsFlushInFlight = false;
+            teardownStaleContext();
+          }
+        });
+      } catch (_) {
+        statsFlushInFlight = false;
+        teardownStaleContext();
+      }
+    }
+
+    const saveStats = (stats, delta) => {
       if (!isContextAlive() || !hasChromeStorage) return;
       try {
-        chrome.storage.local.set({ [D.STATS_KEY]: stats });
+        if (delta && typeof chrome.storage.local.get === 'function') {
+          pendingStatsDelta.date = stats.date;
+          pendingStatsDelta.allow += delta.allow || 0;
+          pendingStatsDelta.continue += delta.continue || 0;
+          flushPendingStatsDelta();
+          return;
+        }
+        chrome.storage.local.set({ [D.STATS_KEY]: Object.assign({}, stats) });
       } catch (_) {
         teardownStaleContext();
       }
@@ -1723,6 +2137,7 @@
           if (!isContextAlive()) return;
           const migratedRes = D.migrateStoredSettings(res && res[D.STORAGE_KEY]);
           engine.settings = migratedRes.settings;
+          engine.refreshLocalizedTexts();
           if (migratedRes.migrated) {
             saveSettings(engine.settings);
           }
@@ -1731,7 +2146,7 @@
           }
           settingsReady = true;
           engine.markExistingContinueCandidatesSeen();
-          engine.addLog('🚀 Gemini MCP Auto Helper v0.2 已就绪');
+          engine.addLog('🚀 Gemini MCP Auto Helper v0.3 已就绪');
           engine.emitState();
         });
 
@@ -1740,6 +2155,7 @@
           if (changes[D.STORAGE_KEY] && changes[D.STORAGE_KEY].newValue) {
             const oldAlert = engine.settings ? engine.settings.stallAlertEnabled : true;
             engine.settings = D.mergeSettings(changes[D.STORAGE_KEY].newValue);
+            engine.refreshLocalizedTexts();
             if (!engine.settings.enabled || !engine.settings.stallAlertEnabled) {
               engine.resetStallMonitor(true);
               if (oldAlert && !engine.settings.stallAlertEnabled) {
@@ -1760,21 +2176,7 @@
           if (changes[D.STATS_KEY] && changes[D.STATS_KEY].newValue) {
             engine.stats = D.normalizeStats(changes[D.STATS_KEY].newValue);
           }
-          if (
-            engine.circuitBreaker.tripped &&
-            engine.circuitBreaker.reasonCode === 'daily_limit' &&
-            (engine.settings.dailyContinueLimit === 0 ||
-              engine.stats.continueCount < engine.settings.dailyContinueLimit)
-          ) {
-            engine.clearBreaker('今日计数已清零或上限已放开，自动解除每日熔断');
-            return;
-          }
-          if (
-            engine.circuitBreaker.tripped &&
-            engine.circuitBreaker.reasonCode === 'task_limit' &&
-            engine.taskContinueCount < engine.settings.maxContinuesPerTask
-          ) {
-            engine.clearBreaker('单次任务上限已提高，自动解除任务熔断');
+          if (engine.reconcileBreakerWithSettings()) {
             return;
           }
           engine.emitState();
@@ -1858,13 +2260,63 @@
       }
     }
 
+    function runScanAndSchedule() {
+      if (!isContextAlive() || !canRunScanInCurrentVisibility()) return null;
+      const res = engine.scanOnce();
+      if (res && engine.settings.backgroundMode && isBackgroundOrUnfocused(document)) {
+        const nextDelay =
+          typeof res.retryInMs === 'number' && res.retryInMs > 0
+            ? res.retryInMs + 100
+            : typeof res.pendingRetryInMs === 'number' && res.pendingRetryInMs > 0
+              ? res.pendingRetryInMs + 120
+              : 0;
+        if (nextDelay > 0) {
+          sendToBackground({
+            type: 'GMAH_SCHEDULE_TICK',
+            delayMs: nextDelay,
+            reason: res.reason || res.action || 'bg_followup'
+          });
+        }
+      }
+      return res;
+    }
+
     function handleVisibilityChange() {
       if (!isContextAlive()) return;
-      if (!document.hidden && !bgPort) {
+      if (!bgPort) {
         connectBackgroundPort();
       }
+      if (document.hidden && engine.settings.backgroundMode) {
+        sendToBackground({ type: 'GMAH_TAB_KEEPALIVE' });
+        sendToBackground({
+          type: 'GMAH_SCHEDULE_TICK',
+          delayMs: 500,
+          reason: 'visibility_hidden'
+        });
+      }
       if (canRunScanInCurrentVisibility()) {
-        engine.scanOnce();
+        runScanAndSchedule();
+      }
+    }
+
+    function handleWindowBlur() {
+      if (!isContextAlive()) return;
+      if (engine.settings.backgroundMode) {
+        if (!bgPort) connectBackgroundPort();
+        sendToBackground({ type: 'GMAH_TAB_KEEPALIVE' });
+        sendToBackground({
+          type: 'GMAH_SCHEDULE_TICK',
+          delayMs: 600,
+          reason: 'window_blur'
+        });
+      }
+    }
+
+    function handleWindowFocus() {
+      if (!isContextAlive()) return;
+      if (!bgPort) connectBackgroundPort();
+      if (canRunScanInCurrentVisibility()) {
+        runScanAndSchedule();
       }
     }
 
@@ -1898,6 +2350,8 @@
         document.removeEventListener('keydown', handleKeydown, true);
         document.removeEventListener('click', handleClick, true);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('blur', handleWindowBlur);
+        window.removeEventListener('focus', handleWindowFocus);
       } catch (_) {}
       try {
         delete window.__GMAH_BOOTSTRAPPED__;
@@ -1909,15 +2363,45 @@
     document.addEventListener('keydown', handleKeydown, true);
     document.addEventListener('click', handleClick, true);
 
-    // Observe DOM mutations outside HUD.
-    // When tab is hidden/minimized and backgroundMode is on, use microtask scheduling
-    // so Chrome's background timer throttling cannot delay permission clicks!
+    // Observe DOM mutations outside HUD (including open ShadowRoots of Material Web Components).
+    // When tab is hidden/minimized or unfocused and backgroundMode is on, use microtask scheduling
+    // PLUS Service Worker delayed ticks so Chrome's background timer throttling can never stall clicks!
     let lastMicrotaskScanAt = 0;
     let microtaskQueued = false;
+    const observedShadowRoots = typeof WeakSet === 'function' ? new WeakSet() : null;
+
+    function observeShadowTree(rootNode) {
+      if (!observer || !rootNode) return;
+      const attach = (sr) => {
+        if (!sr || (observedShadowRoots && observedShadowRoots.has(sr))) return;
+        if (observedShadowRoots) observedShadowRoots.add(sr);
+        try {
+          observer.observe(sr, {
+            childList: true,
+            subtree: true,
+            characterData: true
+          });
+        } catch (_) {}
+      };
+      if (rootNode.shadowRoot) {
+        attach(rootNode.shadowRoot);
+        observeShadowTree(rootNode.shadowRoot);
+      }
+      if (typeof rootNode.querySelectorAll === 'function') {
+        const descendants = rootNode.querySelectorAll('*');
+        for (let i = 0; i < descendants.length; i++) {
+          const d = descendants[i];
+          if (d && d.shadowRoot && !isIgnoredAncestor(d)) {
+            attach(d.shadowRoot);
+            observeShadowTree(d.shadowRoot);
+          }
+        }
+      }
+    }
 
     function scheduleScan(delay) {
       if (!isContextAlive() || !settingsReady) return;
-      if (document.hidden && engine.settings.backgroundMode) {
+      if (isBackgroundOrUnfocused(document) && engine.settings.backgroundMode) {
         if (!microtaskQueued) {
           microtaskQueued = true;
           Promise.resolve().then(() => {
@@ -1926,7 +2410,14 @@
             const now = Date.now();
             if (now - lastMicrotaskScanAt >= 200) {
               lastMicrotaskScanAt = now;
-              engine.scanOnce();
+              runScanAndSchedule();
+            } else {
+              // Fast 250ms SW follow-up so rapid MCP Allow dialogs aren't delayed while Continue still settles cleanly
+              sendToBackground({
+                type: 'GMAH_SCHEDULE_TICK',
+                delayMs: 250,
+                reason: 'bg_mutation_burst'
+              });
             }
           });
         }
@@ -1936,7 +2427,7 @@
       scanTimer = setTimeout(() => {
         scanTimer = null;
         if (!isContextAlive() || !canRunScanInCurrentVisibility()) return;
-        engine.scanOnce();
+        runScanAndSchedule();
       }, delay);
     }
 
@@ -1945,9 +2436,16 @@
         if (!isContextAlive()) return;
         let relevant = false;
         for (const m of mutations) {
-          if (m.target && !isIgnoredAncestor(m.target)) {
+          if (m.addedNodes && m.addedNodes.length > 0) {
+            for (let i = 0; i < m.addedNodes.length; i++) {
+              const added = m.addedNodes[i];
+              if (added && added.nodeType === 1 && !isIgnoredAncestor(added)) {
+                observeShadowTree(added);
+              }
+            }
+          }
+          if (m.target && !isIgnoredAncestor(m.target) && !isNoisyMutationTarget(m.target)) {
             relevant = true;
-            break;
           }
         }
         if (relevant) {
@@ -1960,10 +2458,12 @@
         subtree: true,
         characterData: true
       });
+      observeShadowTree(document.body);
     }
 
-    // Background Service Worker Port (keeps scanning alive at 1.5s intervals even when tab is hidden/minimized)
+    // Background Service Worker Port (keeps scanning alive at 1.5s intervals + seamless 4-min rotation)
     let quickReconnectCount = 0;
+    let rotatingPort = false;
 
     function connectBackgroundPort() {
       if (!isContextAlive()) return;
@@ -1977,30 +2477,53 @@
       }
       if (bgPort) return;
       try {
-        bgPort = chrome.runtime.connect({ name: 'gmah-tab' });
-        bgPort.onMessage.addListener((msg) => {
+        const port = chrome.runtime.connect({ name: 'gmah-tab' });
+        bgPort = port;
+        port.onMessage.addListener((msg) => {
           if (!isContextAlive()) return;
           quickReconnectCount = 0;
-          if (msg && msg.type === 'GMAH_BG_TICK') {
+          if (!msg || typeof msg !== 'object') return;
+          if (msg.type === 'GMAH_ROTATE_PORT') {
+            // Proactively replace the long-lived port before Chrome's 5-min MV3 forced disconnect
+            rotatingPort = true;
+            bgPort = null;
+            try { port.disconnect(); } catch (_) {}
+            rotatingPort = false;
+            connectBackgroundPort();
+            return;
+          }
+          if (msg.type === 'GMAH_BG_TICK') {
             if (canRunScanInCurrentVisibility()) {
-              engine.scanOnce();
+              runScanAndSchedule();
             }
             try {
-              if (bgPort) bgPort.postMessage({ type: 'GMAH_TAB_PONG', ts: Date.now() });
+              if (bgPort === port) port.postMessage({ type: 'GMAH_TAB_PONG', ts: Date.now() });
             } catch (_) {
               // Ignore transient port close
             }
           }
         });
-        bgPort.onDisconnect.addListener(() => {
-          bgPort = null;
-          if (!isContextAlive()) return;
+        port.onDisconnect.addListener(() => {
+          if (bgPort === port) {
+            bgPort = null;
+          }
+          if (rotatingPort || !isContextAlive()) return;
           if (!chrome.runtime || !chrome.runtime.id) {
             teardownStaleContext();
             return;
           }
-          if (document.hidden && engine.settings.backgroundMode && quickReconnectCount < 3) {
+          if (isBackgroundOrUnfocused(document) && engine.settings.backgroundMode && quickReconnectCount < 2) {
             quickReconnectCount += 1;
+            // Wake Service Worker via sendMessage before reconnecting Port so restarts don't burn retries
+            if (typeof chrome.runtime.sendMessage === 'function') {
+              try {
+                chrome.runtime.sendMessage({ type: 'GMAH_TAB_KEEPALIVE' }, () => {
+                  void (chrome.runtime && chrome.runtime.lastError);
+                  if (isContextAlive() && !bgPort) connectBackgroundPort();
+                });
+                return;
+              } catch (_) {}
+            }
             Promise.resolve().then(() => connectBackgroundPort());
             return;
           }
@@ -2008,10 +2531,10 @@
             reconnectTimer = setTimeout(() => {
               reconnectTimer = null;
               connectBackgroundPort();
-            }, 3000);
+            }, 2500);
           }
         });
-        bgPort.postMessage({
+        port.postMessage({
           type: 'GMAH_TAB_HELLO',
           url: window.location.href,
           stallAlertActive: Boolean(engine.stallAlertActive)
@@ -2024,15 +2547,20 @@
 
     connectBackgroundPort();
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
 
     // Periodic foreground heartbeat (Service Worker Port + Alarms take over when tab is hidden)
     heartbeatInterval = setInterval(() => {
       if (!isContextAlive()) return;
+      if (!bgPort && engine.settings.enabled && engine.settings.backgroundMode) {
+        connectBackgroundPort();
+      }
       if (hud && engine.settings.showHud && !document.getElementById('gmah-hud')) {
         hud.mount();
       }
       if (canRunScanInCurrentVisibility()) {
-        engine.scanOnce();
+        runScanAndSchedule();
       }
     }, 900);
 
@@ -2043,12 +2571,21 @@
         if (msg.type === 'GMAH_BG_TICK') {
           if (!bgPort) connectBackgroundPort();
           if (canRunScanInCurrentVisibility()) {
-            const res = engine.scanOnce();
+            const res = runScanAndSchedule();
             sendResponse({ ok: true, result: res });
           } else {
             sendResponse({ ok: true, skipped: 'background_disabled' });
           }
+        } else if (msg.type === 'GMAH_APPLY_SETTINGS' && msg.settings) {
+          engine.updateSettings(msg.settings, false);
+          if (engine.settings.enabled && engine.settings.backgroundMode && !bgPort) {
+            connectBackgroundPort();
+          }
+          sendResponse({ ok: true, state: engine.getState() });
         } else if (msg.type === 'GMAH_GET_STATE') {
+          if (engine.settings.enabled && engine.settings.backgroundMode && !bgPort) {
+            connectBackgroundPort();
+          }
           sendResponse({ ok: true, state: engine.getState() });
         } else if (msg.type === 'GMAH_RESET_BREAKER') {
           engine.clearBreaker();

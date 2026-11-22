@@ -18,7 +18,7 @@ KenEasy Gemini MCP Auto Helper is an open-source productivity extension engineer
 It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with an industrial-grade 6-layer circuit breaker and multi-window safety guards.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✨ KEY FEATURES (V0.2 BETA)
+✨ KEY FEATURES (V0.3 BETA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⚡ 1. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)

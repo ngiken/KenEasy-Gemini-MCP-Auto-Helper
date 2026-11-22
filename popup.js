@@ -9,6 +9,7 @@
     const d = doc || (typeof document !== 'undefined' ? document : null);
     const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
     let toastTimer = null;
+    let autoSaveTimer = null;
     let currentSettings = D.mergeSettings(D.DEFAULT_SETTINGS);
 
     function byId(id) {
@@ -330,6 +331,10 @@
     }
 
     function saveSettings(customSettings, msg) {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+      }
       const next = customSettings ? D.mergeSettings(customSettings) : readSettingsFromForm();
       renderSettings(next);
       if (!next.stallAlertEnabled && api && api.runtime && typeof api.runtime.sendMessage === 'function') {
@@ -345,7 +350,8 @@
           api.storage.local.get([D.STATS_KEY], (res) => {
             renderStats(res && res[D.STATS_KEY], next);
           });
-          sendToGeminiTabs({ type: 'GMAH_GET_STATE' }, (state, meta) => {
+          // Push settings directly to open Gemini tabs so breaker reconciliation & live status never race storage.onChanged
+          sendToGeminiTabs({ type: 'GMAH_APPLY_SETTINGS', settings: next }, (state, meta) => {
             if (state) {
               renderLiveStatus(Object.assign({}, state, { settings: next }), meta);
             } else {
@@ -355,6 +361,14 @@
         });
       }
       return next;
+    }
+
+    function scheduleAutoSave() {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        autoSaveTimer = null;
+        saveSettings(null, tr('toastSynced'));
+      }, 450);
     }
 
     function loadInitial() {
@@ -436,6 +450,27 @@
         if (el) {
           el.addEventListener('change', () => {
             saveSettings(null, tr('toastSynced'));
+          });
+        }
+      }
+
+      const autoSyncFieldIds = [
+        'maxContinuesPerTask',
+        'dailyContinueLimit',
+        'continueCooldownSec',
+        'idleSettleSec',
+        'stallAlertMinutes',
+        'customAlwaysAllowKeywords',
+        'customContinueKeywords'
+      ];
+      for (const id of autoSyncFieldIds) {
+        const el = byId(id);
+        if (el) {
+          el.addEventListener('change', () => {
+            saveSettings(null, tr('toastSynced'));
+          });
+          el.addEventListener('input', () => {
+            scheduleAutoSave();
           });
         }
       }

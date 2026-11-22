@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-11-22
+
+### 🚀 Ultimate Background Persistence, Smart Click Retries & UI Stability Overhaul (v0.3 Beta)
+
+#### 🔥 Background & Minimized Tab Reliability Fixes
+- **MV3 Service Worker Never-Sleep Keepalive & 4-Min Seamless Port Rotation (`background.js` / `content.js`)**:
+  - Added periodic lightweight `chrome.runtime.getPlatformInfo` keepalive calls (~19.5s) while Gemini tabs are active so Chrome MV3 never terminates the Service Worker after 30 seconds of idle time.
+  - Added proactive 4-minute Port rotation (`GMAH_ROTATE_PORT`) before Chrome's 5-minute hard disconnect limit, plus `GMAH_TAB_KEEPALIVE` wakeup before reconnecting on unexpected drops.
+  - Added `chrome.tabs.onActivated`, `chrome.windows.onFocusChanged`, `window.blur`, and `window.focus` listeners to wake and scan Gemini tabs the instant you switch tabs or Alt+Tab to another application.
+- **Unthrottled Service Worker Delayed Tick Scheduling (`GMAH_SCHEDULE_TICK`)**:
+  - Solved the background `settling` / `cooldown` deadlock: whenever a hidden or unfocused tab waits for output settle (`1.8s`) or cooldown (`4s`), it delegates an unthrottled delayed callback to the Service Worker so Chrome's 1-minute background timer throttling can never freeze Auto-Continue.
+- **Shadow DOM Recursive MutationObserver & Noise Filtering**:
+  - Automatically attaches `MutationObserver` into open `ShadowRoot` trees (including dynamically mounted Material Web Components), while ignoring `.mat-ripple` and `role="tooltip"` UI noise so idle settle timers aren't endlessly reset.
+- **Minimized-Window False `isGenerating` Lock Fix**:
+  - Strengthened visibility checks for loading spinners and Stop buttons (`opacity: 0`, `0px` dimensions, `scale(0)`, `.ng-hide`) so hidden/collapsed spinners in minimized windows (`0×0` viewport) never permanently block Auto-Continue.
+- **Safe Background Click Retry with MWC Shadow Piercing**:
+  - If a permission Allow or Continue button fails to dismiss while the tab is hidden/unfocused, the engine safely retries once after 2.5s / 3.5s (max 2 attempts) with center coordinates, safe `focus({ preventScroll: true })`, and `@material/web` ShadowRoot inner `<button>` piercing — without double-counting stats or falsely tripping `stagnant_output`.
+- **Smart Non-Duplicate Tab Probing**:
+  - Probes tabs with `GMAH_GET_STATE` before dynamic script injection so existing Gemini tabs never receive duplicate `hud.css` / script injections.
+
+#### 🐛 Everyday UX & Logic Bug Fixes
+- **Fixed HUD Snapping to `(0, 0)` on Windows Minimize**: `hud.js` now ignores minimized `0×0` resize events, preserving your exact HUD coordinates when restoring the browser window.
+- **Fixed HUD Off-Screen Clipping on Expand / Panel Open**: Expanding a minimized HUD or opening the Logs / Inspect panel automatically re-clamps the HUD inside the viewport.
+- **Eliminated Duplicate Drag Events & Unnecessary DOM Re-renders**: Deduplicated bubbling `pointer*`/`mouse*` events, extended post-drag click lock to 250ms, guarded async position restoration during active drags, and added render-signature diffing to eliminate redundant 900ms HUD repaints.
+- **Fixed New Chat `/app` → `/app/<chatId>` Suppression**: Creating a brand-new conversation from `/app` no longer falsely suppresses the first Continue button, while switching between historical chats still protects against stale chips.
+- **Fixed Split Inline `<span>` Labels, Zero-Width Chars, Cookie Guard & Live 4-Language Status**: Strips zero-width characters while inserting spaces between split ASCII spans (e.g. `<span>Always\u200B</span><span>allow</span>` → `"Always allow"`), protects both `alwaysAllow` and `singleAllow` against cookie/notification/camera/mic/location prompts across all 4 languages, lets explicit `继续生成` / `Continue generating` buttons override completion cues, and localizes all live engine status and breaker messages (with 100% i18n key & placeholder parity across `zh-CN`/`zh-TW`/`en`/`ja`).
+- **Popup Auto-Save & Race-Free Breaker Reconciliation**: Numeric inputs and custom keywords now auto-save on change/input and immediately push `GMAH_APPLY_SETTINGS` to open Gemini tabs so raising limits clears tripped breakers instantaneously; multi-tab stats use serialized delta-merged storage writes.
+
+#### 🧪 Quality Assurance & Tests
+- Expanded automated test suite to **64 tests** across 5 suites including a **30-minute background marathon VM sandbox** (7+ Port rotations, SW crash recovery, frozen background timers), recycled DOM node verification, 3-level Shadow DOM + 500-mutation noise storm, 20+ adversarial false-positive matrix, 4-language i18n parity audit, and multi-tab concurrent stats merge (**64/64 passing**).
+
+---
+
 ## [0.2.0] - 2026-11-22
 
 ### ✨ Multi-Language, Light/Dark Mode, Drag & Multi-Window Guard Fixes (v0.2 Beta)

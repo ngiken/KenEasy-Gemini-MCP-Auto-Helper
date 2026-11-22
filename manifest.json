@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "KenEasy Gemini MCP Auto Helper",
-  "version": "0.2.0",
-  "description": "自动点击 Google Gemini 的 MCP 权限允许与继续按钮，支持多语言切换、黑白深浅模式、自由拖拽悬浮窗、超时桌面通知及 6 层防刷熔断保护。",
+  "version": "0.3.0",
+  "description": "自动点击 Google Gemini 的 MCP 权限允许与继续按钮，强化后台/最小化永不断线引擎与自动重试，支持 4 语言、黑白双模式、自由拖拽悬浮窗、超时桌面通知及 6 层防刷熔断保护。",
   "permissions": ["storage", "tabs", "alarms", "scripting", "notifications"],
   "host_permissions": ["https://gemini.google.com/*"],
   "icons": {

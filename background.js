@@ -15,16 +15,25 @@
   const ALARM_NAME = 'gmah_bg_keepalive';
   const STORAGE_KEY = 'gmah_settings_v1';
   const HEARTBEAT_INTERVAL_MS = 1500;
+  const KEEPALIVE_EVERY_N_TICKS = 13; // ~19.5s: resets Chrome MV3 30s SW idle timer
+  const RESYNC_EVERY_N_TICKS = 10; // ~15s: rediscovers any unattached Gemini tabs
+  const PORT_ROTATE_MS = 4 * 60 * 1000; // Rotate long-lived MV3 port before Chrome's 5-min hard disconnect
+  const MIN_SCHEDULED_TICK_MS = 150;
+  const MAX_SCHEDULED_TICK_MS = 30000;
 
   function isGeminiUrl(url) {
     return typeof url === 'string' && /^https:\/\/gemini\.google\.com(\/|$|\?)/i.test(url);
   }
 
-  function createBackgroundController(chromeApi, timers) {
+  function createBackgroundController(chromeApi, timers, clockFn) {
     const api = chromeApi || (typeof chrome !== 'undefined' ? chrome : null);
-    const t = timers || { setInterval, clearInterval };
+    const t = Object.assign({ setInterval, clearInterval, setTimeout, clearTimeout }, timers || {});
+    const nowFn = typeof clockFn === 'function' ? clockFn : () => Date.now();
     const ports = new Map(); // tabId -> port
+    const portMeta = new Map(); // tabId -> { connectedAt, lastPongAt, rotateSent }
+    const scheduledTicks = new Map(); // tabId -> { timerId, dueAt }
     let heartbeatTimer = null;
+    let heartbeatTickCount = 0;
     let settingsLoaded = false;
     let settings = {
       language: 'zh-CN',
@@ -138,6 +147,30 @@
       }
     }
 
+    function ensureTabInjected(tabId) {
+      if (api && api.tabs && typeof api.tabs.sendMessage === 'function') {
+        try {
+          const res = api.tabs.sendMessage(
+            tabId,
+            { type: 'GMAH_GET_STATE' },
+            () => {
+              const hadErr = Boolean(api.runtime && api.runtime.lastError);
+              if (hadErr) {
+                injectIntoTab(tabId);
+              }
+            }
+          );
+          if (res && typeof res.catch === 'function') {
+            res.catch(() => {});
+          }
+          return;
+        } catch (_) {
+          // Fall through to direct injection
+        }
+      }
+      injectIntoTab(tabId);
+    }
+
     function syncAllGeminiTabs(sendTick, autoInject) {
       if (!api || !api.tabs || typeof api.tabs.query !== 'function') return;
       try {
@@ -149,11 +182,11 @@
             if (tab.url && !isGeminiUrl(tab.url)) continue;
             applyDiscardProtection(tab.id);
             if (tab.discarded) continue;
-            if (autoInject && !ports.has(tab.id)) {
-              injectIntoTab(tab.id);
-            }
             if (sendTick && settings.enabled && settings.backgroundMode) {
+              // pingTab already probes via port or sendMessage and falls back to injectIntoTab if missing
               pingTab(tab.id, 'alarm');
+            } else if (autoInject && !ports.has(tab.id)) {
+              ensureTabInjected(tab.id);
             }
           }
         });
@@ -167,17 +200,18 @@
       const port = ports.get(tabId);
       if (port) {
         try {
-          port.postMessage({ type: 'GMAH_BG_TICK', source, ts: Date.now() });
+          port.postMessage({ type: 'GMAH_BG_TICK', source, ts: nowFn() });
           return;
         } catch (_) {
           ports.delete(tabId);
+          portMeta.delete(tabId);
         }
       }
       if (api && api.tabs && typeof api.tabs.sendMessage === 'function') {
         try {
           const res = api.tabs.sendMessage(
             tabId,
-            { type: 'GMAH_BG_TICK', source, ts: Date.now() },
+            { type: 'GMAH_BG_TICK', source, ts: nowFn() },
             () => {
               const hadErr = Boolean(api.runtime && api.runtime.lastError);
               if (hadErr && source !== 'post_inject') {
@@ -196,6 +230,67 @@
       }
     }
 
+    function keepServiceWorkerAlive() {
+      if (!api) return;
+      try {
+        if (api.runtime && typeof api.runtime.getPlatformInfo === 'function') {
+          api.runtime.getPlatformInfo(() => {
+            void (api.runtime && api.runtime.lastError);
+          });
+        } else if (api.storage && api.storage.local && typeof api.storage.local.get === 'function') {
+          api.storage.local.get([STORAGE_KEY], () => {
+            void (api.runtime && api.runtime.lastError);
+          });
+        }
+      } catch (_) {
+        // Ignore transient SW keepalive errors
+      }
+    }
+
+    function clearScheduledTick(tabId) {
+      const entry = scheduledTicks.get(tabId);
+      if (entry) {
+        try {
+          t.clearTimeout(entry.timerId);
+        } catch (_) {}
+        scheduledTicks.delete(tabId);
+      }
+    }
+
+    function clearAllScheduledTicks() {
+      for (const tabId of Array.from(scheduledTicks.keys())) {
+        clearScheduledTick(tabId);
+      }
+    }
+
+    function scheduleDelayedTick(tabId, delayMs, source) {
+      if (typeof tabId !== 'number') return false;
+      if (!settings.enabled || !settings.backgroundMode) return false;
+      const numericDelay = Number(delayMs);
+      const clamped = Number.isFinite(numericDelay)
+        ? Math.min(MAX_SCHEDULED_TICK_MS, Math.max(MIN_SCHEDULED_TICK_MS, Math.round(numericDelay)))
+        : 1000;
+      const now = nowFn();
+      const dueAt = now + clamped;
+      const existing = scheduledTicks.get(tabId);
+      if (existing && existing.dueAt <= dueAt + 120) {
+        return true;
+      }
+      if (existing) {
+        clearScheduledTick(tabId);
+      }
+      const timerId = t.setTimeout(() => {
+        scheduledTicks.delete(tabId);
+        withLoadedSettings(() => {
+          if (settings.enabled && settings.backgroundMode) {
+            pingTab(tabId, source || 'scheduled');
+          }
+        });
+      }, clamped);
+      scheduledTicks.set(tabId, { timerId, dueAt });
+      return true;
+    }
+
     function tickConnectedPorts() {
       if (!settings.enabled || !settings.backgroundMode) {
         stopHeartbeat();
@@ -205,8 +300,27 @@
         stopHeartbeat();
         return;
       }
+      heartbeatTickCount += 1;
+      const now = nowFn();
       for (const tabId of Array.from(ports.keys())) {
+        const meta = portMeta.get(tabId);
+        const port = ports.get(tabId);
+        if (meta && port && !meta.rotateSent && now - meta.connectedAt >= PORT_ROTATE_MS) {
+          meta.rotateSent = true;
+          try {
+            port.postMessage({ type: 'GMAH_ROTATE_PORT', ts: now });
+          } catch (_) {
+            ports.delete(tabId);
+            portMeta.delete(tabId);
+          }
+        }
         pingTab(tabId, 'heartbeat');
+      }
+      if (heartbeatTickCount % KEEPALIVE_EVERY_N_TICKS === 0) {
+        keepServiceWorkerAlive();
+      }
+      if (heartbeatTickCount % RESYNC_EVERY_N_TICKS === 0) {
+        syncAllGeminiTabs(false, true);
       }
     }
 
@@ -214,6 +328,7 @@
       if (heartbeatTimer !== null) return;
       if (!settings.enabled || !settings.backgroundMode) return;
       if (ports.size === 0) return;
+      heartbeatTickCount = 0;
       heartbeatTimer = t.setInterval(tickConnectedPorts, HEARTBEAT_INTERVAL_MS);
     }
 
@@ -222,6 +337,7 @@
         t.clearInterval(heartbeatTimer);
         heartbeatTimer = null;
       }
+      heartbeatTickCount = 0;
     }
 
     function ensureAlarm() {
@@ -437,16 +553,50 @@
 
     function handleTabRemoved(tabId) {
       ports.delete(tabId);
+      portMeta.delete(tabId);
+      clearScheduledTick(tabId);
       if (ports.size === 0) {
         stopHeartbeat();
       }
       clearStallNotification(tabId);
     }
 
+    function handleTabActivated() {
+      withLoadedSettings(() => {
+        if (!settings.enabled || !settings.backgroundMode) return;
+        ensureAlarm();
+        syncAllGeminiTabs(true, true);
+      });
+    }
+
+    function handleWindowFocusChanged() {
+      withLoadedSettings(() => {
+        if (!settings.enabled || !settings.backgroundMode) return;
+        ensureAlarm();
+        syncAllGeminiTabs(true, true);
+      });
+    }
+
     function handleRuntimeMessage(msg, sender, sendResponse) {
       if (!msg || typeof msg !== 'object') return;
       const tabId = sender && sender.tab && sender.tab.id;
-      if (msg.type === 'GMAH_STALL_ALERT' && typeof tabId === 'number') {
+      if (msg.type === 'GMAH_SCHEDULE_TICK' && typeof tabId === 'number') {
+        withLoadedSettings(() => {
+          const ok = scheduleDelayedTick(tabId, msg.delayMs, msg.reason || 'scheduled');
+          if (typeof sendResponse === 'function') sendResponse({ ok });
+        });
+        return true;
+      } else if (msg.type === 'GMAH_TAB_KEEPALIVE' && typeof tabId === 'number') {
+        withLoadedSettings(() => {
+          applyDiscardProtection(tabId);
+          ensureAlarm();
+          if (settings.enabled && settings.backgroundMode) {
+            keepServiceWorkerAlive();
+          }
+          if (typeof sendResponse === 'function') sendResponse({ ok: true, connected: ports.has(tabId) });
+        });
+        return true;
+      } else if (msg.type === 'GMAH_STALL_ALERT' && typeof tabId === 'number') {
         showStallNotification(tabId, msg);
         if (typeof sendResponse === 'function') sendResponse({ ok: true });
       } else if (msg.type === 'GMAH_STALL_CLEAR' && typeof tabId === 'number') {
@@ -467,6 +617,8 @@
       if (typeof tabId !== 'number') return;
 
       ports.set(tabId, port);
+      const connectedNow = nowFn();
+      portMeta.set(tabId, { connectedAt: connectedNow, lastPongAt: connectedNow, rotateSent: false });
 
       port.onMessage.addListener((msg) => {
         if (!msg || typeof msg !== 'object') return;
@@ -480,7 +632,13 @@
           });
         } else if (msg.type === 'GMAH_TAB_PONG') {
           // Two-way port traffic keeps the MV3 service worker awake while monitoring in background
+          const meta = portMeta.get(tabId);
+          if (meta) meta.lastPongAt = nowFn();
           void msg.ts;
+        } else if (msg.type === 'GMAH_SCHEDULE_TICK') {
+          withLoadedSettings(() => {
+            scheduleDelayedTick(tabId, msg.delayMs, msg.reason || 'scheduled');
+          });
         } else if (msg.type === 'GMAH_STALL_ALERT') {
           showStallNotification(tabId, msg);
         } else if (msg.type === 'GMAH_STALL_CLEAR') {
@@ -493,6 +651,7 @@
       port.onDisconnect.addListener(() => {
         if (ports.get(tabId) === port) {
           ports.delete(tabId);
+          portMeta.delete(tabId);
         }
         if (ports.size === 0) {
           stopHeartbeat();
@@ -514,7 +673,7 @@
     function handleAlarm(alarm) {
       if (!alarm || alarm.name !== ALARM_NAME) return;
       loadSettings(() => {
-        syncAllGeminiTabs(true);
+        syncAllGeminiTabs(true, true);
       });
     }
 
@@ -529,6 +688,9 @@
       if (!meaningfulChange) return;
       withLoadedSettings(() => {
         applyDiscardProtection(tabId);
+        if (changeInfo && changeInfo.status === 'complete' && settings.enabled && settings.backgroundMode && !ports.has(tabId)) {
+          ensureTabInjected(tabId);
+        }
       });
     }
 
@@ -544,6 +706,9 @@
           startHeartbeat();
         } else {
           stopHeartbeat();
+          if (!settings.enabled || !settings.backgroundMode) {
+            clearAllScheduledTicks();
+          }
         }
         syncAllGeminiTabs(false);
       }
@@ -552,7 +717,7 @@
     function init() {
       loadSettings(() => {
         ensureAlarm();
-        syncAllGeminiTabs(false);
+        syncAllGeminiTabs(false, true);
       });
 
       if (!api) return;
@@ -570,6 +735,12 @@
       }
       if (api.tabs && api.tabs.onRemoved) {
         api.tabs.onRemoved.addListener(handleTabRemoved);
+      }
+      if (api.tabs && api.tabs.onActivated) {
+        api.tabs.onActivated.addListener(handleTabActivated);
+      }
+      if (api.windows && api.windows.onFocusChanged) {
+        api.windows.onFocusChanged.addListener(handleWindowFocusChanged);
       }
       if (api.notifications && api.notifications.onClicked) {
         api.notifications.onClicked.addListener(handleNotificationClicked);
@@ -603,21 +774,29 @@
       handleAlarm,
       handleTabUpdated,
       handleTabRemoved,
+      handleTabActivated,
+      handleWindowFocusChanged,
       handleStorageChanged,
       syncAllGeminiTabs,
       injectIntoTab,
+      scheduleDelayedTick,
+      clearScheduledTick,
+      keepServiceWorkerAlive,
       tickConnectedPorts,
       clearAllStallNotifications,
       clearStallNotification,
       getConnectedTabIds: () => Array.from(ports.keys()),
+      getScheduledTickTabIds: () => Array.from(scheduledTicks.keys()),
+      getPortMeta: (tabId) => (portMeta.has(tabId) ? Object.assign({}, portMeta.get(tabId)) : null),
       isHeartbeatRunning: () => heartbeatTimer !== null,
       getSettings: () => Object.assign({}, settings),
       ALARM_NAME,
+      PORT_ROTATE_MS,
       STALL_NOTIF_PREFIX
     };
   }
 
-  root.GMAH_BG = { createBackgroundController, isGeminiUrl, ALARM_NAME };
+  root.GMAH_BG = { createBackgroundController, isGeminiUrl, ALARM_NAME, PORT_ROTATE_MS };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = root.GMAH_BG;
   }

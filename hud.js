@@ -12,6 +12,8 @@
     let activePanel = null; // null | 'logs' | 'inspect'
     let currentState = null;
     let lastLogSignature = '';
+    let lastRenderSignature = '';
+    let lastMinimized = null;
     let lastLang = null;
     let docCleanup = null;
 
@@ -117,9 +119,18 @@
       const win = getWindow();
       const vw = (win && typeof win.innerWidth === 'number') ? win.innerWidth : 1024;
       const vh = (win && typeof win.innerHeight === 'number') ? win.innerHeight : 768;
-      const r = (container.getBoundingClientRect && container.getBoundingClientRect()) || { width: 248, height: 280 };
-      const width = (r && typeof r.width === 'number' && r.width > 0) ? r.width : 248;
-      const height = (r && typeof r.height === 'number' && r.height > 0) ? r.height : 280;
+      // Guard against Windows minimized viewport (0x0) snapping the HUD to top-left (0, 0)
+      if (vw < 120 || vh < 120) {
+        const curLeft = container.style.left ? parseFloat(container.style.left) : Math.round(Number(left) || 0);
+        const curTop = container.style.top ? parseFloat(container.style.top) : Math.round(Number(top) || 0);
+        return {
+          left: Number.isFinite(curLeft) ? curLeft : 0,
+          top: Number.isFinite(curTop) ? curTop : 0
+        };
+      }
+      const r = (container.getBoundingClientRect && container.getBoundingClientRect()) || { width: 262, height: 290 };
+      const width = (r && typeof r.width === 'number' && r.width > 0) ? r.width : 262;
+      const height = (r && typeof r.height === 'number' && r.height > 0) ? r.height : 290;
 
       const maxLeft = Math.max(0, vw - width);
       const maxTop = Math.max(0, vh - height);
@@ -134,8 +145,21 @@
       return { left: clampedLeft, top: clampedTop };
     }
 
+    function ensureInViewport() {
+      if (!container || !container.style.left || container.style.left === 'auto') return;
+      if (!container.style.top || container.style.top === 'auto') return;
+      const curLeft = parseFloat(container.style.left);
+      const curTop = parseFloat(container.style.top);
+      if (Number.isFinite(curLeft) && Number.isFinite(curTop)) {
+        applyPosition(curLeft, curTop);
+      }
+    }
+
     function mount() {
       if (container && container.isConnected) return container;
+      lastRenderSignature = '';
+      lastLogSignature = '';
+      lastMinimized = null;
       const existing = document.getElementById('gmah-hud');
       if (existing) existing.remove();
 
@@ -264,6 +288,14 @@
       let startPointerY = 0;
       let startElemLeft = 0;
       let startElemTop = 0;
+      let lastHandledDragEvent = null;
+
+      function isDuplicateEvent(e) {
+        if (!e) return false;
+        if (lastHandledDragEvent === e) return true;
+        lastHandledDragEvent = e;
+        return false;
+      }
 
       function getEventCoords(e) {
         const clientX = e && e.clientX !== undefined ? e.clientX : (e && e.pageX !== undefined ? e.pageX : 0);
@@ -336,7 +368,7 @@
       }
 
       function onDragMove(mode, e) {
-        if (!isPointerDown || !e) return;
+        if (!isPointerDown || !e || isDuplicateEvent(e)) return;
         if (activeInputMode && activeInputMode !== mode) return;
         if (typeof e.buttons === 'number' && (e.buttons & 1) === 0) {
           // Left button was released off-screen: finalize at current HUD coordinates without jumping
@@ -357,7 +389,7 @@
             hasDraggedResetTimer = setTimeout(() => {
               hasDragged = false;
               hasDraggedResetTimer = null;
-            }, 80);
+            }, 250);
           }
           releaseCaptureSafe(capturedId);
           return;
@@ -388,6 +420,7 @@
       }
 
       function onDragEnd(mode, e) {
+        if (isDuplicateEvent(e)) return;
         if (activeInputMode && activeInputMode !== mode) return;
         if (!isPointerDown && !isDragging) return;
 
@@ -409,7 +442,7 @@
           hasDraggedResetTimer = setTimeout(() => {
             hasDragged = false;
             hasDraggedResetTimer = null;
-          }, 80);
+          }, 250);
         }
         releaseCaptureSafe(capturedId);
       }
@@ -455,9 +488,9 @@
         if (isPointerDown || isDragging) onDragEnd('mouse', e);
       }
       function handleWinResize() {
-        if (container && container.style.left && container.style.top) {
-          applyPosition(parseFloat(container.style.left), parseFloat(container.style.top));
-        }
+        const w = getWindow();
+        if (w && (w.innerWidth < 120 || w.innerHeight < 120)) return;
+        ensureInViewport();
       }
       function handleWinBlur() {
         cancelActiveDrag();
@@ -583,6 +616,7 @@
       if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
         try {
           chrome.storage.local.get([STORAGE_POS_KEY], (res) => {
+            if (isDragging || isPointerDown) return;
             if (res && res[STORAGE_POS_KEY] && typeof res[STORAGE_POS_KEY].left === 'number') {
               applyPosition(res[STORAGE_POS_KEY].left, res[STORAGE_POS_KEY].top);
             }
@@ -609,11 +643,12 @@
         const logs = (currentState && currentState.logs) || [];
         if (logs.length === 0) {
           els.panel.appendChild(el('div', 'gmah-log-item', tr('logsEmpty')));
-          return;
+        } else {
+          for (const item of logs) {
+            els.panel.appendChild(el('div', 'gmah-log-item', `[${item.time}] ${item.message}`));
+          }
         }
-        for (const item of logs) {
-          els.panel.appendChild(el('div', 'gmah-log-item', `[${item.time}] ${item.message}`));
-        }
+        ensureInViewport();
         return;
       }
 
@@ -653,6 +688,7 @@
           wrap.appendChild(addCont);
           els.panel.appendChild(wrap);
         }
+        ensureInViewport();
       }
     }
 
@@ -664,6 +700,38 @@
       const stats = state.stats;
       const cbState = state.circuitBreaker;
       const lang = getLang();
+
+      const logs = (state && state.logs) || [];
+      const logSig = logs.length > 0 ? `${logs.length}|${logs[0].time}|${logs[0].message}` : '0';
+      const renderSig = [
+        s.showHud ? 1 : 0,
+        s.theme,
+        lang,
+        s.hudMinimized ? 1 : 0,
+        s.enabled ? 1 : 0,
+        s.autoAllow ? 1 : 0,
+        s.autoContinue ? 1 : 0,
+        s.backgroundMode ? 1 : 0,
+        s.stallAlertEnabled ? 1 : 0,
+        s.maxContinuesPerTask,
+        s.dailyContinueLimit,
+        stats.allowCount,
+        stats.continueCount,
+        state.taskContinueCount,
+        state.isGenerating ? 1 : 0,
+        state.isNonChatPage ? 1 : 0,
+        state.stallAlertActive ? 1 : 0,
+        cbState.tripped ? 1 : 0,
+        cbState.reasonCode || '',
+        cbState.reason || '',
+        state.lastStatusText || '',
+        logSig
+      ].join('|');
+
+      if (renderSig === lastRenderSignature) {
+        return;
+      }
+      lastRenderSignature = renderSig;
 
       container.style.display = s.showHud ? 'block' : 'none';
       if (!s.showHud) return;
@@ -699,6 +767,8 @@
       els.btnLogs.textContent = tr('btnLogs');
 
       // Minimized state
+      const wasMinimized = lastMinimized;
+      lastMinimized = Boolean(s.hudMinimized);
       if (s.hudMinimized) {
         els.card.className = 'gmah-card minimized';
         els.body.style.display = 'none';
@@ -707,6 +777,9 @@
         els.card.className = 'gmah-card';
         els.body.style.display = 'flex';
         els.minBtn.textContent = '−';
+        if (wasMinimized === true) {
+          ensureInViewport();
+        }
       }
 
       // Status dot
