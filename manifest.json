@@ -2,9 +2,17 @@
   "manifest_version": 3,
   "name": "KenEasy Gemini MCP Auto Helper",
   "version": "1.0.0",
-  "description": "Google Gemini MCP 自动化助手 v1.0.0 正式版：自动点击始终允许与继续、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、一键立即续接、拟人防降速节流、MV3 永不断线后台引擎、4 语言黑白双模式与 6 层防刷熔断保护。",
-  "permissions": ["storage", "tabs", "alarms", "scripting", "notifications"],
-  "host_permissions": ["https://gemini.google.com/*"],
+  "description": "Google Gemini MCP ????? v1.0.0???????????????????????????????????????????? 6 ??????",
+  "permissions": [
+    "storage",
+    "tabs",
+    "alarms",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://gemini.google.com/*"
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -24,9 +32,17 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://gemini.google.com/*"],
-      "js": ["defaults.js", "hud.js", "content.js"],
-      "css": ["hud.css"],
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "defaults.js",
+        "hud.js",
+        "content.js"
+      ],
+      "css": [
+        "hud.css"
+      ],
       "run_at": "document_idle"
     }
   ]
