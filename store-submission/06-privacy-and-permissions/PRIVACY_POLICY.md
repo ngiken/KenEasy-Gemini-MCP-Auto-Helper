@@ -1,7 +1,7 @@
 # Privacy Policy for KenEasy Gemini MCP Auto Helper
 
-**Last updated:** 2026-11-22  
-**Extension Version:** 0.3.0 (Beta)
+**Last updated:** 2026-11-23  
+**Extension Version:** 1.0.0
 
 ## 1. Overview
 KenEasy Gemini MCP Auto Helper ("the Extension") is an open-source browser extension designed to automate permission approvals for MCP (Model Context Protocol) tools and continue action chips exclusively on Google Gemini (`https://gemini.google.com/*`).

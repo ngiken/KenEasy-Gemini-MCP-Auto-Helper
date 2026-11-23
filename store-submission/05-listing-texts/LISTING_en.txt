@@ -18,8 +18,13 @@ KenEasy Gemini MCP Auto Helper is an open-source productivity extension engineer
 It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with an industrial-grade 6-layer circuit breaker and multi-window safety guards.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✨ KEY FEATURES (V0.3 BETA)
+✨ KEY FEATURES (V1.0.0 OFFICIAL RELEASE)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ 0. STALL AUTO-RECOVERY, LIVE WAIT TIMER & HUMAN PACING 🆕
+• Live connection/wait elapsed timer right inside the floating HUD and Popup.
+• Automatically stops stuck MCP/Gemini turns after your timeout (default 5 min) and sends your customizable reconnect prompt (default: "继续，刚才mcp连接断开了") with draft protection and a one-click "Resume Now" button.
+• Built-in human-like anti-throttling pacing (natural delays, chunked typing, safe off-center hover clicks, and a 60s anti-burst governor).
 
 ⚡ 1. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)
 • Automatically detects and clicks "Always allow / 始终允许 / 常に許可" permission confirmation dialogs.

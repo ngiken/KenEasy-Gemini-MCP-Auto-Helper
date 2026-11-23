@@ -1,6 +1,6 @@
 # Chrome Web Store 上架全流程手把手操作指引 (KenEasy Gemini MCP Auto Helper)
 
-> 本文件為 **KenEasy Gemini MCP Auto Helper (v0.3 Beta)** 的 Chrome 官方商店上架一站式操作手冊。
+> 本文件為 **KenEasy Gemini MCP Auto Helper (v1.0.0 正式版)** 的 Chrome 官方商店上架一站式操作手冊。
 > 本資料夾 `store-submission/` 內已分類準備好所有需上傳的軟體包、圖示、5 張高清宣傳截圖、2 張推薦橫幅、4 種語言文案與隱私權審查文件。
 > 你只需打開 [Chrome Web Store 官方開發者控制台](https://chrome.google.com/webstore/devconsole)，按照下方步驟依序複製貼上即可！
 
