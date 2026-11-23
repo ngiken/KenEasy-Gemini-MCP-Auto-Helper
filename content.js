@@ -137,11 +137,18 @@
     'button[aria-label*="Stop" i]',
     'button[aria-label*="停止"]',
     'button[aria-label*="取消生成"]',
+    'button[aria-label*="终止"]',
+    'button[aria-label*="終止"]',
+    'button[aria-label*="中止"]',
     'button[aria-label*="Stop generating" i]',
+    'button[aria-label*="Stop response" i]',
     '[data-test-id*="stop-button"]',
     '[data-test-id*="stop_button"]',
     'button.stop-button',
-    '.send-button.stop'
+    'button.stop',
+    '.send-button.stop',
+    '[role="button"][aria-label*="Stop" i]',
+    '[role="button"][aria-label*="停止"]'
   ];
 
   const LOADING_SELECTORS = [
@@ -173,9 +180,15 @@
     '[role="status"]',
     '[role="progressbar"]',
     '.tool-call',
+    '.tool-execution',
     '.mcp-status',
+    '.mcp-tool-call',
     '.connecting',
     '.loading-text',
+    '.thinking-indicator',
+    'tool-call',
+    'mcp-tool-call',
+    'mat-expansion-panel-header',
     '[data-test-id*="tool"]',
     '[data-test-id*="mcp"]',
     '[data-test-id*="connect"]',
@@ -185,6 +198,7 @@
 
   const CONNECTING_KEYWORDS = [
     'connecting',
+    'connecting to',
     'reconnecting',
     'calling tool',
     'running tool',
@@ -193,16 +207,70 @@
     'waiting for mcp',
     'loading mcp',
     '正在连接',
+    '正在连接到',
     '重新连接',
     '连接中',
     '連接中',
     '正在連接',
+    '正在連線',
+    '連線中',
     '正在调用',
     '正在調用',
     '正在运行工具',
     '正在执行工具',
     '等待响应',
-    '等待工具'
+    '等待工具',
+    '接続中',
+    '接続しています',
+    'ツールを実行',
+    'ツールを呼び出し',
+    '応答を待っています'
+  ];
+
+  const PROMPT_INPUT_SELECTORS = [
+    '.ql-editor[contenteditable="true"]',
+    '[contenteditable="true"][role="textbox"]',
+    '[contenteditable="true"][aria-label*="prompt" i]',
+    '[contenteditable="true"][aria-label*="Gemini" i]',
+    '[contenteditable="true"][aria-label*="输入"]',
+    '[contenteditable="true"][aria-label*="輸入"]',
+    '[contenteditable="true"][aria-label*="入力"]',
+    '[contenteditable="true"][aria-label*="消息"]',
+    '[contenteditable="true"][aria-label*="訊息"]',
+    'textarea[aria-label*="prompt" i]',
+    'textarea[aria-label*="Gemini" i]',
+    'textarea[aria-label*="输入"]',
+    'textarea[aria-label*="輸入"]',
+    'textarea[aria-label*="入力"]',
+    'textarea.prompt-textarea',
+    'textarea'
+  ];
+
+  const SEND_BUTTON_SELECTORS = [
+    'button.send-button',
+    'button[aria-label="Send message" i]',
+    'button[aria-label="Send prompt" i]',
+    'button[aria-label="Send" i]',
+    'button[aria-label*="Send message" i]',
+    'button[aria-label*="Send prompt" i]',
+    'button[aria-label="Submit" i]',
+    'button[aria-label="提交"]',
+    'button[aria-label="发送"]',
+    'button[aria-label="发送消息"]',
+    'button[aria-label="发送提示"]',
+    'button[aria-label*="发送"]',
+    'button[aria-label="傳送"]',
+    'button[aria-label="傳送訊息"]',
+    'button[aria-label*="傳送"]',
+    'button[aria-label="送信"]',
+    'button[aria-label*="送信"]',
+    'button[data-test-id*="send-button"]',
+    'button[data-test-id*="send_button"]',
+    '[role="button"][aria-label*="Send" i]',
+    '[role="button"][aria-label*="发送"]',
+    '[role="button"][aria-label*="傳送"]',
+    '[role="button"][aria-label*="送信"]',
+    '.send-button'
   ];
 
   const STRONG_FOLLOWUP_PROMPT_CUES = [
@@ -808,7 +876,9 @@
 
   const BG_ALLOW_RETRY_DELAY_MS = 2500;
   const BG_CONTINUE_RETRY_DELAY_MS = 3500;
+  const BG_LATE_RETRY_DELAY_MS = 12000;
   const MAX_BG_CLICK_ATTEMPTS = 2;
+  const MAX_BG_HIDDEN_ATTEMPTS = 4;
 
   function isBackgroundOrUnfocused(doc) {
     if (!doc) return false;
@@ -829,14 +899,16 @@
     }
     for (let depth = 0; depth < 3 && cur && cur.nodeType === 1; depth++) {
       if (isIconOrDecorativeNode(cur)) return true;
+      const tag = (cur.tagName || '').toUpperCase();
+      if (tag === 'MAT-PROGRESS-SPINNER' || tag === 'MAT-PROGRESS-BAR') return true;
       const role = cur.getAttribute ? (cur.getAttribute('role') || '').toLowerCase() : '';
-      if (role === 'tooltip') return true;
+      if (role === 'tooltip' || role === 'progressbar' || role === 'status') return true;
       const cls =
         typeof cur.className === 'string'
           ? cur.className
           : (cur.getAttribute && cur.getAttribute('class')) || '';
       if (
-        /\b(mat-ripple|mat-mdc-ripple-element|mat-ripple-element|cdk-overlay-backdrop|mdc-tooltip|mat-mdc-tooltip)\b/i.test(
+        /\b(mat-ripple|mat-mdc-ripple-element|mat-ripple-element|cdk-overlay-backdrop|mdc-tooltip|mat-mdc-tooltip|streaming-indicator|loading-text)\b/i.test(
           cls
         )
       ) {
@@ -857,17 +929,28 @@
     return el;
   }
 
-  function defaultClickElement(el, win, attempt) {
+  function defaultClickElement(el, win, attempt, randomFn) {
     const w = win || (typeof window !== 'undefined' ? window : null);
-    const target = resolveClickTarget(el, attempt || 1);
+    const tryNum = attempt || 1;
+    const target = resolveClickTarget(el, tryNum);
     let coords = {};
     if (typeof target.getBoundingClientRect === 'function') {
       try {
         const rect = target.getBoundingClientRect();
         if (rect && rect.width > 0 && rect.height > 0) {
+          // On initial click with human pacing randomFn, add slight natural variation within inner safe box (±22%);
+          // on retry attempts (attempt >= 2), aim dead-center for maximum hit reliability.
+          let offsetX = 0;
+          let offsetY = 0;
+          if (tryNum < 2 && typeof randomFn === 'function') {
+            const r1 = Math.max(0, Math.min(1, Number(randomFn()) || 0));
+            const r2 = Math.max(0, Math.min(1, Number(randomFn()) || 0));
+            offsetX = (r1 - 0.5) * 0.44;
+            offsetY = (r2 - 0.5) * 0.44;
+          }
           coords = {
-            clientX: Math.round((rect.left || 0) + rect.width / 2),
-            clientY: Math.round((rect.top || 0) + rect.height / 2)
+            clientX: Math.round((rect.left || 0) + rect.width * (0.5 + offsetX)),
+            clientY: Math.round((rect.top || 0) + rect.height * (0.5 + offsetY))
           };
         }
       } catch (_) {}
@@ -875,13 +958,15 @@
 
     const baseOpts = Object.assign(
       { bubbles: true, cancelable: true, composed: true, button: 0 },
+      w && typeof w.addEventListener === 'function' ? { view: w } : {},
       coords
     );
-    const downOpts = Object.assign({ buttons: 1 }, baseOpts);
-    const upOpts = Object.assign({ buttons: 0 }, baseOpts);
+    const hoverOpts = Object.assign({ buttons: 0, detail: 0 }, baseOpts);
+    const downOpts = Object.assign({ buttons: 1, detail: 1 }, baseOpts);
+    const upOpts = Object.assign({ buttons: 0, detail: 1 }, baseOpts);
 
     // Safe non-scrolling focus on retry attempts helps background Angular/MWC components register interaction
-    if ((attempt || 1) >= 2 && typeof target.focus === 'function') {
+    if (tryNum >= 2 && typeof target.focus === 'function') {
       try {
         target.focus({ preventScroll: true });
       } catch (_) {
@@ -892,6 +977,13 @@
     }
 
     try {
+      if (w && typeof w.PointerEvent === 'function') {
+        target.dispatchEvent(new w.PointerEvent('pointerover', Object.assign({ pointerId: 1, isPrimary: true }, hoverOpts)));
+        target.dispatchEvent(new w.PointerEvent('pointermove', Object.assign({ pointerId: 1, isPrimary: true }, hoverOpts)));
+      }
+      if (w && typeof w.MouseEvent === 'function') {
+        target.dispatchEvent(new w.MouseEvent('mouseover', hoverOpts));
+      }
       if (w && typeof w.PointerEvent === 'function') {
         target.dispatchEvent(new w.PointerEvent('pointerdown', Object.assign({ pointerId: 1, isPrimary: true }, downOpts)));
       }
@@ -912,6 +1004,332 @@
     } else if (w && typeof w.MouseEvent === 'function') {
       target.dispatchEvent(new w.MouseEvent('click', upOpts));
     }
+    // On late background thaw retries (attempt >= 3), also send Enter activation for focused Material buttons
+    if (tryNum >= 3 && typeof target.dispatchEvent === 'function') {
+      dispatchEnterKey(target, w);
+    }
+  }
+
+  const STALL_STOP_SETTLE_MS = 800;
+  const STALL_STOP_RETRY_MS = 2500;
+  const STALL_STOP_GIVEUP_MS = 6000;
+  const STALL_SEND_SETTLE_MS = 400;
+  const STALL_SEND_FALLBACK_MS = 2000;
+
+  function isInsideHudOrNonComposer(el) {
+    let cur = el;
+    while (cur && cur.nodeType === 1) {
+      if (cur.id === 'gmah-hud') return true;
+      if (cur.getAttribute && cur.getAttribute('data-gmah-ignore') === 'true') return true;
+      const tag = (cur.tagName || '').toUpperCase();
+      if (
+        tag === 'NAV' ||
+        tag === 'ASIDE' ||
+        tag === 'HEADER' ||
+        tag === 'PRE' ||
+        tag === 'CODE' ||
+        tag === 'SCRIPT' ||
+        tag === 'STYLE' ||
+        tag === 'DIALOG' ||
+        tag === 'MAT-DIALOG-CONTAINER'
+      ) {
+        return true;
+      }
+      if (cur.getAttribute) {
+        const role = (cur.getAttribute('role') || '').toLowerCase();
+        if (role === 'navigation' || role === 'menubar' || role === 'dialog' || role === 'alertdialog') {
+          return true;
+        }
+        const testId = (cur.getAttribute('data-test-id') || '').toLowerCase();
+        if (
+          testId.includes('conversation-list') ||
+          testId.includes('sidebar') ||
+          testId.includes('sidenav') ||
+          testId.includes('feedback') ||
+          testId.includes('survey') ||
+          testId.includes('search')
+        ) {
+          return true;
+        }
+      }
+      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    }
+    return false;
+  }
+
+  const STOP_ICON_SELECTOR =
+    'mat-icon[fonticon="stop"],mat-icon[fonticon="stop_circle"],mat-icon[data-mat-icon-name="stop"],mat-icon[data-mat-icon-name="stop_circle"],.stop-icon';
+
+  function isStopButtonElement(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const cls =
+      typeof el.className === 'string'
+        ? el.className
+        : (el.getAttribute && el.getAttribute('class')) || '';
+    if (/\bstop(?:-button)?\b/i.test(cls)) return true;
+    const testId = (el.getAttribute && el.getAttribute('data-test-id') || '').toLowerCase();
+    if (testId.includes('stop')) return true;
+    if (typeof el.querySelector === 'function') {
+      try {
+        if (el.querySelector(STOP_ICON_SELECTOR)) return true;
+      } catch (_) {}
+    }
+    const aria = D.normalizeText((el.getAttribute && el.getAttribute('aria-label')) || '');
+    const lbl = D.normalizeText(getElementLabel(el));
+    const combined = `${aria} ${lbl}`;
+    return (
+      /\bstop\b/i.test(combined) ||
+      combined.includes('停止') ||
+      combined.includes('取消生成') ||
+      combined.includes('终止') ||
+      combined.includes('終止') ||
+      combined.includes('中止')
+    );
+  }
+
+  function findClosestButtonAncestor(node) {
+    let cur = node;
+    for (let depth = 0; depth < 5 && cur && cur.nodeType === 1; depth++) {
+      const tag = (cur.tagName || '').toUpperCase();
+      const role = cur.getAttribute ? (cur.getAttribute('role') || '').toLowerCase() : '';
+      if (tag === 'BUTTON' || role === 'button') return cur;
+      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    }
+    return null;
+  }
+
+  function findStopButton(doc, win, searchRoots, strictOnly) {
+    if (!doc) return null;
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
+    const nodes = queryAllFromRoots(roots, STOP_BUTTON_COMBINED_SELECTOR, []);
+    for (const n of nodes) {
+      if (!n || isIgnoredAncestor(n)) continue;
+      if (isElementVisible(n, win, doc)) return n;
+    }
+    const iconNodes = queryAllFromRoots(roots, STOP_ICON_SELECTOR, []);
+    for (const icon of iconNodes) {
+      if (!icon || isIgnoredAncestor(icon)) continue;
+      const btn = findClosestButtonAncestor(icon);
+      if (btn && !isIgnoredAncestor(btn) && isElementVisible(btn, win, doc)) return btn;
+    }
+    if (!strictOnly && doc.hidden === true) {
+      for (const n of nodes) {
+        if (!n || isIgnoredAncestor(n)) continue;
+        if (isElementVisible(n, win, doc, { relaxHiddenLayout: true })) return n;
+      }
+      for (const icon of iconNodes) {
+        if (!icon || isIgnoredAncestor(icon)) continue;
+        const btn = findClosestButtonAncestor(icon);
+        if (btn && !isIgnoredAncestor(btn) && isElementVisible(btn, win, doc, { relaxHiddenLayout: true })) {
+          return btn;
+        }
+      }
+    }
+    return null;
+  }
+
+  function isInsideRichTextareaOrInputArea(el) {
+    let cur = el;
+    for (let depth = 0; depth < 6 && cur && cur.nodeType === 1; depth++) {
+      const tag = (cur.tagName || '').toUpperCase();
+      if (tag === 'RICH-TEXTAREA') return true;
+      const cls =
+        typeof cur.className === 'string'
+          ? cur.className
+          : (cur.getAttribute && cur.getAttribute('class')) || '';
+      if (/\b(input-area|text-input-field|prompt-input|composer)\b/i.test(cls)) return true;
+      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    }
+    return false;
+  }
+
+  function findPromptInput(doc, win, searchRoots) {
+    if (!doc) return null;
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
+    let fallback = null;
+    for (const sel of PROMPT_INPUT_SELECTORS) {
+      const nodes = queryAllFromRoots(roots, sel, []);
+      for (const n of nodes) {
+        if (!n || isInsideHudOrNonComposer(n)) continue;
+        if (n.readOnly === true) continue;
+        if (n.getAttribute) {
+          if (n.getAttribute('readonly') !== null) continue;
+          if (n.getAttribute('aria-readonly') === 'true') continue;
+        }
+        if (!isElementVisible(n, win, doc, { relaxHiddenLayout: true })) continue;
+        if (isInsideRichTextareaOrInputArea(n)) return n;
+        if (!fallback) fallback = n;
+      }
+      if (fallback) return fallback;
+    }
+    return fallback;
+  }
+
+  const SEND_ICON_SELECTOR =
+    'mat-icon[fonticon="send"],mat-icon[data-mat-icon-name="send"],.send-icon';
+
+  function findSendButton(doc, win, searchRoots) {
+    if (!doc) return null;
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
+    for (const sel of SEND_BUTTON_SELECTORS) {
+      const nodes = queryAllFromRoots(roots, sel, []);
+      for (const n of nodes) {
+        if (!n || isIgnoredAncestor(n)) continue;
+        if (isStopButtonElement(n)) continue;
+        if (!isElementVisible(n, win, doc, { relaxHiddenLayout: true })) continue;
+        return n;
+      }
+    }
+    const iconNodes = queryAllFromRoots(roots, SEND_ICON_SELECTOR, []);
+    for (const icon of iconNodes) {
+      if (!icon || isIgnoredAncestor(icon)) continue;
+      const btn = findClosestButtonAncestor(icon);
+      if (btn && !isIgnoredAncestor(btn) && !isStopButtonElement(btn) && isElementVisible(btn, win, doc, { relaxHiddenLayout: true })) {
+        return btn;
+      }
+    }
+    return null;
+  }
+
+  function readPromptInputText(el) {
+    if (!el) return '';
+    const tag = (el.tagName || '').toUpperCase();
+    const raw =
+      tag === 'TEXTAREA' || tag === 'INPUT'
+        ? String(el.value || '')
+        : String(el.innerText || el.textContent || '');
+    return raw.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  }
+
+  function dispatchSyntheticEvent(el, type, win, extra) {
+    if (!el || typeof el.dispatchEvent !== 'function') return;
+    const w = win || (typeof window !== 'undefined' ? window : null);
+    const opts = Object.assign({ bubbles: true, cancelable: true, composed: true }, extra || {});
+    try {
+      if ((type === 'input' || type === 'beforeinput') && w && typeof w.InputEvent === 'function') {
+        el.dispatchEvent(new w.InputEvent(type, opts));
+        return;
+      }
+      if (w && typeof w.Event === 'function') {
+        el.dispatchEvent(new w.Event(type, opts));
+        return;
+      }
+    } catch (_) {
+      // Fall through to plain object dispatch for lightweight mock DOMs
+    }
+    try {
+      el.dispatchEvent(Object.assign({ type, target: el }, opts));
+    } catch (_) {}
+  }
+
+  function defaultFillPromptInput(el, text, doc, win) {
+    if (!el || typeof text !== 'string') return false;
+    const w = win || (typeof window !== 'undefined' ? window : null);
+    const d = doc || el.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const cleanText = text.trim();
+    if (!cleanText) return false;
+
+    if (typeof el.focus === 'function') {
+      try {
+        el.focus({ preventScroll: true });
+      } catch (_) {
+        try {
+          el.focus();
+        } catch (_) {}
+      }
+    }
+
+    const tag = (el.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'INPUT') {
+      try {
+        const proto =
+          tag === 'TEXTAREA'
+            ? w && w.HTMLTextAreaElement && w.HTMLTextAreaElement.prototype
+            : w && w.HTMLInputElement && w.HTMLInputElement.prototype;
+        const desc = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
+        if (desc && typeof desc.set === 'function') {
+          desc.set.call(el, cleanText);
+        } else {
+          el.value = cleanText;
+        }
+      } catch (_) {
+        el.value = cleanText;
+      }
+      dispatchSyntheticEvent(el, 'input', w, { inputType: 'insertText', data: cleanText });
+      dispatchSyntheticEvent(el, 'change', w);
+      return readPromptInputText(el) === cleanText;
+    }
+
+    // Contenteditable (e.g. Gemini's Quill .ql-editor inside <rich-textarea>)
+    let insertedByCommand = false;
+    if (d && typeof d.execCommand === 'function') {
+      try {
+        if (w && typeof w.getSelection === 'function' && typeof d.createRange === 'function') {
+          const range = d.createRange();
+          range.selectNodeContents(el);
+          const sel = w.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
+        insertedByCommand = Boolean(d.execCommand('insertText', false, cleanText));
+      } catch (_) {
+        insertedByCommand = false;
+      }
+    }
+
+    if (!insertedByCommand || readPromptInputText(el) !== cleanText) {
+      if (el.classList && typeof el.classList.remove === 'function') {
+        try {
+          el.classList.remove('ql-blank');
+        } catch (_) {}
+      }
+      const cls =
+        typeof el.className === 'string'
+          ? el.className
+          : (el.getAttribute && el.getAttribute('class')) || '';
+      if (/\bql-editor\b/i.test(cls) && d && typeof d.createElement === 'function') {
+        try {
+          el.textContent = '';
+          const p = d.createElement('p');
+          p.textContent = cleanText;
+          el.appendChild(p);
+        } catch (_) {
+          el.textContent = cleanText;
+        }
+      } else {
+        el.textContent = cleanText;
+      }
+      dispatchSyntheticEvent(el, 'beforeinput', w, { inputType: 'insertText', data: cleanText });
+      dispatchSyntheticEvent(el, 'input', w, { inputType: 'insertText', data: cleanText });
+      dispatchSyntheticEvent(el, 'change', w);
+    }
+
+    return readPromptInputText(el) === cleanText;
+  }
+
+  function dispatchEnterKey(el, win) {
+    if (!el || typeof el.dispatchEvent !== 'function') return;
+    const w = win || (typeof window !== 'undefined' ? window : null);
+    const keyOpts = {
+      key: 'Enter',
+      code: 'Enter',
+      keyCode: 13,
+      which: 13,
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    };
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      try {
+        if (w && typeof w.KeyboardEvent === 'function') {
+          el.dispatchEvent(new w.KeyboardEvent(type, keyOpts));
+        } else {
+          el.dispatchEvent(Object.assign({ type, target: el }, keyOpts));
+        }
+      } catch (_) {}
+    }
   }
 
   class GmahEngine {
@@ -920,12 +1338,16 @@
       this.doc = opts.doc || (typeof document !== 'undefined' ? document : null);
       this.win = opts.win || (typeof window !== 'undefined' ? window : null);
       this.now = typeof opts.now === 'function' ? opts.now : () => Date.now();
+      this.randomFn = typeof opts.randomFn === 'function' ? opts.randomFn : Math.random;
       this.clickFn = typeof opts.clickFn === 'function' ? opts.clickFn : defaultClickElement;
+      this.fillInputFn = typeof opts.fillInputFn === 'function' ? opts.fillInputFn : defaultFillPromptInput;
       this.onStateChange = typeof opts.onStateChange === 'function' ? opts.onStateChange : null;
       this.onStatsSave = typeof opts.onStatsSave === 'function' ? opts.onStatsSave : null;
       this.onSettingsSave = typeof opts.onSettingsSave === 'function' ? opts.onSettingsSave : null;
       this.onStallAlert = typeof opts.onStallAlert === 'function' ? opts.onStallAlert : null;
       this.onStallResolved = typeof opts.onStallResolved === 'function' ? opts.onStallResolved : null;
+      this.onBreakerTrip = typeof opts.onBreakerTrip === 'function' ? opts.onBreakerTrip : null;
+      this.onBreakerClear = typeof opts.onBreakerClear === 'function' ? opts.onBreakerClear : null;
 
       this.settings = D.mergeSettings(opts.settings);
       this.stats = D.normalizeStats(opts.stats, D.getTodayKey(new Date(this.now())));
@@ -934,24 +1356,37 @@
       this.clickAttempts = new Map(); // el -> { kind, count, lastAttemptAt, label, tier }
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
+      this.bgNoStopSinceAt = 0;
+      this.bgNoStopTurnFp = null;
       this.lastContinueFingerprint = null;
       this.lastContinueContentFingerprint = null;
       this.lastAllowClickAt = 0;
       this.lastContinueClickAt = 0;
+      this.nextAllowCooldownMs = 0;
+      this.nextContinueCooldownMs = 0;
+      this.recentActionTimestamps = [];
       this.lastMutationAt = 0;
       this.lastUrl = this.win && this.win.location ? this.win.location.href : '';
       this.statusKey = 'hudStatusMonitoring';
       this.statusVars = null;
       this.lastStatusText = this.tr('hudStatusMonitoring');
       this.isGenerating = false;
+      this.bgNoStopSinceAt = 0;
+      this.bgNoStopTurnFp = null;
       this.isNonChatPage = isNonChatGeminiUrl(this.lastUrl);
       this.ignoreStaleInitialContinue = Boolean(opts.ignoreStaleInitialContinue);
       this.suppressInitialContinueUntil = this.ignoreStaleInitialContinue ? this.now() + 2000 : 0;
 
-      // Connection / waiting stall timer state
+      // Connection / waiting stall timer & auto-recovery state
       this.stallStartAt = 0;
+      this.stallElapsedMs = 0;
+      this.stallConnectingLabel = '';
       this.stallFingerprint = null;
       this.stallAlertActive = false;
+      this.stallRecovery = null;
+      this.stallRecoveryCount = 0;
+      this.stallRecoveryBlockedFp = null;
+      this.stallRecoveryBaselineFp = null;
 
       this.circuitBreaker = {
         tripped: false,
@@ -1008,6 +1443,10 @@
         isGenerating: this.isGenerating,
         isNonChatPage: this.isNonChatPage,
         stallAlertActive: this.stallAlertActive,
+        stallElapsedMs: this.stallElapsedMs,
+        stallConnectingLabel: this.stallConnectingLabel,
+        stallRecoveryActive: Boolean(this.stallRecovery),
+        stallRecoveryCount: this.stallRecoveryCount,
         lastStatusText: this.lastStatusText,
         circuitBreaker: Object.assign({}, this.circuitBreaker),
         logs: this.logs.slice()
@@ -1023,8 +1462,12 @@
     resetStallMonitor(notifyIfActive, resolvedLog) {
       const wasActive = this.stallAlertActive;
       this.stallStartAt = 0;
+      this.stallElapsedMs = 0;
+      this.stallConnectingLabel = '';
       this.stallFingerprint = null;
       this.stallAlertActive = false;
+      this.stallRecovery = null;
+      this.stallRecoveryBlockedFp = null;
       if (wasActive) {
         if (this.statusKey === 'hudStatusStallMinutes' || (this.lastStatusText && this.lastStatusText.startsWith('⚠️'))) {
           this.setStatus('hudStatusMonitoring');
@@ -1062,8 +1505,24 @@
       const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
       this.settings = D.mergeSettings(Object.assign({}, this.settings, partial));
       this.refreshLocalizedTexts();
-      if (!this.settings.enabled || !this.settings.stallAlertEnabled) {
-        this.resetStallMonitor(true);
+      if (!this.settings.enabled) {
+        if (!this.stallRecovery || !this.stallRecovery.manual) {
+          this.resetStallMonitor(true);
+        }
+      } else {
+        if (!this.settings.stallAutoRecoverEnabled && this.stallRecovery && !this.stallRecovery.manual) {
+          this.stallRecovery = null;
+          this.stallRecoveryBlockedFp = null;
+        }
+        if (!this.settings.stallAlertEnabled && this.stallAlertActive) {
+          this.stallAlertActive = false;
+          if (this.statusKey === 'hudStatusStallMinutes') {
+            this.setStatus('hudStatusMonitoring');
+          }
+          if (this.onStallResolved) {
+            this.onStallResolved();
+          }
+        }
       }
       if (prevStallAlert && !this.settings.stallAlertEnabled) {
         if (this.onStallResolved) {
@@ -1093,6 +1552,77 @@
       this.lastMutationAt = this.now();
     }
 
+    nextRandom() {
+      try {
+        const v = Number(this.randomFn());
+        if (Number.isFinite(v)) return Math.max(0, Math.min(1, v));
+      } catch (_) {}
+      return 0.5;
+    }
+
+    pickRandomDelay(minMs, maxMs) {
+      const lo = Math.max(0, Math.round(Number(minMs) || 0));
+      const hi = Math.max(lo, Math.round(Number(maxMs) || lo));
+      if (hi === lo) return lo;
+      return lo + Math.round(this.nextRandom() * (hi - lo));
+    }
+
+    recordAutomatedAction(now) {
+      this.recentActionTimestamps.push(now);
+      const cutoff = now - 60000;
+      while (this.recentActionTimestamps.length > 0 && this.recentActionTimestamps[0] < cutoff) {
+        this.recentActionTimestamps.shift();
+      }
+    }
+
+    getBurstExtraDelayMs(now) {
+      if (!this.settings.humanPacingEnabled) return 0;
+      const cutoff60 = now - 60000;
+      const cutoff20 = now - 20000;
+      while (this.recentActionTimestamps.length > 0 && this.recentActionTimestamps[0] < cutoff60) {
+        this.recentActionTimestamps.shift();
+      }
+      const in60s = this.recentActionTimestamps.length;
+      let in20s = 0;
+      for (let i = in60s - 1; i >= 0; i--) {
+        if (this.recentActionTimestamps[i] >= cutoff20) in20s += 1;
+        else break;
+      }
+      if (in60s >= 8) {
+        return this.pickRandomDelay(3000, 5500);
+      }
+      if (in20s >= 4) {
+        return this.pickRandomDelay(1800, 3600);
+      }
+      return 0;
+    }
+
+    computeEffectiveAllowCooldownMs(now) {
+      const base = this.settings.allowCooldownMs;
+      if (!this.settings.humanPacingEnabled) return base;
+      const jitter = Math.round(this.nextRandom() * Math.min(250, base * 0.35));
+      return base + jitter + this.getBurstExtraDelayMs(now);
+    }
+
+    computeEffectiveContinueCooldownMs(now) {
+      const base = this.settings.continueCooldownMs;
+      if (!this.settings.humanPacingEnabled) return base;
+      const in20s = this.recentActionTimestamps.filter((ts) => ts >= now - 20000).length;
+      const maxJitter = in20s >= 2 ? Math.min(900, base * 0.25) : Math.min(180, base * 0.05);
+      const jitter = Math.round(this.nextRandom() * maxJitter);
+      return base + jitter + this.getBurstExtraDelayMs(now);
+    }
+
+    computeRecoveryStopSettleMs(isManual) {
+      if (!this.settings.humanPacingEnabled) return STALL_STOP_SETTLE_MS;
+      return isManual ? this.pickRandomDelay(1500, 2400) : this.pickRandomDelay(2000, 3400);
+    }
+
+    computeRecoverySendSettleMs(isManual) {
+      if (!this.settings.humanPacingEnabled) return STALL_SEND_SETTLE_MS;
+      return isManual ? this.pickRandomDelay(900, 1700) : this.pickRandomDelay(1100, 2200);
+    }
+
     tripBreaker(reasonCode, reason, reasonKey, reasonVars) {
       if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === reasonCode) {
         return;
@@ -1110,6 +1640,13 @@
       this.statusVars = null;
       this.lastStatusText = this.tr('hudStatusBreaker', { reason: resolvedReason });
       this.addLog(`🛑 熔断触发: ${resolvedReason}`);
+      if (this.onBreakerTrip) {
+        this.onBreakerTrip({
+          reasonCode,
+          reason: resolvedReason,
+          notify: reasonCode !== 'emergency_stop' && Boolean(this.settings.stallAlertEnabled)
+        });
+      }
       this.emitState();
     }
 
@@ -1133,16 +1670,25 @@
         this.lastContinueFingerprint = null;
         this.lastContinueContentFingerprint = null;
       }
+      this.stallRecoveryCount = 0;
+      this.stallRecoveryBaselineFp = null;
       this.setStatus('hudStatusMonitoring');
       this.addLog(logMsg || '✅ 已解除熔断并重置本次任务计数');
+      if (this.onBreakerClear) {
+        this.onBreakerClear();
+      }
       this.emitState();
     }
 
     onUserManualPrompt() {
       this.resetStallMonitor(true);
+      this.stallRecoveryCount = 0;
+      this.stallRecoveryBaselineFp = null;
       this.suppressInitialContinueUntil = 0;
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
+      this.bgNoStopSinceAt = 0;
+      this.bgNoStopTurnFp = null;
       this.lastContinueFingerprint = null;
       this.lastContinueContentFingerprint = null;
       this.clickAttempts.clear();
@@ -1163,6 +1709,8 @@
     onConversationChange(newUrl) {
       const prevUrl = this.lastUrl;
       this.resetStallMonitor(true);
+      this.stallRecoveryCount = 0;
+      this.stallRecoveryBaselineFp = null;
       this.lastUrl = newUrl;
       this.isNonChatPage = isNonChatGeminiUrl(newUrl);
       // Do NOT suppress continue when transitioning from fresh /app landing page into a brand-new /app/<id> chat
@@ -1171,6 +1719,8 @@
         this.ignoreStaleInitialContinue && !isFreshChatCreation ? this.now() + 2000 : 0;
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
+      this.bgNoStopSinceAt = 0;
+      this.bgNoStopTurnFp = null;
       this.lastContinueFingerprint = null;
       this.lastContinueContentFingerprint = null;
       this.clickAttempts.clear();
@@ -1185,17 +1735,11 @@
       }
     }
 
-    detectGenerating(searchRoots) {
+    detectLoadingIndicator(searchRoots) {
       if (!this.doc) return false;
       const roots = Array.isArray(searchRoots)
         ? searchRoots
         : collectSearchRoots(this.doc.body || this.doc, []);
-      const stopNodes = queryAllFromRoots(roots, STOP_BUTTON_COMBINED_SELECTOR, []);
-      for (const n of stopNodes) {
-        if (!isIgnoredAncestor(n) && isElementVisible(n, this.win, this.doc)) {
-          return true;
-        }
-      }
       const loadingNodes = queryAllFromRoots(roots, LOADING_COMBINED_SELECTOR, []);
       for (const n of loadingNodes) {
         if (!isIgnoredAncestor(n) && isElementVisible(n, this.win, this.doc)) {
@@ -1205,7 +1749,41 @@
       return false;
     }
 
-    detectConnectingStatus(searchRoots) {
+    detectGenerating(searchRoots, turns, now) {
+      if (!this.doc) return false;
+      const roots = Array.isArray(searchRoots)
+        ? searchRoots
+        : collectSearchRoots(this.doc.body || this.doc, []);
+      if (findStopButton(this.doc, this.win, roots, true)) {
+        this.bgNoStopSinceAt = 0;
+        this.bgNoStopTurnFp = null;
+        return true;
+      }
+      if (!this.detectLoadingIndicator(roots)) {
+        this.bgNoStopSinceAt = 0;
+        this.bgNoStopTurnFp = null;
+        return false;
+      }
+      // In background tabs (document.hidden === true), Chrome pauses CSS/Angular leave animations,
+      // which can leave a finished response's spinner/streaming-indicator stuck in DOM with opacity:1
+      // after the Stop button is already gone. Once no Stop button and no new text arrive for >= 2.2s,
+      // treat the lingering spinner as frozen UI rather than active generation so Auto-Continue runs in BG!
+      if (this.doc.hidden === true && typeof now === 'number') {
+        const turnFp = computeResponseFingerprint(turns) || '';
+        if (this.bgNoStopSinceAt === 0 || turnFp !== this.bgNoStopTurnFp) {
+          this.bgNoStopSinceAt = now;
+          this.bgNoStopTurnFp = turnFp;
+          return true;
+        }
+        const graceMs = Math.max(2200, this.settings.idleSettleMs);
+        if (now - this.bgNoStopSinceAt >= graceMs) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    detectConnectingStatus(searchRoots, turns) {
       if (!this.doc) return null;
       const roots = Array.isArray(searchRoots)
         ? searchRoots
@@ -1219,11 +1797,55 @@
           return txt;
         }
       }
+      // Fallback: when Gemini is actively generating/waiting, scan short visible labels inside the latest turn
+      // so MCP tool connection cards (e.g. "正在连接 Desktop Commander...") are caught even without role="status"
+      if (this.isGenerating && Array.isArray(turns) && turns.length > 0) {
+        const latestTurn = turns[turns.length - 1];
+        if (latestTurn && typeof latestTurn.querySelectorAll === 'function') {
+          const turnRoots = collectSearchRoots(latestTurn, []);
+          const candidates = queryAllFromRoots(turnRoots, 'span,div,button,mat-expansion-panel-header', []);
+          let best = null;
+          for (const el of candidates) {
+            if (!el || isIgnoredAncestor(el) || !isElementVisible(el, this.win, this.doc)) continue;
+            const txt = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (!txt || txt.length > 100) continue;
+            if (D.containsKeyword(txt, CONNECTING_KEYWORDS)) {
+              if (!best || txt.length < best.length) {
+                best = txt;
+              }
+            }
+          }
+          if (best) return best;
+        }
+      }
       return null;
     }
 
+    cleanConnectingDisplayLabel(connectingText) {
+      if (typeof connectingText !== 'string' || !connectingText.trim()) return '';
+      const cleaned = connectingText
+        .replace(/\(\s*\d+\s*[s秒]?\s*\)/gi, '')
+        .replace(/[.。…]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!cleaned) return '';
+      return cleaned.length > 34 ? `${cleaned.slice(0, 33)}…` : cleaned;
+    }
+
     computeStallProgressFingerprint(turns, connectingText) {
-      const turnFp = computeResponseFingerprint(turns) || '';
+      let turnFp = '';
+      if (turns && turns.length > 0) {
+        const latest = turns[turns.length - 1];
+        let text = D.normalizeText(latest.innerText || latest.textContent || '');
+        if (connectingText) {
+          const normConn = D.normalizeText(connectingText);
+          if (normConn && text.includes(normConn)) {
+            text = text.split(normConn).join('');
+          }
+        }
+        text = text.replace(/\s+/g, ' ').trim();
+        turnFp = text ? `${turns.length}|${text.length}|${text.slice(-300)}` : `${turns.length}|0|`;
+      }
       // Strip volatile digits / animated ellipsis from status indicators (e.g. "Connecting (12s)...")
       const stableStatus = connectingText
         ? D.normalizeText(connectingText)
@@ -1236,42 +1858,64 @@
     }
 
     updateStallMonitor(now, turns, isWaiting, connectingText) {
-      if (!this.settings.enabled || !this.settings.stallAlertEnabled) {
+      if (!this.settings.enabled) {
         this.resetStallMonitor(true);
-        return false;
+        return { stalled: false, elapsedMs: 0, fp: null };
+      }
+
+      // While a multi-step stall auto-recovery (stop -> fill -> send) is in progress,
+      // let stepStallRecovery own the transition instead of resetting mid-flight.
+      if (this.stallRecovery) {
+        return { stalled: false, elapsedMs: this.stallElapsedMs, fp: this.stallFingerprint, recovering: true };
+      }
+
+      const curTurnFp = computeResponseFingerprint(turns);
+      if (this.stallRecoveryBaselineFp && curTurnFp && curTurnFp !== this.stallRecoveryBaselineFp) {
+        this.stallRecoveryCount = 0;
+        this.stallRecoveryBaselineFp = null;
       }
 
       if (!isWaiting) {
-        this.resetStallMonitor(true, '✅ 连接/生成已恢复正常，已清除超时提醒');
-        return false;
+        this.resetStallMonitor(true, this.tr('logStallRecovered'));
+        return { stalled: false, elapsedMs: 0, fp: null };
       }
 
+      this.stallConnectingLabel = this.cleanConnectingDisplayLabel(connectingText);
       const fp = this.computeStallProgressFingerprint(turns, connectingText);
       if (this.stallStartAt === 0 || fp !== this.stallFingerprint) {
         this.stallStartAt = now;
+        this.stallElapsedMs = 0;
         this.stallFingerprint = fp;
+        this.stallRecoveryBlockedFp = null;
         if (this.stallAlertActive) {
           this.stallAlertActive = false;
           if (this.statusKey === 'hudStatusStallMinutes' || (this.lastStatusText && this.lastStatusText.startsWith('⚠️'))) {
             this.setStatus('hudStatusMonitoring');
           }
-          this.addLog('✅ 检测到新输出进展，已清除连接超时提醒');
+          this.addLog(this.tr('logStallProgress'));
           if (this.onStallResolved) this.onStallResolved();
         }
-        return false;
+        return { stalled: false, elapsedMs: 0, fp };
       }
 
+      const elapsedMs = Math.max(0, now - this.stallStartAt);
+      this.stallElapsedMs = elapsedMs;
+      return { stalled: true, elapsedMs, fp };
+    }
+
+    maybeTriggerStallAlert(now, stallInfo) {
+      if (!this.settings.enabled || !this.settings.stallAlertEnabled) return false;
+      if (!stallInfo || !stallInfo.stalled) return false;
       const thresholdMs = Math.max(1, this.settings.stallAlertMinutes) * 60 * 1000;
-      const elapsedMs = now - this.stallStartAt;
-      if (!this.stallAlertActive && elapsedMs >= thresholdMs) {
+      if (!this.stallAlertActive && stallInfo.elapsedMs >= thresholdMs) {
         this.stallAlertActive = true;
-        const mins = Math.max(1, Math.floor(elapsedMs / 60000));
+        const mins = Math.max(1, Math.floor(stallInfo.elapsedMs / 60000));
         this.setStatus('hudStatusStallMinutes', { mins });
-        this.addLog(`🔔 检测到连接/等待连续超过 ${mins} 分钟无新进展，已发送桌面通知`);
+        this.addLog(this.tr('logStallTriggered', { mins }));
         if (this.onStallAlert) {
           this.onStallAlert({
             minutes: mins,
-            elapsedMs,
+            elapsedMs: stallInfo.elapsedMs,
             url: this.lastUrl
           });
         }
@@ -1279,6 +1923,461 @@
         return true;
       }
       return false;
+    }
+
+    stepStallRecovery(now, turns, searchRoots, stallInfo) {
+      const isManualActive = Boolean(this.stallRecovery && this.stallRecovery.manual);
+      if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
+        this.stallRecovery = null;
+        return null;
+      }
+      if (!isManualActive && (!this.settings.enabled || !this.settings.stallAutoRecoverEnabled || this.circuitBreaker.tripped)) {
+        this.stallRecovery = null;
+        return null;
+      }
+
+      const abortRecovery = (logKey, logVars) => {
+        const failedFp = (this.stallRecovery && this.stallRecovery.stallFp) || (stallInfo && stallInfo.fp) || null;
+        this.stallRecovery = null;
+        this.stallRecoveryBlockedFp = failedFp;
+        if (logKey) {
+          this.addLog(this.tr(logKey, logVars));
+        }
+        this.emitState();
+        return null;
+      };
+
+      const executeFillPhase = (sr) => {
+        const inputEl = findPromptInput(this.doc, this.win, searchRoots);
+        if (!inputEl) {
+          if (now - sr.phaseAt < 4000) {
+            this.emitState();
+            return { action: 'wait', reason: 'stall_recover_awaiting_input', retryInMs: 600 };
+          }
+          return abortRecovery('logStallRecoverFailed');
+        }
+
+        const existingText = readPromptInputText(inputEl);
+        const normPrompt = D.normalizeText(sr.promptText);
+        const normExisting = D.normalizeText(existingText);
+        const isOurPartialOrFull =
+          !normExisting || normExisting === normPrompt || normPrompt.startsWith(normExisting);
+        if (!isOurPartialOrFull) {
+          return abortRecovery('logStallRecoverDraftSkip', { prompt: sr.promptText });
+        }
+
+        sr.inputEl = inputEl;
+
+        // Human-paced natural character-by-character typing (avoids instant 0ms clipboard dump)
+        if (this.settings.humanPacingEnabled && sr.promptText.length > 1 && normExisting !== normPrompt) {
+          const curLen = typeof sr.typedChars === 'number' && sr.typedChars > 0 ? sr.typedChars : 0;
+          const stepSize = sr.promptText.length <= 8 ? 1 : Math.ceil(sr.promptText.length / 6);
+          const nextCount = Math.min(sr.promptText.length, curLen + stepSize);
+          const partialText = sr.promptText.slice(0, nextCount);
+          this.fillInputFn(inputEl, partialText, this.doc, this.win);
+          sr.typedChars = nextCount;
+          sr.phaseAt = now;
+
+          if (nextCount < sr.promptText.length) {
+            sr.phase = 'typing';
+            sr.nextCharDelayMs = this.pickRandomDelay(140, 280);
+            this.setStatus('hudStatusStallTyping', { prompt: sr.promptText });
+            this.emitState();
+            return {
+              action: 'stall_recover_type',
+              typed: partialText,
+              prompt: sr.promptText,
+              element: inputEl,
+              retryInMs: sr.nextCharDelayMs
+            };
+          }
+        } else if (normExisting !== normPrompt) {
+          this.fillInputFn(inputEl, sr.promptText, this.doc, this.win);
+          sr.typedChars = sr.promptText.length;
+        }
+
+        const sendSettleMs = this.computeRecoverySendSettleMs(Boolean(sr.manual));
+        sr.phase = 'sending';
+        sr.phaseAt = now;
+        sr.sendSettleMs = sendSettleMs;
+        sr.fillAttempts += 1;
+        this.setStatus(
+          this.settings.humanPacingEnabled ? 'hudStatusStallPacing' : 'hudStatusStallSending',
+          { prompt: sr.promptText }
+        );
+        this.emitState();
+        return {
+          action: 'stall_recover_fill',
+          prompt: sr.promptText,
+          element: inputEl,
+          retryInMs: sendSettleMs + 100
+        };
+      };
+
+      // 1. Continue an in-progress recovery state machine
+      if (this.stallRecovery) {
+        const sr = this.stallRecovery;
+
+        if (sr.phase === 'stopping') {
+          const stopBtn = findStopButton(this.doc, this.win, searchRoots);
+          if (stopBtn) {
+            const elapsed = now - sr.phaseAt;
+            if (elapsed < STALL_STOP_RETRY_MS) {
+              this.emitState();
+              return {
+                action: 'wait',
+                reason: 'stall_recover_stopping',
+                retryInMs: Math.max(250, Math.min(1000, STALL_STOP_RETRY_MS - elapsed))
+              };
+            }
+            if (sr.stopAttempts < 2) {
+              sr.stopAttempts += 1;
+              sr.phaseAt = now;
+              this.clickFn(stopBtn, this.win, sr.stopAttempts, this.randomFn);
+              this.emitState();
+              return {
+                action: 'stall_recover_stop_retry',
+                attempt: sr.stopAttempts,
+                element: stopBtn,
+                retryInMs: 1200
+              };
+            }
+            if (now - sr.startedAt < STALL_STOP_GIVEUP_MS) {
+              this.emitState();
+              return { action: 'wait', reason: 'stall_recover_stopping', retryInMs: 800 };
+            }
+            return abortRecovery('logStallRecoverFailed');
+          }
+
+          // Stop button is gone; wait a natural randomized cooldown so backend aborts cleanly before typing
+          const targetStopSettleMs =
+            typeof sr.stopSettleMs === 'number' && sr.stopSettleMs > 0
+              ? sr.stopSettleMs
+              : this.computeRecoveryStopSettleMs(Boolean(sr.manual));
+          sr.stopSettleMs = targetStopSettleMs;
+          const sinceStop = now - sr.phaseAt;
+          if (sinceStop < targetStopSettleMs) {
+            this.emitState();
+            return {
+              action: 'wait',
+              reason: 'stall_recover_settling',
+              retryInMs: Math.max(200, targetStopSettleMs - sinceStop)
+            };
+          }
+
+          sr.phase = 'filling';
+          sr.phaseAt = now;
+          return executeFillPhase(sr);
+        }
+
+        if (sr.phase === 'filling') {
+          return executeFillPhase(sr);
+        }
+
+        if (sr.phase === 'typing') {
+          const waitCharMs = typeof sr.nextCharDelayMs === 'number' ? sr.nextCharDelayMs : 180;
+          const sinceChar = now - sr.phaseAt;
+          if (sinceChar < waitCharMs) {
+            this.emitState();
+            return {
+              action: 'wait',
+              reason: 'stall_recover_typing',
+              retryInMs: Math.max(100, waitCharMs - sinceChar)
+            };
+          }
+          return executeFillPhase(sr);
+        }
+
+        if (sr.phase === 'sending') {
+          const targetSendSettleMs =
+            typeof sr.sendSettleMs === 'number' && sr.sendSettleMs > 0
+              ? sr.sendSettleMs
+              : this.computeRecoverySendSettleMs(Boolean(sr.manual));
+          const sinceFill = now - sr.phaseAt;
+          if (sinceFill < targetSendSettleMs) {
+            this.emitState();
+            return {
+              action: 'wait',
+              reason: 'stall_recover_send_settle',
+              retryInMs: Math.max(150, targetSendSettleMs - sinceFill)
+            };
+          }
+
+          const inputEl =
+            sr.inputEl && sr.inputEl.isConnected
+              ? sr.inputEl
+              : findPromptInput(this.doc, this.win, searchRoots);
+
+          if (inputEl) {
+            const curText = readPromptInputText(inputEl);
+            if (!curText && sr.fillAttempts < 2) {
+              sr.fillAttempts += 1;
+              sr.phaseAt = now;
+              this.fillInputFn(inputEl, sr.promptText, this.doc, this.win);
+              this.emitState();
+              return {
+                action: 'stall_recover_fill',
+                prompt: sr.promptText,
+                element: inputEl,
+                retryInMs: targetSendSettleMs + 100
+              };
+            }
+          }
+
+          const sendBtn = findSendButton(this.doc, this.win, searchRoots);
+          let method = null;
+          let targetEl = null;
+          const fallbackDeadlineMs = targetSendSettleMs + STALL_SEND_FALLBACK_MS;
+
+          if (sendBtn) {
+            this.clickFn(sendBtn, this.win, 1, this.randomFn);
+            method = 'button';
+            targetEl = sendBtn;
+          } else if (sinceFill < fallbackDeadlineMs) {
+            this.emitState();
+            return {
+              action: 'wait',
+              reason: 'stall_recover_awaiting_send',
+              retryInMs: Math.max(200, Math.min(500, fallbackDeadlineMs - sinceFill))
+            };
+          } else if (inputEl) {
+            dispatchEnterKey(inputEl, this.win);
+            method = 'enter';
+            targetEl = inputEl;
+          } else {
+            return abortRecovery('logStallRecoverFailed');
+          }
+
+          const promptText = sr.promptText;
+          const baselineFp = sr.baselineFp;
+          const hadStopButton = sr.hadStopButton;
+          const wasManual = Boolean(sr.manual);
+          if (!wasManual) {
+            this.stallRecoveryCount += 1;
+            this.stallRecoveryBaselineFp = baselineFp;
+          }
+          this.recordAutomatedAction(now);
+          this.stallRecovery = null;
+          this.stallStartAt = 0;
+          this.stallElapsedMs = 0;
+          this.stallConnectingLabel = '';
+          this.stallFingerprint = null;
+          this.stallRecoveryBlockedFp = null;
+          this.lastMutationAt = now;
+
+          if (this.stallAlertActive) {
+            this.stallAlertActive = false;
+            if (this.onStallResolved) this.onStallResolved();
+          }
+
+          if (wasManual) {
+            this.setStatus('logForceRecoverSent', { prompt: promptText });
+            this.addLog(this.tr('logForceRecoverSent', { prompt: promptText }));
+          } else {
+            this.setStatus('hudStatusStallRecovered', {
+              prompt: promptText,
+              count: this.stallRecoveryCount,
+              max: this.settings.maxStallRecoveriesPerTask
+            });
+            this.addLog(
+              this.tr('logStallRecoverSent', {
+                prompt: promptText,
+                count: this.stallRecoveryCount,
+                max: this.settings.maxStallRecoveriesPerTask
+              })
+            );
+          }
+          this.emitState();
+          return {
+            action: 'stall_recover_sent',
+            manual: wasManual,
+            prompt: promptText,
+            method,
+            hadStopButton,
+            element: targetEl,
+            recoveryCount: this.stallRecoveryCount,
+            maxRecoveries: this.settings.maxStallRecoveriesPerTask
+          };
+        }
+
+        this.stallRecovery = null;
+        return null;
+      }
+
+      // 2. Check if a new stall auto-recovery should start
+      if (!stallInfo || !stallInfo.stalled) return null;
+      if (this.stallRecoveryBlockedFp && this.stallRecoveryBlockedFp === stallInfo.fp) return null;
+
+      const recoverThresholdMs = Math.max(1, this.settings.stallAutoRecoverMinutes) * 60 * 1000;
+      if (stallInfo.elapsedMs < recoverThresholdMs) return null;
+
+      // Safety check: never auto-recover into a quota/rate-limit error
+      const quotaHit = this.detectQuotaOrError(turns, searchRoots);
+      if (quotaHit) {
+        this.tripBreaker('quota_error', null, 'breakerReasonQuotaError', { kw: quotaHit });
+        return { action: 'tripped', reason: 'quota_error', keyword: quotaHit };
+      }
+
+      // Safety cap: stop looping after maxStallRecoveriesPerTask consecutive recoveries without progress
+      if (this.stallRecoveryCount >= this.settings.maxStallRecoveriesPerTask) {
+        this.stallRecoveryBlockedFp = stallInfo.fp;
+        this.addLog(
+          this.tr('logStallRecoverLimit', {
+            count: this.stallRecoveryCount,
+            max: this.settings.maxStallRecoveriesPerTask
+          })
+        );
+        this.emitState();
+        return null;
+      }
+
+      const stopBtn = findStopButton(this.doc, this.win, searchRoots);
+      const inputEl = findPromptInput(this.doc, this.win, searchRoots);
+      if (!stopBtn && !inputEl) {
+        // Page lacks both Stop button and prompt input; fall back cleanly to desktop alert if enabled
+        return null;
+      }
+
+      const promptText = this.settings.stallAutoRecoverPrompt || D.DEFAULT_SETTINGS.stallAutoRecoverPrompt;
+      const mins = Math.max(1, Math.floor(stallInfo.elapsedMs / 60000));
+      const baselineFp = computeResponseFingerprint(turns);
+
+      if (stopBtn) {
+        const stopSettleMs = this.computeRecoveryStopSettleMs(false);
+        this.clickFn(stopBtn, this.win, 1, this.randomFn);
+        this.stallRecovery = {
+          phase: 'stopping',
+          startedAt: now,
+          phaseAt: now,
+          stopSettleMs,
+          stopAttempts: 1,
+          fillAttempts: 0,
+          sendAttempts: 0,
+          typedChars: 0,
+          minutes: mins,
+          promptText,
+          baselineFp,
+          hadStopButton: true,
+          stallFp: stallInfo.fp,
+          inputEl: null
+        };
+        this.setStatus('hudStatusStallStopping', { mins });
+        this.addLog(this.tr('logStallRecoverStop', { mins, prompt: promptText }));
+        this.emitState();
+        return {
+          action: 'stall_recover_stop',
+          minutes: mins,
+          prompt: promptText,
+          element: stopBtn,
+          retryInMs: Math.min(1200, stopSettleMs)
+        };
+      }
+
+      // No stop button present (e.g. stuck connecting indicator with unlocked input) -> fill & send directly
+      this.stallRecovery = {
+        phase: 'filling',
+        startedAt: now,
+        phaseAt: now,
+        stopAttempts: 0,
+        fillAttempts: 0,
+        sendAttempts: 0,
+        typedChars: 0,
+        minutes: mins,
+        promptText,
+        baselineFp,
+        hadStopButton: false,
+        stallFp: stallInfo.fp,
+        inputEl: null
+      };
+      this.addLog(this.tr('logStallRecoverDirect', { mins, prompt: promptText }));
+      return executeFillPhase(this.stallRecovery);
+    }
+
+    /**
+     * User-triggered immediate cancel & send continue (bypasses the 5-min wait threshold).
+     */
+    forceStallRecovery() {
+      if (!this.doc) return { action: 'noop', reason: 'no_doc' };
+      const currentHref = this.win && this.win.location ? this.win.location.href : this.lastUrl;
+      if (isNonChatGeminiUrl(currentHref || this.lastUrl)) {
+        return { action: 'noop', reason: 'non_chat_page' };
+      }
+      if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
+        return { action: 'blocked', reason: 'emergency_stop' };
+      }
+
+      const now = this.now();
+      const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
+      const turns = getAssistantTurns(this.doc, searchRoots);
+
+      // If a recovery is already mid-flight, promote to manual and advance immediately
+      if (this.stallRecovery) {
+        this.stallRecovery.manual = true;
+        return this.stepStallRecovery(now, turns, searchRoots, { stalled: false, elapsedMs: this.stallElapsedMs, fp: this.stallFingerprint });
+      }
+
+      const stopBtn = findStopButton(this.doc, this.win, searchRoots);
+      const inputEl = findPromptInput(this.doc, this.win, searchRoots);
+      if (!stopBtn && !inputEl) {
+        this.addLog(this.tr('logForceRecoverNoTarget'));
+        this.emitState();
+        return { action: 'noop', reason: 'force_recover_no_target' };
+      }
+
+      const promptText = this.settings.stallAutoRecoverPrompt || D.DEFAULT_SETTINGS.stallAutoRecoverPrompt;
+      const baselineFp = computeResponseFingerprint(turns);
+      this.stallRecoveryBlockedFp = null;
+
+      if (stopBtn) {
+        const stopSettleMs = this.computeRecoveryStopSettleMs(true);
+        this.clickFn(stopBtn, this.win, 1, this.randomFn);
+        this.stallRecovery = {
+          phase: 'stopping',
+          manual: true,
+          startedAt: now,
+          phaseAt: now,
+          stopSettleMs,
+          stopAttempts: 1,
+          fillAttempts: 0,
+          sendAttempts: 0,
+          typedChars: 0,
+          minutes: Math.floor((this.stallElapsedMs || 0) / 60000),
+          promptText,
+          baselineFp,
+          hadStopButton: true,
+          stallFp: this.stallFingerprint,
+          inputEl: null
+        };
+        this.setStatus('hudStatusForceStopping', { prompt: promptText });
+        this.addLog(this.tr('logForceRecoverStop', { prompt: promptText }));
+        this.emitState();
+        return {
+          action: 'stall_recover_stop',
+          manual: true,
+          prompt: promptText,
+          element: stopBtn,
+          retryInMs: Math.min(1200, stopSettleMs)
+        };
+      }
+
+      this.stallRecovery = {
+        phase: 'filling',
+        manual: true,
+        startedAt: now,
+        phaseAt: now,
+        stopAttempts: 0,
+        fillAttempts: 0,
+        sendAttempts: 0,
+        typedChars: 0,
+        minutes: Math.floor((this.stallElapsedMs || 0) / 60000),
+        promptText,
+        baselineFp,
+        hadStopButton: false,
+        stallFp: this.stallFingerprint,
+        inputEl: null
+      };
+      this.addLog(this.tr('logForceRecoverDirect', { prompt: promptText }));
+      return this.stepStallRecovery(now, turns, searchRoots, { stalled: false, elapsedMs: this.stallElapsedMs, fp: this.stallFingerprint });
     }
 
     detectQuotaOrError(turns, searchRoots) {
@@ -1388,15 +2487,24 @@
       return null;
     }
 
+    getBgRetryPolicy(kind, currentCount) {
+      const maxAttempts = this.doc && this.doc.hidden === true ? MAX_BG_HIDDEN_ATTEMPTS : MAX_BG_CLICK_ATTEMPTS;
+      if (currentCount >= maxAttempts) return null;
+      const baseDelay = kind === 'allow' ? BG_ALLOW_RETRY_DELAY_MS : BG_CONTINUE_RETRY_DELAY_MS;
+      // Fast retry on attempt 2 (2.5s / 3.5s); late background-thaw retries on attempts 3-4 (12s / 15s)
+      const delay = currentCount >= MAX_BG_CLICK_ATTEMPTS ? BG_LATE_RETRY_DELAY_MS + (currentCount - MAX_BG_CLICK_ATTEMPTS) * 3000 : baseDelay;
+      return { delay, maxAttempts };
+    }
+
     findBgRetryCandidate(kind, visibleSet, now) {
       if (!isBackgroundOrUnfocused(this.doc) || this.clickAttempts.size === 0) return null;
-      const delay = kind === 'allow' ? BG_ALLOW_RETRY_DELAY_MS : BG_CONTINUE_RETRY_DELAY_MS;
       for (const [el, entry] of this.clickAttempts.entries()) {
         if (!entry || entry.kind !== kind) continue;
-        if (entry.count >= MAX_BG_CLICK_ATTEMPTS) continue;
+        const policy = this.getBgRetryPolicy(kind, entry.count);
+        if (!policy) continue;
         if (!visibleSet.has(el)) continue;
-        if (now - entry.lastAttemptAt >= delay) {
-          return { el, entry };
+        if (now - entry.lastAttemptAt >= policy.delay) {
+          return { el, entry, maxAttempts: policy.maxAttempts };
         }
       }
       return null;
@@ -1406,10 +2514,11 @@
       if (!isBackgroundOrUnfocused(this.doc) || this.clickAttempts.size === 0) return 0;
       let minRemaining = 0;
       for (const [el, entry] of this.clickAttempts.entries()) {
-        if (!entry || entry.count >= MAX_BG_CLICK_ATTEMPTS) continue;
+        if (!entry) continue;
+        const policy = this.getBgRetryPolicy(entry.kind, entry.count);
+        if (!policy) continue;
         if (!visibleSet.has(el)) continue;
-        const delay = entry.kind === 'allow' ? BG_ALLOW_RETRY_DELAY_MS : BG_CONTINUE_RETRY_DELAY_MS;
-        const rem = Math.max(100, delay - (now - entry.lastAttemptAt));
+        const rem = Math.max(100, policy.delay - (now - entry.lastAttemptAt));
         if (minRemaining === 0 || rem < minRemaining) {
           minRemaining = rem;
         }
@@ -1552,10 +2661,30 @@
       }
 
       this.ensureTodayStats();
+      const now = this.now();
       const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
-      this.isGenerating = this.detectGenerating(searchRoots);
+      const turns = getAssistantTurns(this.doc, searchRoots);
+      this.isGenerating = this.detectGenerating(searchRoots, turns, now);
       if (this.isGenerating) {
         this.suppressInitialContinueUntil = 0;
+      }
+
+      // Emergency stop blocks EVERYTHING (both Allow & Continue & Recovery)
+      if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
+        this.resetStallMonitor(true);
+        this.emitState();
+        return { action: 'blocked', reason: 'emergency_stop' };
+      }
+
+      // Allow an explicit user-triggered "Resume Now" (manual force-recovery) to finish even if auto-monitoring is paused
+      if (this.stallRecovery && this.stallRecovery.manual) {
+        const manualRes = this.stepStallRecovery(now, turns, searchRoots, {
+          stalled: false,
+          elapsedMs: this.stallElapsedMs,
+          fp: this.stallFingerprint,
+          recovering: true
+        });
+        if (manualRes) return manualRes;
       }
 
       if (!this.settings.enabled) {
@@ -1564,18 +2693,9 @@
         return { action: 'noop', reason: 'disabled' };
       }
 
-      // Emergency stop blocks EVERYTHING (both Allow & Continue)
-      if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
-        this.resetStallMonitor(true);
-        this.emitState();
-        return { action: 'blocked', reason: 'emergency_stop' };
-      }
-
-      const now = this.now();
       const clickables = collectClickableElements(this.doc, this.win, searchRoots);
       const visibleSet = new Set(clickables.map((c) => c.el));
-      const turns = getAssistantTurns(this.doc, searchRoots);
-      const connectingText = this.detectConnectingStatus(searchRoots);
+      const connectingText = this.detectConnectingStatus(searchRoots, turns);
       const isWaiting = Boolean(this.isGenerating || connectingText);
 
       // Prune clicked elements that are no longer visible/mounted so Angular-recycled
@@ -1598,7 +2718,11 @@
       // 1. Check MCP Permission Allow first (works even while Gemini turn is paused mid-generation!)
       if (this.settings.autoAllow) {
         const allowElapsed = now - this.lastAllowClickAt;
-        if (allowElapsed >= this.settings.allowCooldownMs) {
+        const effectiveAllowCooldown =
+          this.lastAllowClickAt > 0
+            ? Math.max(this.settings.allowCooldownMs, this.nextAllowCooldownMs || this.settings.allowCooldownMs)
+            : 0;
+        if (allowElapsed >= effectiveAllowCooldown) {
           const allowHit = this.findAllowCandidate(clickables);
           if (allowHit) {
             this.clickedElements.add(allowHit.item.el);
@@ -1610,13 +2734,16 @@
               tier: allowHit.tier
             });
             this.lastAllowClickAt = now;
+            this.recordAutomatedAction(now);
+            this.nextAllowCooldownMs = this.computeEffectiveAllowCooldownMs(now);
             this.stats.allowCount += 1;
             this.resetStallMonitor(true);
             if (this.onStatsSave) this.onStatsSave(this.stats, { allow: 1 });
-            this.clickFn(allowHit.item.el, this.win, 1);
+            this.clickFn(allowHit.item.el, this.win, 1, this.randomFn);
             const tag = allowHit.tier === 'always' ? '始终允许' : '允许';
+            const bgTag = this.doc && this.doc.hidden ? ' [后台]' : '';
             this.setStatus('hudStatusClickedAllow', { label: allowHit.item.label });
-            this.addLog(`✅ 自动点击[${tag}]：「${allowHit.item.label}」`);
+            this.addLog(`✅ 自动点击[${tag}]${bgTag}：「${allowHit.item.label}」`);
             this.emitState();
             return {
               action: 'clicked_allow',
@@ -1633,15 +2760,18 @@
             allowRetry.entry.count += 1;
             allowRetry.entry.lastAttemptAt = now;
             this.lastAllowClickAt = now;
+            this.recordAutomatedAction(now);
+            this.nextAllowCooldownMs = this.computeEffectiveAllowCooldownMs(now);
             this.resetStallMonitor(true);
-            this.clickFn(allowRetry.el, this.win, allowRetry.entry.count);
+            this.clickFn(allowRetry.el, this.win, allowRetry.entry.count, this.randomFn);
+            const maxRetry = allowRetry.maxAttempts || MAX_BG_CLICK_ATTEMPTS;
             this.setStatus('hudStatusRetryClick', {
               label: allowRetry.entry.label,
               attempt: allowRetry.entry.count,
-              max: MAX_BG_CLICK_ATTEMPTS
+              max: maxRetry
             });
             this.addLog(
-              `🔁 后台重试点击允许：「${allowRetry.entry.label}」 (${allowRetry.entry.count}/${MAX_BG_CLICK_ATTEMPTS})`
+              `🔁 后台重试点击允许：「${allowRetry.entry.label}」 (${allowRetry.entry.count}/${maxRetry})`
             );
             this.emitState();
             return {
@@ -1649,7 +2779,8 @@
               tier: allowRetry.entry.tier,
               label: allowRetry.entry.label,
               attempt: allowRetry.entry.count,
-              element: allowRetry.el
+              element: allowRetry.el,
+              pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
             };
           }
         } else {
@@ -1659,14 +2790,19 @@
             return {
               action: 'wait',
               reason: 'allow_cooldown',
-              retryInMs: Math.max(100, this.settings.allowCooldownMs - allowElapsed)
+              retryInMs: Math.max(100, effectiveAllowCooldown - allowElapsed)
             };
           }
         }
       }
 
-      // Track connection / generation stall timeout (triggers desktop notification if stuck >= N mins)
-      this.updateStallMonitor(now, turns, isWaiting, connectingText);
+      // Track connection / generation stall timeout (auto-recovers via stop + "继续", or fires desktop alert)
+      const stallInfo = this.updateStallMonitor(now, turns, isWaiting, connectingText);
+      const recoverResult = this.stepStallRecovery(now, turns, searchRoots, stallInfo);
+      if (recoverResult) {
+        return recoverResult;
+      }
+      this.maybeTriggerStallAlert(now, stallInfo);
 
       // 2. Check Auto-Continue (strictly guarded by 6-layer anti-quota-burn circuit breaker)
       if (!this.settings.autoContinue) {
@@ -1692,10 +2828,16 @@
 
       // Layer B: Wait for streaming to finish + DOM settle
       if (this.isGenerating) {
+        let retryInMs = 0;
+        if (this.doc && this.doc.hidden === true && this.bgNoStopSinceAt > 0) {
+          const graceMs = Math.max(2200, this.settings.idleSettleMs);
+          retryInMs = Math.max(250, graceMs - (now - this.bgNoStopSinceAt));
+        }
         this.emitState();
         return {
           action: 'wait',
           reason: 'generating',
+          retryInMs,
           pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
         };
       }
@@ -1723,21 +2865,23 @@
         contRetry.entry.lastAttemptAt = now;
         this.lastContinueClickAt = now;
         this.resetStallMonitor(true);
-        this.clickFn(contRetry.el, this.win, contRetry.entry.count);
+        this.clickFn(contRetry.el, this.win, contRetry.entry.count, this.randomFn);
+        const maxRetry = contRetry.maxAttempts || MAX_BG_CLICK_ATTEMPTS;
         this.setStatus('hudStatusRetryClick', {
           label: contRetry.entry.label,
           attempt: contRetry.entry.count,
-          max: MAX_BG_CLICK_ATTEMPTS
+          max: maxRetry
         });
         this.addLog(
-          `🔁 后台重试点击继续：「${contRetry.entry.label}」 (${contRetry.entry.count}/${MAX_BG_CLICK_ATTEMPTS})`
+          `🔁 后台重试点击继续：「${contRetry.entry.label}」 (${contRetry.entry.count}/${maxRetry})`
         );
         this.emitState();
         return {
           action: 'retried_continue',
           label: contRetry.entry.label,
           attempt: contRetry.entry.count,
-          element: contRetry.el
+          element: contRetry.el,
+          pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
         };
       }
 
@@ -1776,13 +2920,17 @@
         return { action: 'tripped', reason: 'daily_limit' };
       }
 
-      // Layer E: Cooldown
-      if (this.lastContinueClickAt > 0 && now - this.lastContinueClickAt < this.settings.continueCooldownMs) {
+      // Layer E: Cooldown (with randomized human-like pacing jitter & anti-burst protection)
+      const effectiveContinueCooldown =
+        this.lastContinueClickAt > 0
+          ? Math.max(this.settings.continueCooldownMs, this.nextContinueCooldownMs || this.settings.continueCooldownMs)
+          : 0;
+      if (this.lastContinueClickAt > 0 && now - this.lastContinueClickAt < effectiveContinueCooldown) {
         this.emitState();
         return {
           action: 'wait',
           reason: 'cooldown',
-          retryInMs: Math.max(150, this.settings.continueCooldownMs - (now - this.lastContinueClickAt))
+          retryInMs: Math.max(150, effectiveContinueCooldown - (now - this.lastContinueClickAt))
         };
       }
 
@@ -1835,6 +2983,8 @@
         fingerprint: fp
       });
       this.lastContinueClickAt = now;
+      this.recordAutomatedAction(now);
+      this.nextContinueCooldownMs = this.computeEffectiveContinueCooldownMs(now);
       this.lastContinueFingerprint = fp;
       this.lastContinueContentFingerprint = contentFp;
       this.taskContinueCount += 1;
@@ -1842,13 +2992,14 @@
       this.resetStallMonitor(true);
       if (this.onStatsSave) this.onStatsSave(this.stats, { continue: 1 });
 
-      this.clickFn(contHit.item.el, this.win, 1);
+      this.clickFn(contHit.item.el, this.win, 1, this.randomFn);
+      const bgTag = this.doc && this.doc.hidden ? ' [后台]' : '';
       this.setStatus('hudStatusClickedContinue', {
         task: this.taskContinueCount,
         max: this.settings.maxContinuesPerTask
       });
       this.addLog(
-        `▶️ 自动点击继续：「${contHit.item.label}」 (${this.taskContinueCount}/${this.settings.maxContinuesPerTask})`
+        `▶️ 自动点击继续${bgTag}：「${contHit.item.label}」 (${this.taskContinueCount}/${this.settings.maxContinuesPerTask})`
       );
       this.emitState();
 
@@ -1879,7 +3030,12 @@
     computeResponseFingerprint,
     computeContentFingerprint,
     resolveClickTarget,
-    defaultClickElement
+    defaultClickElement,
+    findStopButton,
+    findPromptInput,
+    findSendButton,
+    readPromptInputText,
+    defaultFillPromptInput
   };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = root.GMAH_ENGINE;
@@ -1909,6 +3065,10 @@
     let scanTimer = null;
     let reconnectTimer = null;
     let bgPort = null;
+    let bgKeepaliveLockRelease = null;
+    let bgKeepaliveLockPending = false;
+    let bgLockGeneration = 0;
+    const bgLockName = `gmah_bg_keepalive_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const hudApi = root.GMAH_HUD;
     let hud = null;
 
@@ -2033,6 +3193,12 @@
         sendToBackground({ type: 'GMAH_STALL_CLEAR' });
         sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
       },
+      onBreakerTrip: (payload) => {
+        sendToBackground(Object.assign({ type: 'GMAH_BREAKER_ALERT' }, payload || {}));
+      },
+      onBreakerClear: () => {
+        sendToBackground({ type: 'GMAH_BREAKER_CLEAR' });
+      },
       onStateChange: (state) => {
         if (hud && !contextInvalidated) hud.update(state);
       }
@@ -2075,6 +3241,7 @@
         onToggleEnabled: () => {
           if (!isContextAlive()) return;
           engine.updateSettings({ enabled: !engine.settings.enabled }, true);
+          syncBackgroundKeepaliveLock();
           engine.addLog(engine.settings.enabled ? '▶️ 插件已开启' : '⏸️ 插件已暂停');
           engine.emitState();
         },
@@ -2089,6 +3256,7 @@
         onToggleBackground: () => {
           if (!isContextAlive()) return;
           engine.updateSettings({ backgroundMode: !engine.settings.backgroundMode }, true);
+          syncBackgroundKeepaliveLock();
           engine.addLog(
             engine.settings.backgroundMode ? '🌙 后台静默运行已开启' : '🌙 后台静默运行已关闭'
           );
@@ -2104,6 +3272,18 @@
           }
           engine.addLog(nextVal ? '🔔 桌面通知提醒已开启' : '🔕 桌面通知提醒已关闭');
           engine.emitState();
+        },
+        onToggleStallRecover: () => {
+          if (!isContextAlive()) return;
+          const nextVal = !engine.settings.stallAutoRecoverEnabled;
+          engine.updateSettings({ stallAutoRecoverEnabled: nextVal }, true);
+          engine.addLog(engine.tr(nextVal ? 'logStallRecoverOn' : 'logStallRecoverOff'));
+          engine.emitState();
+        },
+        onForceStallRecover: () => {
+          if (!isContextAlive()) return;
+          const res = engine.forceStallRecovery();
+          scheduleFollowupForResult(res);
         },
         onPositionChange: (pos) => {
           if (!isContextAlive()) return;
@@ -2145,8 +3325,9 @@
             engine.stats = D.normalizeStats(res[D.STATS_KEY]);
           }
           settingsReady = true;
+          syncBackgroundKeepaliveLock();
           engine.markExistingContinueCandidatesSeen();
-          engine.addLog('🚀 Gemini MCP Auto Helper v0.3 已就绪');
+          engine.addLog(engine.tr('logReady'));
           engine.emitState();
         });
 
@@ -2156,12 +3337,23 @@
             const oldAlert = engine.settings ? engine.settings.stallAlertEnabled : true;
             engine.settings = D.mergeSettings(changes[D.STORAGE_KEY].newValue);
             engine.refreshLocalizedTexts();
-            if (!engine.settings.enabled || !engine.settings.stallAlertEnabled) {
-              engine.resetStallMonitor(true);
-              if (oldAlert && !engine.settings.stallAlertEnabled) {
-                sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
+            if (!engine.settings.enabled) {
+              if (!engine.stallRecovery || !engine.stallRecovery.manual) {
+                engine.resetStallMonitor(true);
+              }
+            } else {
+              if (!engine.settings.stallAutoRecoverEnabled && engine.stallRecovery && !engine.stallRecovery.manual) {
+                engine.stallRecovery = null;
+                engine.stallRecoveryBlockedFp = null;
+              }
+              if (!engine.settings.stallAlertEnabled && engine.stallAlertActive) {
+                engine.stallAlertActive = false;
               }
             }
+            if (!engine.settings.enabled || (oldAlert && !engine.settings.stallAlertEnabled)) {
+              sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
+            }
+            syncBackgroundKeepaliveLock();
           }
           if (changes.gmah_hud_position && hud) {
             if (changes.gmah_hud_position.newValue && typeof hud.setPosition === 'function') {
@@ -2260,24 +3452,35 @@
       }
     }
 
+    function scheduleFollowupForResult(res) {
+      if (!res || !isContextAlive()) return;
+      const nextDelay =
+        typeof res.retryInMs === 'number' && res.retryInMs > 0
+          ? res.retryInMs + 100
+          : typeof res.pendingRetryInMs === 'number' && res.pendingRetryInMs > 0
+            ? res.pendingRetryInMs + 120
+            : 0;
+      if (nextDelay <= 0) return;
+      if (engine.settings.backgroundMode && isBackgroundOrUnfocused(document)) {
+        sendToBackground({
+          type: 'GMAH_SCHEDULE_TICK',
+          delayMs: nextDelay,
+          reason: res.reason || res.action || 'bg_followup'
+        });
+      } else {
+        const isRecoverStep =
+          (typeof res.action === 'string' && res.action.startsWith('stall_recover_')) ||
+          (typeof res.reason === 'string' && res.reason.startsWith('stall_recover_'));
+        if (isRecoverStep) {
+          scheduleScan(nextDelay);
+        }
+      }
+    }
+
     function runScanAndSchedule() {
       if (!isContextAlive() || !canRunScanInCurrentVisibility()) return null;
       const res = engine.scanOnce();
-      if (res && engine.settings.backgroundMode && isBackgroundOrUnfocused(document)) {
-        const nextDelay =
-          typeof res.retryInMs === 'number' && res.retryInMs > 0
-            ? res.retryInMs + 100
-            : typeof res.pendingRetryInMs === 'number' && res.pendingRetryInMs > 0
-              ? res.pendingRetryInMs + 120
-              : 0;
-        if (nextDelay > 0) {
-          sendToBackground({
-            type: 'GMAH_SCHEDULE_TICK',
-            delayMs: nextDelay,
-            reason: res.reason || res.action || 'bg_followup'
-          });
-        }
-      }
+      scheduleFollowupForResult(res);
       return res;
     }
 
@@ -2320,9 +3523,76 @@
       }
     }
 
+    // Chromium Background Tab Freezing Shield: holding a unique per-tab shared Web Lock
+    // signals Chrome's PageScheduler not to freeze this Gemini tab while backgroundMode is ON.
+    function releaseBackgroundKeepaliveLock() {
+      bgLockGeneration += 1;
+      bgKeepaliveLockPending = false;
+      if (bgKeepaliveLockRelease) {
+        const fn = bgKeepaliveLockRelease;
+        bgKeepaliveLockRelease = null;
+        try { fn(); } catch (_) {}
+      }
+    }
+
+    function syncBackgroundKeepaliveLock() {
+      const shouldHold = Boolean(
+        isContextAlive() &&
+          engine.settings.enabled &&
+          engine.settings.backgroundMode
+      );
+      if (!shouldHold) {
+        releaseBackgroundKeepaliveLock();
+        return;
+      }
+      if (bgKeepaliveLockRelease || bgKeepaliveLockPending) return;
+      const nav = typeof navigator !== 'undefined' ? navigator : (window && window.navigator);
+      if (!nav || !nav.locks || typeof nav.locks.request !== 'function') return;
+      bgKeepaliveLockPending = true;
+      const gen = bgLockGeneration;
+      try {
+        const lockPromise = nav.locks.request(bgLockName, { mode: 'shared' }, () => {
+          return new Promise((resolve) => {
+            bgKeepaliveLockPending = false;
+            if (
+              gen !== bgLockGeneration ||
+              !isContextAlive() ||
+              !engine.settings.enabled ||
+              !engine.settings.backgroundMode
+            ) {
+              resolve();
+              return;
+            }
+            bgKeepaliveLockRelease = resolve;
+          });
+        });
+        if (lockPromise && typeof lockPromise.catch === 'function') {
+          lockPromise.catch(() => {
+            if (gen === bgLockGeneration) bgKeepaliveLockPending = false;
+          });
+        }
+      } catch (_) {
+        if (gen === bgLockGeneration) bgKeepaliveLockPending = false;
+      }
+    }
+
+    function handlePageFreeze() {
+      releaseBackgroundKeepaliveLock();
+    }
+
+    function handlePageResume() {
+      if (!isContextAlive()) return;
+      syncBackgroundKeepaliveLock();
+      forceReconnectBackgroundPort();
+      if (canRunScanInCurrentVisibility()) {
+        runScanAndSchedule();
+      }
+    }
+
     function teardownStaleContext() {
       if (contextInvalidated) return;
       contextInvalidated = true;
+      releaseBackgroundKeepaliveLock();
       if (observer) {
         try { observer.disconnect(); } catch (_) {}
         observer = null;
@@ -2350,8 +3620,12 @@
         document.removeEventListener('keydown', handleKeydown, true);
         document.removeEventListener('click', handleClick, true);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.removeEventListener('freeze', handlePageFreeze);
+        document.removeEventListener('resume', handlePageResume);
         window.removeEventListener('blur', handleWindowBlur);
         window.removeEventListener('focus', handleWindowFocus);
+        window.removeEventListener('pagehide', handlePageFreeze);
+        window.removeEventListener('beforeunload', handlePageFreeze);
       } catch (_) {}
       try {
         delete window.__GMAH_BOOTSTRAPPED__;
@@ -2379,7 +3653,9 @@
           observer.observe(sr, {
             childList: true,
             subtree: true,
-            characterData: true
+            characterData: true,
+            attributes: true,
+            attributeFilter: ['disabled', 'hidden', 'aria-hidden', 'aria-disabled']
           });
         } catch (_) {}
       };
@@ -2434,7 +3710,8 @@
     if (typeof MutationObserver === 'function' && document.body) {
       observer = new MutationObserver((mutations) => {
         if (!isContextAlive()) return;
-        let relevant = false;
+        let relevantContent = false;
+        let relevantAttr = false;
         for (const m of mutations) {
           if (m.addedNodes && m.addedNodes.length > 0) {
             for (let i = 0; i < m.addedNodes.length; i++) {
@@ -2445,25 +3722,46 @@
             }
           }
           if (m.target && !isIgnoredAncestor(m.target) && !isNoisyMutationTarget(m.target)) {
-            relevant = true;
+            if (m.type === 'attributes') {
+              relevantAttr = true;
+            } else {
+              relevantContent = true;
+            }
           }
         }
-        if (relevant) {
+        if (relevantContent) {
           engine.recordMutation();
           scheduleScan(300);
+        } else if (relevantAttr) {
+          scheduleScan(200);
         }
       });
       observer.observe(document.body, {
         childList: true,
         subtree: true,
-        characterData: true
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['disabled', 'hidden', 'aria-hidden', 'aria-disabled']
       });
       observeShadowTree(document.body);
     }
 
     // Background Service Worker Port (keeps scanning alive at 1.5s intervals + seamless 4-min rotation)
     let quickReconnectCount = 0;
+    let lastQuickReconnectWindowAt = 0;
     let rotatingPort = false;
+
+    function forceReconnectBackgroundPort() {
+      if (!isContextAlive()) return;
+      if (bgPort) {
+        rotatingPort = true;
+        const old = bgPort;
+        bgPort = null;
+        try { old.disconnect(); } catch (_) {}
+        rotatingPort = false;
+      }
+      connectBackgroundPort();
+    }
 
     function connectBackgroundPort() {
       if (!isContextAlive()) return;
@@ -2512,7 +3810,12 @@
             teardownStaleContext();
             return;
           }
-          if (isBackgroundOrUnfocused(document) && engine.settings.backgroundMode && quickReconnectCount < 2) {
+          const reconnectNow = Date.now();
+          if (reconnectNow - lastQuickReconnectWindowAt >= 15000) {
+            quickReconnectCount = 0;
+            lastQuickReconnectWindowAt = reconnectNow;
+          }
+          if (isBackgroundOrUnfocused(document) && engine.settings.backgroundMode && quickReconnectCount < 3) {
             quickReconnectCount += 1;
             // Wake Service Worker via sendMessage before reconnecting Port so restarts don't burn retries
             if (typeof chrome.runtime.sendMessage === 'function') {
@@ -2537,7 +3840,8 @@
         port.postMessage({
           type: 'GMAH_TAB_HELLO',
           url: window.location.href,
-          stallAlertActive: Boolean(engine.stallAlertActive)
+          stallAlertActive: Boolean(engine.stallAlertActive),
+          breakerTripped: Boolean(engine.circuitBreaker && engine.circuitBreaker.tripped)
         });
       } catch (_) {
         bgPort = null;
@@ -2546,13 +3850,19 @@
     }
 
     connectBackgroundPort();
+    syncBackgroundKeepaliveLock();
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('freeze', handlePageFreeze);
+    document.addEventListener('resume', handlePageResume);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('pagehide', handlePageFreeze);
+    window.addEventListener('beforeunload', handlePageFreeze);
 
     // Periodic foreground heartbeat (Service Worker Port + Alarms take over when tab is hidden)
     heartbeatInterval = setInterval(() => {
       if (!isContextAlive()) return;
+      syncBackgroundKeepaliveLock();
       if (!bgPort && engine.settings.enabled && engine.settings.backgroundMode) {
         connectBackgroundPort();
       }
@@ -2569,7 +3879,15 @@
       chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         if (!isContextAlive() || !msg || typeof msg !== 'object') return;
         if (msg.type === 'GMAH_BG_TICK') {
-          if (!bgPort) connectBackgroundPort();
+          if (
+            !bgPort ||
+            msg.source === 'pong_recovery' ||
+            msg.source === 'alarm' ||
+            msg.source === 'resync' ||
+            msg.source === 'keepalive_sync'
+          ) {
+            forceReconnectBackgroundPort();
+          }
           if (canRunScanInCurrentVisibility()) {
             const res = runScanAndSchedule();
             sendResponse({ ok: true, result: res });
@@ -2578,6 +3896,7 @@
           }
         } else if (msg.type === 'GMAH_APPLY_SETTINGS' && msg.settings) {
           engine.updateSettings(msg.settings, false);
+          syncBackgroundKeepaliveLock();
           if (engine.settings.enabled && engine.settings.backgroundMode && !bgPort) {
             connectBackgroundPort();
           }
@@ -2593,6 +3912,10 @@
         } else if (msg.type === 'GMAH_EMERGENCY_STOP') {
           engine.emergencyStop();
           sendResponse({ ok: true, state: engine.getState() });
+        } else if (msg.type === 'GMAH_FORCE_STALL_RECOVER') {
+          const res = engine.forceStallRecovery();
+          scheduleFollowupForResult(res);
+          sendResponse({ ok: true, result: res, state: engine.getState() });
         } else if (msg.type === 'GMAH_RESET_HUD_POS') {
           if (hud && typeof hud.resetPosition === 'function') {
             hud.resetPosition();

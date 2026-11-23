@@ -1789,13 +1789,14 @@ function runTests(test) {
       const rootEl = hud.mount();
       assert.ok(rootEl && doc.getElementById('gmah-hud'));
 
-      // Check the 5th row: 桌面通知
+      // Check the 5th row (桌面通知) and 6th row (超时自动续接)
       const rows = rootEl.querySelectorAll('.gmah-row');
-      assert.strictEqual(rows.length, 5, 'HUD must have 5 control rows including desktop notifications');
+      assert.strictEqual(rows.length, 6, 'HUD must have 6 control rows including desktop notifications and stall auto-recovery');
       const notifRow = rows[4];
       assert.ok(notifRow.textContent.includes('桌面通知'));
       const notifPill = notifRow.querySelector('.gmah-pill');
       assert.ok(notifPill);
+      assert.ok(rows[5].textContent.includes('超时自动续接'));
 
       hud.update(engine.getState());
       assert.strictEqual(notifPill.textContent, '已开启');
@@ -1928,10 +1929,10 @@ function runTests(test) {
       const rootEl = hud.mount();
       rootEl.rect = { width: 248, height: 280 };
 
-      // Beta badge check
+      // Version badge check
       const betaBadge = rootEl.querySelector('.gmah-badge-beta');
       assert.ok(betaBadge, 'HUD must contain .gmah-badge-beta element');
-      assert.strictEqual(betaBadge.textContent, 'v0.3 Beta');
+      assert.strictEqual(betaBadge.textContent, 'v1.0.0');
 
       // Restored initial position
       assert.strictEqual(rootEl.style.left, '200px');
@@ -2280,6 +2281,749 @@ function runTests(test) {
 
     pdoc.getElementById('btnResetHudPos').click();
     assert.ok(removedKeys.includes('gmah_hud_position'));
+  });
+
+  // 34. Stall auto-recovery: auto-stop + fill "继续" + send after default 5 min & custom threshold (even with desktop alerts off and hidden tab)
+  test('stall auto-recovery stops stuck connecting turn after threshold, writes "继续", and sends automatically', () => {
+    const { doc, win } = createMockEnv('https://gemini.google.com/app/stall-recover-1');
+    doc.hidden = true; // Verify works in background/hidden tab
+    let now = 2000000;
+    const alerts = [];
+    let resolvedCount = 0;
+
+    addTurn(doc, '正在调用 MCP 工具处理请求...');
+    const statusNode = doc.createElement('div', {
+      attrs: { role: 'status' },
+      text: '正在连接 Desktop Commander (5s)...'
+    });
+    doc.body.appendChild(statusNode);
+
+    const stopBtn = doc.createElement('button', {
+      className: 'send-button stop',
+      attrs: { 'aria-label': '停止生成' },
+      rect: { width: 36, height: 36 }
+    });
+    doc.body.appendChild(stopBtn);
+
+    const richTextarea = doc.createElement('rich-textarea');
+    const editor = doc.createElement('div', {
+      className: 'ql-editor ql-blank',
+      attrs: { contenteditable: 'true', role: 'textbox', 'aria-label': '输入提示' },
+      rect: { width: 0, height: 0 } // Simulate deferred layout in hidden tab
+    });
+    richTextarea.appendChild(editor);
+    doc.body.appendChild(richTextarea);
+
+    const sendBtn = doc.createElement('button', {
+      className: 'send-button',
+      attrs: { 'aria-label': '发送消息' },
+      disabled: true,
+      rect: { width: 0, height: 0 }
+    });
+    doc.body.appendChild(sendBtn);
+
+    // Simulate real Gemini behavior: clicking Stop removes stopBtn & statusNode; input enables sendBtn
+    stopBtn.addEventListener('click', () => {
+      stopBtn.remove();
+      statusNode.remove();
+    });
+    editor.addEventListener('input', () => {
+      sendBtn.disabled = false;
+    });
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      randomFn: () => 0.5, // Deterministic mid-range human pacing: stopSettle=2700ms, charDelay=210ms, sendSettle=1650ms
+      settings: {
+        stallAlertEnabled: false, // Auto-recovery must still work even if desktop alerts are disabled!
+        stallAutoRecoverEnabled: true,
+        stallAutoRecoverMinutes: 5,
+        stallAutoRecoverPrompt: '继续',
+        humanPacingEnabled: true
+      },
+      onStallAlert: (p) => alerts.push(p),
+      onStallResolved: () => { resolvedCount += 1; }
+    });
+
+    // t = 0: start stall tracking
+    const r0 = engine.scanOnce();
+    assert.strictEqual(r0.action, 'wait');
+    assert.strictEqual(stopBtn.clickCount, 0);
+
+    // t = 4m 59s: animated status text must NOT reset timer and must NOT trigger early
+    now += 4 * 60 * 1000 + 59 * 1000;
+    statusNode.textContent = '正在连接 Desktop Commander (299s)...';
+    const rEarly = engine.scanOnce();
+    assert.strictEqual(rEarly.action, 'wait');
+    assert.strictEqual(stopBtn.clickCount, 0);
+
+    // t = 5m 00s: threshold hit -> clicks Stop button!
+    now += 1000;
+    const rStop = engine.scanOnce();
+    assert.strictEqual(rStop.action, 'stall_recover_stop');
+    assert.strictEqual(rStop.minutes, 5);
+    assert.strictEqual(rStop.prompt, '继续');
+    assert.strictEqual(stopBtn.clickCount, 1);
+    assert.strictEqual(engine.getState().stallRecoveryActive, true);
+
+    // t + 1000ms: still in natural post-stop pacing cooldown (must NOT rush to type right after Stop!)
+    now += 1000;
+    const rSettle = engine.scanOnce();
+    assert.strictEqual(rSettle.action, 'wait');
+    assert.strictEqual(rSettle.reason, 'stall_recover_settling');
+
+    // t + 1800ms (total 2800ms >= 2700ms): begins natural char-by-char typing ('继')
+    now += 1800;
+    const rType1 = engine.scanOnce();
+    assert.strictEqual(rType1.action, 'stall_recover_type');
+    assert.strictEqual(rType1.typed, '继');
+    assert.strictEqual(editor.textContent.trim(), '继');
+
+    // t + 250ms: types second char ('继续') and enters pre-send human pause
+    now += 250;
+    const rFill = engine.scanOnce();
+    assert.strictEqual(rFill.action, 'stall_recover_fill');
+    assert.strictEqual(rFill.prompt, '继续');
+    assert.strictEqual(editor.textContent.trim(), '继续');
+    assert.strictEqual(editor.classList.contains('ql-blank'), false);
+    assert.strictEqual(sendBtn.disabled, false);
+
+    // t + 500ms: still in natural pre-send pause (must NOT fire Send immediately after typing!)
+    now += 500;
+    const rPause = engine.scanOnce();
+    assert.strictEqual(rPause.action, 'wait');
+    assert.strictEqual(rPause.reason, 'stall_recover_send_settle');
+    assert.strictEqual(sendBtn.clickCount, 0);
+
+    // t + 1300ms (total 1800ms >= 1650ms): clicks Send button and completes recovery
+    now += 1300;
+    const rSend = engine.scanOnce();
+    assert.strictEqual(rSend.action, 'stall_recover_sent');
+    assert.strictEqual(rSend.method, 'button');
+    assert.strictEqual(rSend.prompt, '继续');
+    assert.strictEqual(rSend.recoveryCount, 1);
+    assert.strictEqual(sendBtn.clickCount, 1);
+    assert.strictEqual(engine.getState().stallRecoveryActive, false);
+    assert.strictEqual(engine.getState().stallRecoveryCount, 1);
+    assert.strictEqual(alerts.length, 0);
+    void resolvedCount;
+  });
+
+  // 35. Stall auto-recovery safety guards: user draft protection, max retries cap + progress reset, quota guard, and Enter fallback
+  test('stall auto-recovery protects user draft, enforces max recoveries cap, resets on progress, and supports Enter fallback', () => {
+    const { doc, win } = createMockEnv('https://gemini.google.com/app/stall-guards');
+    let now = 3000000;
+    const alerts = [];
+
+    const turn = addTurn(doc, '工具执行中...');
+    const statusNode = doc.createElement('div', {
+      attrs: { role: 'status' },
+      text: 'Connecting to MCP server...'
+    });
+    doc.body.appendChild(statusNode);
+
+    const textarea = doc.createElement('textarea', {
+      attrs: { 'aria-label': 'Enter a prompt here' },
+      value: '用户正在手动输入的问题'
+    });
+    doc.body.appendChild(textarea);
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      settings: {
+        stallAlertEnabled: true,
+        stallAlertMinutes: 2,
+        stallAutoRecoverEnabled: true,
+        stallAutoRecoverMinutes: 2,
+        stallAutoRecoverPrompt: '继续',
+        maxStallRecoveriesPerTask: 2,
+        humanPacingEnabled: false // Also exercises fast non-paced mode cleanly
+      },
+      onStallAlert: (p) => alerts.push(p)
+    });
+
+    // 1) User has unsent draft in textarea -> MUST NOT overwrite draft; falls back to desktop alert
+    engine.scanOnce();
+    now += 2 * 60 * 1000;
+    engine.scanOnce();
+    assert.strictEqual(textarea.value, '用户正在手动输入的问题', 'User draft must never be overwritten');
+    assert.strictEqual(engine.stallRecoveryCount, 0);
+    assert.strictEqual(alerts.length, 1, 'Desktop alert should fire when draft blocks auto-recovery');
+
+    // 2) Clear draft and produce a new turn -> direct fill + Enter fallback (no Stop button & no Send button)
+    textarea.value = '';
+    turn.textContent = '新的响应阶段，继续连接...';
+    now += 5000;
+    engine.scanOnce(); // progress resets timer & blocked fingerprint
+
+    now += 2 * 60 * 1000;
+    const rFill = engine.scanOnce();
+    assert.strictEqual(rFill.action, 'stall_recover_fill');
+    assert.strictEqual(textarea.value, '继续');
+
+    // Wait past targetSendSettleMs + STALL_SEND_FALLBACK_MS with no Send button -> dispatches Enter key on textarea!
+    now += 2500;
+    const rEnter = engine.scanOnce();
+    assert.strictEqual(rEnter.action, 'stall_recover_sent');
+    assert.strictEqual(rEnter.method, 'enter');
+    assert.strictEqual(rEnter.recoveryCount, 1);
+    assert.ok(textarea.dispatchedEvents.includes('keydown'));
+
+    // 3) Second recovery hits maxStallRecoveriesPerTask (2/2), third stall must NOT auto-recover and must alert
+    textarea.value = '';
+    now += 1000;
+    engine.scanOnce(); // starts new stall timer
+    now += 2 * 60 * 1000;
+    const rFill2 = engine.scanOnce();
+    assert.strictEqual(rFill2.action, 'stall_recover_fill');
+    now += 2500;
+    const rEnter2 = engine.scanOnce();
+    assert.strictEqual(rEnter2.action, 'stall_recover_sent');
+    assert.strictEqual(rEnter2.recoveryCount, 2);
+
+    textarea.value = '';
+    now += 1000;
+    engine.scanOnce(); // starts 3rd stall timer
+    const alertsBeforeCap = alerts.length;
+    now += 2 * 60 * 1000;
+    const rCapped = engine.scanOnce();
+    assert.notStrictEqual(rCapped.action, 'stall_recover_fill');
+    assert.strictEqual(textarea.value, '', 'Must not fill prompt once maxStallRecoveriesPerTask is reached');
+    assert.strictEqual(alerts.length, alertsBeforeCap + 1, 'Desktop alert should notify user when recovery cap reached');
+
+    // 4) Once Gemini produces genuine new progress, stallRecoveryCount resets back to 0!
+    turn.textContent = '工具恢复成功，已经产出全新的回复内容！';
+    now += 5000;
+    engine.scanOnce();
+    assert.strictEqual(engine.stallRecoveryCount, 0);
+
+    // 5) Quota error banner while stalled trips quota_error breaker instead of sending "继续"
+    const alertBanner = doc.createElement('div', {
+      attrs: { role: 'alert' },
+      text: 'You have reached your usage limit. Please try again later.'
+    });
+    doc.body.appendChild(alertBanner);
+    now += 2 * 60 * 1000;
+    const rQuota = engine.scanOnce();
+    assert.strictEqual(rQuota.action, 'tripped');
+    assert.strictEqual(rQuota.reason, 'quota_error');
+    assert.strictEqual(textarea.value, '');
+  });
+
+  // 36. Popup renders, clamps, and persists stall auto-recovery settings
+  test('popup.js renders, clamps, and saves stallAutoRecover settings cleanly', () => {
+    const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+    const pdoc = popupEnv.doc;
+    const ids = [
+      'enabled', 'autoAllow', 'preferAlwaysAllow', 'fallbackSingleAllow',
+      'autoContinue', 'backgroundMode', 'preventTabDiscard', 'showHud',
+      'maxContinuesPerTask', 'dailyContinueLimit', 'continueCooldownSec', 'idleSettleSec',
+      'stopOnCompletionCues', 'stopOnStagnantOutput', 'stopOnQuotaOrError',
+      'stallAlertEnabled', 'stallAlertMinutes', 'btnToggleNotif', 'btnTestNotif',
+      'stallAutoRecoverEnabled', 'stallAutoRecoverMinutes', 'maxStallRecoveriesPerTask', 'stallAutoRecoverPrompt',
+      'language', 'btnToggleTheme', 'btnResetHudPos',
+      'customAlwaysAllowKeywords', 'customContinueKeywords',
+      'statAllow', 'statContinue', 'statLive',
+      'btnEmergency', 'btnResetBreaker', 'btnResetStats', 'btnDefaults', 'btnSave', 'toast'
+    ];
+    for (const id of ids) pdoc.body.appendChild(pdoc.createElement('input', { id }));
+
+    const storageState = {
+      [D.STORAGE_KEY]: D.mergeSettings({
+        stallAutoRecoverEnabled: true,
+        stallAutoRecoverMinutes: 5,
+        maxStallRecoveriesPerTask: 3,
+        stallAutoRecoverPrompt: '继续'
+      }),
+      [D.STATS_KEY]: D.createEmptyStats()
+    };
+
+    const mockChrome = {
+      runtime: { lastError: null, sendMessage() {} },
+      storage: {
+        local: {
+          get(_k, cb) { cb(JSON.parse(JSON.stringify(storageState))); },
+          set(obj, cb) { Object.assign(storageState, JSON.parse(JSON.stringify(obj))); if (cb) cb(); }
+        }
+      },
+      tabs: { query(_q, cb) { cb([]); } }
+    };
+
+    const popup = createPopupController(pdoc, mockChrome);
+    popup.init();
+
+    assert.strictEqual(pdoc.getElementById('stallAutoRecoverEnabled').checked, true);
+    assert.strictEqual(pdoc.getElementById('stallAutoRecoverMinutes').value, '5');
+    assert.strictEqual(pdoc.getElementById('maxStallRecoveriesPerTask').value, '3');
+    assert.strictEqual(pdoc.getElementById('stallAutoRecoverPrompt').value, '继续');
+
+    // Update threshold to 3 minutes and custom prompt
+    pdoc.getElementById('stallAutoRecoverMinutes').value = '3';
+    pdoc.getElementById('maxStallRecoveriesPerTask').value = '6';
+    pdoc.getElementById('stallAutoRecoverPrompt').value = '请继续';
+    pdoc.getElementById('stallAutoRecoverMinutes').dispatchEvent({ type: 'change' });
+
+    assert.strictEqual(storageState[D.STORAGE_KEY].stallAutoRecoverMinutes, 3);
+    assert.strictEqual(storageState[D.STORAGE_KEY].maxStallRecoveriesPerTask, 6);
+    assert.strictEqual(storageState[D.STORAGE_KEY].stallAutoRecoverPrompt, '请继续');
+  });
+
+  // 37. Live Desktop Commander connecting timer in HUD & Popup
+  test('live connecting wait timer tracks Desktop Commander elapsed time in HUD and Popup and resets on progress', () => {
+    const { doc, win } = createMockEnv('https://gemini.google.com/app/dc-timer');
+    let now = 4000000;
+
+    // Unclassed <span> inside <model-response> (realistic Gemini Desktop Commander connecting card)
+    const connSpan = doc.createElement('span', { text: '正在连接 Desktop Commander (12s)...' });
+    const turn = addTurn(doc, '', [connSpan]);
+    const stopBtn = doc.createElement('button', {
+      className: 'send-button stop',
+      attrs: { 'aria-label': '停止回复' }
+    });
+    doc.body.appendChild(stopBtn);
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      settings: {
+        stallAutoRecoverEnabled: true,
+        stallAutoRecoverMinutes: 5
+      }
+    });
+
+    const prevDoc = global.document;
+    const prevWin = global.window;
+    global.document = doc;
+    global.window = win;
+    try {
+      const hud = createHud({});
+      const rootEl = hud.mount();
+
+      // t = 0: detects connecting label inside latest turn
+      engine.scanOnce();
+      hud.update(engine.getState());
+      assert.strictEqual(engine.stallConnectingLabel, '正在连接 Desktop Commander');
+      const waitBar = rootEl.querySelector('.gmah-wait-bar');
+      assert.ok(waitBar);
+      assert.strictEqual(waitBar.style.display, 'block');
+      assert.ok(waitBar.textContent.includes('正在连接 Desktop Commander'));
+
+      // t = 2m 15s: wait bar updates with exact elapsed duration
+      now += 135 * 1000;
+      connSpan.textContent = '正在连接 Desktop Commander (147s)...';
+      engine.scanOnce();
+      const state2m = engine.getState();
+      assert.strictEqual(state2m.stallElapsedMs, 135000);
+      hud.update(state2m);
+      assert.ok(waitBar.textContent.includes('2分15秒'), `Expected 2分15秒 in "${waitBar.textContent}"`);
+      assert.ok(waitBar.textContent.includes('5分钟'));
+      assert.ok(!waitBar.className.includes('warn'));
+
+      // t = 3m 30s (>= 60% of 5m threshold): turns amber warn
+      now += 75 * 1000;
+      engine.scanOnce();
+      hud.update(engine.getState());
+      assert.ok(waitBar.textContent.includes('3分30秒'));
+      assert.ok(waitBar.className.includes('warn'));
+
+      // Popup statLive also displays live waiting duration
+      const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+      const liveEl = popupEnv.doc.createElement('strong', { id: 'statLive' });
+      popupEnv.doc.body.appendChild(liveEl);
+      const popup = createPopupController(popupEnv.doc, null);
+      popup.renderLiveStatus(engine.getState(), { reason: 'ok' });
+      assert.strictEqual(liveEl.textContent, '等待 3分30秒');
+
+      // Output arrives & stop button removed -> timer hides cleanly
+      stopBtn.remove();
+      connSpan.remove();
+      turn.textContent = 'Desktop Commander 返回了目录列表结果！';
+      now += 2000;
+      engine.scanOnce();
+      hud.update(engine.getState());
+      assert.strictEqual(engine.getState().stallElapsedMs, 0);
+      assert.strictEqual(waitBar.style.display, 'none');
+
+      hud.unmount();
+    } finally {
+      global.document = prevDoc;
+      global.window = prevWin;
+    }
+  });
+
+  // 38. Immediate "立即续接" button next to "超时自动续接" in HUD & Popup forces stop + send "继续" right away
+  test('immediate "立即续接" button in HUD and Popup cancels stuck turn and sends "继续" without waiting 5 minutes', () => {
+    const { doc, win } = createMockEnv('https://gemini.google.com/app/force-recover');
+    let now = 5000000;
+
+    addTurn(doc, '正在等待 Desktop Commander 响应...');
+
+    // Icon-only Stop button (<mat-icon fonticon="stop">) to test broadened Stop detection
+    const stopBtn = doc.createElement('button', { className: 'send-button' });
+    const stopIcon = doc.createElement('mat-icon', { attrs: { fonticon: 'stop' } });
+    stopBtn.appendChild(stopIcon);
+    doc.body.appendChild(stopBtn);
+
+    const editor = doc.createElement('div', {
+      className: 'ql-editor ql-blank',
+      attrs: { contenteditable: 'true', role: 'textbox' }
+    });
+    doc.body.appendChild(editor);
+
+    const sendBtn = doc.createElement('button', {
+      className: 'send-button',
+      attrs: { 'aria-label': '发送消息' },
+      disabled: true
+    });
+    doc.body.appendChild(sendBtn);
+
+    stopBtn.addEventListener('click', () => { stopBtn.remove(); });
+    editor.addEventListener('input', () => { sendBtn.disabled = false; });
+
+    // Even with auto-recover OFF and master switch paused, manual user click MUST still execute (with safe human pacing)!
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      randomFn: () => 0.5, // manual stopSettle=1950ms, charDelay=210ms, sendSettle=1300ms
+      settings: {
+        enabled: false,
+        stallAutoRecoverEnabled: false,
+        stallAutoRecoverMinutes: 5,
+        stallAutoRecoverPrompt: '继续',
+        humanPacingEnabled: true
+      }
+    });
+
+    const prevDoc = global.document;
+    const prevWin = global.window;
+    global.document = doc;
+    global.window = win;
+    try {
+      let forceClicks = 0;
+      const hud = createHud({
+        onForceStallRecover: () => {
+          forceClicks += 1;
+          engine.forceStallRecovery();
+        }
+      });
+      const rootEl = hud.mount();
+      hud.update(engine.getState());
+
+      const rows = rootEl.querySelectorAll('.gmah-row');
+      const recoverRow = rows[5];
+      const forceBtn = recoverRow.querySelector('.gmah-pill-action');
+      assert.ok(forceBtn, 'HUD stall recover row must have immediate "立即续接" button');
+      assert.strictEqual(forceBtn.textContent, '立即续接');
+
+      // Click "立即续接" immediately at t = 0 (no 5 min wait!)
+      forceBtn.click();
+      assert.strictEqual(forceClicks, 1);
+      assert.strictEqual(stopBtn.clickCount, 1, 'Icon-based Stop button must be clicked immediately');
+      assert.strictEqual(engine.getState().stallRecoveryActive, true);
+
+      // Next scans complete natural settle -> char-by-char type -> natural pre-send pause -> click Send even while enabled=false!
+      now += 2000;
+      const rType = engine.scanOnce();
+      assert.strictEqual(rType.action, 'stall_recover_type');
+      assert.strictEqual(editor.textContent.trim(), '继');
+
+      now += 250;
+      const rFill = engine.scanOnce();
+      assert.strictEqual(rFill.action, 'stall_recover_fill');
+      assert.strictEqual(editor.textContent.trim(), '继续');
+
+      now += 1400;
+      const rSend = engine.scanOnce();
+      assert.strictEqual(rSend.action, 'stall_recover_sent');
+      assert.strictEqual(rSend.manual, true);
+      assert.strictEqual(sendBtn.clickCount, 1);
+      assert.strictEqual(engine.stallRecoveryCount, 0, 'Manual force-recovery must not consume auto-recovery budget');
+
+      hud.unmount();
+    } finally {
+      global.document = prevDoc;
+      global.window = prevWin;
+    }
+
+    // Also verify Popup's btnForceRecover sends GMAH_FORCE_STALL_RECOVER
+    const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+    for (const id of ['btnForceRecover', 'statLive', 'toast', 'btnSave']) {
+      popupEnv.doc.body.appendChild(popupEnv.doc.createElement('button', { id }));
+    }
+    const sentMsgs = [];
+    const mockChrome = {
+      runtime: { lastError: null },
+      storage: { local: { get(_k, cb) { cb({}); }, set(_o, cb) { if (cb) cb(); } } },
+      tabs: {
+        query(_q, cb) { cb([{ id: 42, active: true }]); },
+        sendMessage(_id, msg, cb) {
+          sentMsgs.push(msg);
+          cb({ ok: true, state: engine.getState() });
+        }
+      }
+    };
+    const popup = createPopupController(popupEnv.doc, mockChrome);
+    popup.init();
+    popupEnv.doc.getElementById('btnForceRecover').click();
+    assert.ok(sentMsgs.some((m) => m.type === 'GMAH_FORCE_STALL_RECOVER'));
+  });
+
+  // 39. Anti-burst governor slows down rapid consecutive actions & pointer click includes natural hover + non-center jitter
+  test('anti-burst pacing governor adds cool-off after rapid bursts and clicks include hover + natural coordinate jitter', () => {
+    const { doc, win } = createMockEnv('https://gemini.google.com/app/anti-burst');
+    let now = 6000000;
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      randomFn: () => 0.8,
+      settings: { allowCooldownMs: 600, humanPacingEnabled: true }
+    });
+
+    // Simulate 4 rapid allow clicks within 10s -> 4th click triggers anti-burst cool-off (> 2400ms)!
+    for (let i = 0; i < 4; i++) {
+      const btn = doc.createElement('button', { text: '始终允许' });
+      doc.body.appendChild(btn);
+      const res = engine.scanOnce();
+      assert.strictEqual(res.action, 'clicked_allow');
+      btn.remove();
+      now += 1000;
+    }
+
+    // 5th Allow button right after 1000ms must be held back by anti-burst cool-off!
+    const btn5 = doc.createElement('button', { text: '始终允许' });
+    doc.body.appendChild(btn5);
+    const held = engine.scanOnce();
+    assert.strictEqual(held.action, 'wait');
+    assert.strictEqual(held.reason, 'allow_cooldown');
+    assert.ok(held.retryInMs > 1500, `Expected anti-burst cool-off > 1500ms, got ${held.retryInMs}`);
+
+    // Advance past anti-burst cool-off -> clicks cleanly
+    now += held.retryInMs + 100;
+    const passed = engine.scanOnce();
+    assert.strictEqual(passed.action, 'clicked_allow');
+
+    // Verify defaultClickElement dispatches hover events and non-center coordinates
+    const testBtn = doc.createElement('button', { text: 'Send', rect: { left: 100, top: 200, width: 100, height: 40 } });
+    const received = [];
+    win.PointerEvent = class { constructor(type, opts) { this.type = type; Object.assign(this, opts); } };
+    win.MouseEvent = class { constructor(type, opts) { this.type = type; Object.assign(this, opts); } };
+    for (const evType of ['pointerover', 'pointermove', 'mouseover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
+      testBtn.addEventListener(evType, (e) => received.push({ type: e.type, clientX: e.clientX, clientY: e.clientY }));
+    }
+    defaultClickElement(testBtn, win, 1, () => 0.9);
+    assert.ok(received.some((e) => e.type === 'pointerover'));
+    assert.ok(received.some((e) => e.type === 'mouseover'));
+    assert.ok(received.some((e) => e.type === 'pointerdown'));
+    // With rand=0.9, offsetX = (0.9 - 0.5)*0.44 = +0.176 -> clientX = 100 + 100*0.676 = 168 (not dead center 150!)
+    assert.notStrictEqual(received[0].clientX, 150);
+    assert.ok(received[0].clientX >= 120 && received[0].clientX <= 180);
+  });
+
+  // 40. v1.0.0 default & custom reconnect prompt ('继续，刚才mcp连接断开了') natural chunked typing + Popup live-typing non-clobber
+  test('v1.0.0 default and custom reconnect prompts type cleanly in chunks and Popup preserves active input while typing', () => {
+    const { doc, win } = createMockEnv('https://gemini.google.com/app/custom-reconnect-v1');
+    let now = 7000000;
+
+    addTurn(doc, '正在调用 MCP 工具...');
+    const editor = doc.createElement('div', {
+      className: 'ql-editor ql-blank',
+      attrs: { contenteditable: 'true', role: 'textbox' }
+    });
+    doc.body.appendChild(editor);
+
+    const sendBtn = doc.createElement('button', {
+      className: 'send-button',
+      attrs: { 'aria-label': '发送消息' },
+      disabled: true
+    });
+    doc.body.appendChild(sendBtn);
+    editor.addEventListener('input', () => { sendBtn.disabled = false; });
+
+    // 1) Default v1.0.0 reconnect prompt: '继续，刚才mcp连接断开了'
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      randomFn: () => 0.5
+    });
+    assert.strictEqual(engine.settings.stallAutoRecoverPrompt, '继续，刚才mcp连接断开了');
+
+    let stepRes = engine.forceStallRecovery();
+    let safety = 0;
+    const typedSnapshots = [];
+    while (stepRes && stepRes.action !== 'stall_recover_sent' && safety < 20) {
+      if (stepRes.action === 'stall_recover_type') {
+        typedSnapshots.push(stepRes.typed);
+      }
+      now += (stepRes.retryInMs || 300) + 50;
+      stepRes = engine.scanOnce();
+      safety += 1;
+    }
+    assert.strictEqual(stepRes.action, 'stall_recover_sent');
+    assert.strictEqual(stepRes.prompt, '继续，刚才mcp连接断开了');
+    assert.strictEqual(editor.textContent.trim(), '继续，刚才mcp连接断开了');
+    assert.ok(typedSnapshots.length >= 2, 'Longer reconnect prompt should type naturally in multiple chunks');
+    assert.strictEqual(sendBtn.clickCount, 1);
+
+    // 2) Custom user reconnect prompt with mixed comma/spaces/ASCII+Chinese
+    const customMsg = '继续,刚才mcp 连接断开了，请接着上一步完成测试';
+    editor.textContent = '';
+    sendBtn.disabled = true;
+    engine.updateSettings({ stallAutoRecoverPrompt: customMsg }, false);
+
+    now += 5000;
+    stepRes = engine.forceStallRecovery();
+    safety = 0;
+    while (stepRes && stepRes.action !== 'stall_recover_sent' && safety < 20) {
+      now += (stepRes.retryInMs || 300) + 50;
+      stepRes = engine.scanOnce();
+      safety += 1;
+    }
+    assert.strictEqual(stepRes.action, 'stall_recover_sent');
+    assert.strictEqual(stepRes.prompt, customMsg);
+    assert.strictEqual(editor.textContent.trim(), customMsg);
+    assert.strictEqual(sendBtn.clickCount, 2);
+
+    // 3) Popup renderSettings({ preserveActiveInput: true }) must NOT overwrite actively focused input mid-typing
+    const popupEnv = createMockEnv('chrome-extension://test/popup.html');
+    const promptInput = popupEnv.doc.createElement('input', { id: 'stallAutoRecoverPrompt', value: '继续，刚才 ' });
+    popupEnv.doc.body.appendChild(promptInput);
+    popupEnv.doc.activeElement = promptInput;
+    const popup = createPopupController(popupEnv.doc, null);
+    popup.renderSettings({ stallAutoRecoverPrompt: '继续，刚才' }, { preserveActiveInput: true });
+    assert.strictEqual(promptInput.value, '继续，刚才 ', 'Trailing space in actively focused input must not be clobbered while typing');
+    popup.renderSettings({ stallAutoRecoverPrompt: '继续，刚才mcp连接断开了' });
+    assert.strictEqual(promptInput.value, '继续，刚才mcp连接断开了', 'Explicit render without preserveActiveInput updates field value');
+  });
+
+  // 42. Circuit breaker desktop notification & badge wiring across content.js and background.js
+  test('circuit breaker alerts wire end-to-end across GmahEngine and background.js (badge, notification, click focus, cleanup)', () => {
+    const createdNotifs = [];
+    const clearedNotifs = [];
+    const badgeUpdates = [];
+    const badgeColors = [];
+    const windowUpdates = [];
+    const tabUpdates = [];
+
+    const mockChrome = {
+      runtime: {
+        lastError: null,
+        getURL: (p) => `chrome-extension://test/${p}`,
+        onConnect: { addListener() {} },
+        onMessage: { addListener() {} },
+        onInstalled: { addListener() {} },
+        onStartup: { addListener() {} }
+      },
+      storage: {
+        local: {
+          get(_k, cb) {
+            cb({
+              [D.STORAGE_KEY]: {
+                language: 'zh-CN',
+                enabled: true,
+                backgroundMode: true,
+                preventTabDiscard: true,
+                stallAlertEnabled: true
+              }
+            });
+          }
+        },
+        onChanged: { addListener() {} }
+      },
+      action: {
+        setBadgeText(opts, cb) { badgeUpdates.push(opts); if (cb) cb(); },
+        setBadgeBackgroundColor(opts, cb) { badgeColors.push(opts); if (cb) cb(); }
+      },
+      notifications: {
+        create(id, opts, cb) { createdNotifs.push({ id, opts }); if (cb) cb(id); },
+        clear(id, cb) { clearedNotifs.push(id); if (cb) cb(true); },
+        onClicked: { addListener() {} }
+      },
+      windows: {
+        get(winId, cb) { cb({ id: winId, state: 'minimized' }); },
+        update(winId, props, cb) { windowUpdates.push({ winId, props }); if (cb) cb(); }
+      },
+      tabs: {
+        get(tabId, cb) { cb({ id: tabId, windowId: 91 }); },
+        update(tabId, props, cb) { tabUpdates.push({ tabId, props }); if (cb) cb(); },
+        query(_q, cb) { cb([]); },
+        onUpdated: { addListener() {} },
+        onRemoved: { addListener() {} }
+      },
+      alarms: {
+        create() {},
+        clear() {},
+        onAlarm: { addListener() {} }
+      }
+    };
+
+    const bg = createBackgroundController(mockChrome);
+    bg.init();
+
+    const { doc, win } = createMockEnv();
+    const trippedPayloads = [];
+    let clearCalls = 0;
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      onBreakerTrip: (payload) => {
+        trippedPayloads.push(payload);
+        bg.handleRuntimeMessage(Object.assign({ type: 'GMAH_BREAKER_ALERT' }, payload), { tab: { id: 501 } });
+      },
+      onBreakerClear: () => {
+        clearCalls += 1;
+        bg.handleRuntimeMessage({ type: 'GMAH_BREAKER_CLEAR' }, { tab: { id: 501 } });
+      }
+    });
+
+    // 1) Non-emergency breaker (quota_error) triggers amber "!!" badge + desktop notification
+    engine.tripBreaker('quota_error', null, 'breakerReasonQuotaError', { kw: 'quota exceeded' });
+    assert.strictEqual(trippedPayloads.length, 1);
+    assert.strictEqual(trippedPayloads[0].reasonCode, 'quota_error');
+    assert.strictEqual(trippedPayloads[0].notify, true);
+    assert.ok(badgeUpdates.some((b) => b.tabId === 501 && b.text === '!!'));
+    assert.ok(badgeColors.some((b) => b.tabId === 501 && b.color === '#fbbc04'));
+    assert.strictEqual(createdNotifs.length, 1);
+    assert.strictEqual(createdNotifs[0].id, `${bg.BREAKER_NOTIF_PREFIX}501`);
+    assert.ok(createdNotifs[0].opts.message.includes('quota exceeded'));
+
+    // 2) Clicking breaker notification restores minimized window, activates tab, and clears alert/badge
+    bg.handleNotificationClicked(`${bg.BREAKER_NOTIF_PREFIX}501`);
+    assert.ok(clearedNotifs.includes(`${bg.BREAKER_NOTIF_PREFIX}501`));
+    assert.strictEqual(badgeUpdates[badgeUpdates.length - 1].text, '');
+    assert.deepStrictEqual(windowUpdates[0], { winId: 91, props: { focused: true, state: 'normal' } });
+    assert.ok(tabUpdates.some((u) => u.tabId === 501 && u.props.active === true));
+
+    // 3) Clearing breaker fires onBreakerClear and clears background alert
+    engine.clearBreaker();
+    assert.strictEqual(clearCalls, 1);
+
+    // 4) Emergency stop sets red "!" badge without creating a desktop notification
+    const notifCountBeforeEmergency = createdNotifs.length;
+    engine.emergencyStop();
+    assert.strictEqual(trippedPayloads[1].reasonCode, 'emergency_stop');
+    assert.strictEqual(trippedPayloads[1].notify, false);
+    assert.strictEqual(createdNotifs.length, notifCountBeforeEmergency);
+    assert.strictEqual(badgeUpdates[badgeUpdates.length - 1].text, '!');
+    assert.strictEqual(badgeColors[badgeColors.length - 1].color, '#ea4335');
+
+    // 5) Closing tab cleans up breaker badge and notification
+    bg.handleRuntimeMessage(
+      { type: 'GMAH_BREAKER_ALERT', reasonCode: 'task_limit', reason: '达到上限', notify: true },
+      { tab: { id: 502 } }
+    );
+    assert.ok(createdNotifs.some((n) => n.id === `${bg.BREAKER_NOTIF_PREFIX}502`));
+    bg.handleTabRemoved(502);
+    assert.ok(clearedNotifs.includes(`${bg.BREAKER_NOTIF_PREFIX}502`));
+    assert.ok(badgeUpdates.some((b) => b.tabId === 502 && b.text === ''));
   });
 }
 

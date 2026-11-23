@@ -14,10 +14,10 @@
         <div>
           <div class="brand-title-row">
             <h1 data-i18n="popupTitle">Gemini MCP 助手</h1>
-            <span class="badge-beta" id="popupBetaBadge" data-i18n="betaBadge">v0.3 Beta</span>
+            <span class="badge-beta" id="popupBetaBadge" data-i18n="betaBadge">v1.0.0</span>
           </div>
           <p class="subtitle" data-i18n="popupSubtitle">自动允许 · 多语言黑白模式 · 防误触熔断</p>
-          <div class="beta-notice" data-i18n="popupBetaNotice">⚠️ 公开测试预览版 (v0.3 Beta)</div>
+          <div class="beta-notice" data-i18n="popupBetaNotice">✅ 正式发布版 (v1.0.0)</div>
         </div>
       </div>
       <label class="switch" title="总开关" data-i18n-title="popupMasterTitle">
@@ -118,6 +118,10 @@
         <span data-i18n="lblStopQuota">检测到限流 / 额度 / 报错提示时立刻熔断</span>
         <input type="checkbox" id="stopOnQuotaOrError" />
       </label>
+      <label class="toggle-row">
+        <span data-i18n="lblHumanPacing">拟人防降速节流（随机延迟 + 逐字输入，降低限流风险）</span>
+        <input type="checkbox" id="humanPacingEnabled" />
+      </label>
     </section>
 
     <section class="card">
@@ -136,6 +140,25 @@
         </label>
         <button type="button" id="btnTestNotif" class="btn secondary btn-sm" data-i18n="btnTestNotif">测试通知</button>
       </div>
+      <label class="toggle-row">
+        <span data-i18n="lblStallRecoverEnable">超时卡住时自动终止对话并发送续接文字</span>
+        <input type="checkbox" id="stallAutoRecoverEnabled" />
+      </label>
+      <div class="grid-2">
+        <label class="field">
+          <span data-i18n="lblStallRecoverMinutes">自动终止续接阈值 (分钟)</span>
+          <input type="number" id="stallAutoRecoverMinutes" min="1" max="60" step="1" />
+        </label>
+        <label class="field">
+          <span data-i18n="lblStallRecoverMax">单次任务最多自动恢复次数</span>
+          <input type="number" id="maxStallRecoveriesPerTask" min="1" max="20" step="1" />
+        </label>
+      </div>
+      <label class="field">
+        <span data-i18n="lblStallRecoverPrompt">自定义续接发送文字</span>
+        <input type="text" id="stallAutoRecoverPrompt" maxlength="200" placeholder="默认：继续，刚才mcp连接断开了" data-i18n-placeholder="phStallRecoverPrompt" />
+      </label>
+      <button type="button" id="btnForceRecover" class="btn secondary btn-sm" data-i18n="popupBtnForceRecover">⚡ 立即终止并发送续接文字</button>
     </section>
 
     <section class="card">

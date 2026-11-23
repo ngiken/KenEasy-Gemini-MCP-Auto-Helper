@@ -124,6 +124,13 @@
   gap: 8px;
 }
 
+#gmah-hud .gmah-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 #gmah-hud .gmah-pill {
   padding: 3px 9px;
   border-radius: 999px;
@@ -133,6 +140,41 @@
   cursor: pointer;
   font-size: 11px;
   font-weight: 500;
+}
+
+#gmah-hud .gmah-pill.gmah-pill-action {
+  padding: 3px 7px;
+  background: rgba(138, 180, 248, 0.16);
+  border-color: rgba(138, 180, 248, 0.45);
+  color: #aecbfa;
+}
+
+#gmah-hud .gmah-pill.gmah-pill-action:hover:not(:disabled) {
+  background: rgba(138, 180, 248, 0.3);
+  color: #ffffff;
+}
+
+#gmah-hud .gmah-pill.gmah-pill-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#gmah-hud .gmah-wait-bar {
+  font-size: 11px;
+  font-weight: 500;
+  color: #aecbfa;
+  background: rgba(138, 180, 248, 0.12);
+  border: 1px solid rgba(138, 180, 248, 0.28);
+  border-radius: 8px;
+  padding: 5px 8px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+#gmah-hud .gmah-wait-bar.warn {
+  color: #fdd663;
+  background: rgba(251, 188, 4, 0.14);
+  border-color: rgba(251, 188, 4, 0.42);
 }
 
 #gmah-hud .gmah-pill.on {
@@ -289,6 +331,29 @@
   background: rgba(220, 38, 38, 0.12);
   border-color: rgba(220, 38, 38, 0.45);
   color: #b91c1c;
+}
+
+#gmah-hud.gmah-theme-light .gmah-pill.gmah-pill-action {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #1d4ed8;
+}
+
+#gmah-hud.gmah-theme-light .gmah-pill.gmah-pill-action:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.2);
+  color: #1e3a8a;
+}
+
+#gmah-hud.gmah-theme-light .gmah-wait-bar {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.24);
+}
+
+#gmah-hud.gmah-theme-light .gmah-wait-bar.warn {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.38);
 }
 
 #gmah-hud.gmah-theme-light .gmah-status {

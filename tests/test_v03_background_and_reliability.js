@@ -1015,6 +1015,466 @@ function runTests(test) {
     assert.strictEqual(activePorts.length, initialPortsCount + 1, 'Port must seamlessly rotate after 4 minutes');
     assert.deepStrictEqual(bg.getConnectedTabIds(), [101], 'Tab 101 must remain connected after port rotation');
   });
+
+  // 9. Full End-to-End VM Sandbox: real background.js + content.js + hud.js complete BOTH 5-min auto stall recovery AND immediate HUD "立即续接" click
+  test('v0.3 E2E VM sandbox: Desktop Commander 5-min stall auto-recovery & HUD "立即续接" button work end-to-end across SW + Content + HUD', () => {
+    let clock = 900000;
+    const swTimers = new Map();
+    const tabTimers = new Map();
+    let timerSeq = 1;
+    let swIntervalFn = null;
+    let tabHeartbeatFn = null;
+
+    const storageData = {
+      [D.STORAGE_KEY]: D.mergeSettings({
+        enabled: true,
+        backgroundMode: true,
+        showHud: true,
+        stallAlertEnabled: true,
+        stallAlertMinutes: 5,
+        stallAutoRecoverEnabled: true,
+        stallAutoRecoverMinutes: 5,
+        stallAutoRecoverPrompt: '继续',
+        maxStallRecoveriesPerTask: 3
+      }),
+      [D.STATS_KEY]: D.createEmptyStats(D.getTodayKey(new Date(clock)))
+    };
+
+    const contentEnv = createEnv(GEMINI_ORIGIN + '/app/e2e-stall-dc');
+    contentEnv.doc.hidden = true;
+    contentEnv.doc._focused = false;
+    contentEnv.win.innerWidth = 1280;
+    contentEnv.win.innerHeight = 800;
+
+    const swListeners = { onConnect: [], onMessage: [], onAlarm: [], onStorage: [] };
+    const tabListeners = { onMessage: [], onStorage: [] };
+    const clone = (o) => JSON.parse(JSON.stringify(o));
+
+    const swChrome = {
+      runtime: {
+        id: 'e2e-stall-id',
+        lastError: null,
+        getPlatformInfo(cb) { if (cb) cb({ os: 'win' }); },
+        onConnect: { addListener(fn) { swListeners.onConnect.push(fn); } },
+        onMessage: { addListener(fn) { swListeners.onMessage.push(fn); } },
+        onInstalled: { addListener() {} },
+        onStartup: { addListener() {} }
+      },
+      storage: {
+        local: {
+          get(_k, cb) { cb(clone(storageData)); },
+          set(obj, cb) { Object.assign(storageData, clone(obj)); if (cb) cb(); }
+        },
+        onChanged: { addListener(fn) { swListeners.onStorage.push(fn); } }
+      },
+      tabs: {
+        update(_id, _p, cb) { if (cb) cb(); },
+        query(_q, cb) { cb([{ id: 301, url: contentEnv.win.location.href, discarded: false }]); },
+        sendMessage(_tabId, msg, cb) {
+          let responded = false;
+          for (const fn of tabListeners.onMessage) {
+            fn(msg, {}, (resp) => { responded = true; if (cb) cb(resp); });
+          }
+          if (!responded && cb) cb();
+        },
+        onUpdated: { addListener() {} },
+        onRemoved: { addListener() {} },
+        onActivated: { addListener() {} }
+      },
+      windows: { onFocusChanged: { addListener() {} } },
+      alarms: { create() {}, clear() {}, onAlarm: { addListener(fn) { swListeners.onAlarm.push(fn); } } },
+      notifications: { create() {}, clear() {}, onClicked: { addListener() {} } },
+      action: { setBadgeText() {}, setBadgeBackgroundColor() {} }
+    };
+
+    const bg = createBackgroundController(
+      swChrome,
+      {
+        setInterval(fn) { swIntervalFn = fn; return 1; },
+        clearInterval() { swIntervalFn = null; },
+        setTimeout(fn, delay) {
+          const id = timerSeq++;
+          swTimers.set(id, { fn, dueAt: clock + delay });
+          return id;
+        },
+        clearTimeout(id) { swTimers.delete(id); }
+      },
+      () => clock
+    );
+    bg.init();
+
+    const tabChrome = {
+      runtime: {
+        id: 'e2e-stall-id',
+        lastError: null,
+        connect(opts) {
+          const cMsg = [];
+          const cDisc = [];
+          const sMsg = [];
+          const sDisc = [];
+          let closed = false;
+          const clientPort = {
+            name: opts.name,
+            postMessage(m) { if (closed) throw new Error('closed'); for (const fn of sMsg.slice()) fn(m); },
+            disconnect() { if (closed) return; closed = true; for (const fn of sDisc.slice()) fn(); },
+            onMessage: { addListener(fn) { cMsg.push(fn); } },
+            onDisconnect: { addListener(fn) { cDisc.push(fn); } }
+          };
+          const serverPort = {
+            name: opts.name,
+            sender: { tab: { id: 301 } },
+            postMessage(m) { if (closed) throw new Error('closed'); for (const fn of cMsg.slice()) fn(m); },
+            disconnect() { if (closed) return; closed = true; for (const fn of cDisc.slice()) fn(); },
+            onMessage: { addListener(fn) { sMsg.push(fn); } },
+            onDisconnect: { addListener(fn) { sDisc.push(fn); } }
+          };
+          for (const fn of swListeners.onConnect) fn(serverPort);
+          return clientPort;
+        },
+        sendMessage(msg, cb) {
+          for (const fn of swListeners.onMessage) {
+            fn(msg, { tab: { id: 301 } }, (resp) => { if (cb) cb(resp); });
+          }
+        },
+        onMessage: { addListener(fn) { tabListeners.onMessage.push(fn); } }
+      },
+      storage: {
+        local: {
+          get(_k, cb) { cb(clone(storageData)); },
+          set(obj, cb) { Object.assign(storageData, clone(obj)); if (cb) cb(); }
+        },
+        onChanged: { addListener(fn) { tabListeners.onStorage.push(fn); } }
+      }
+    };
+
+    const FakeDate = class extends Date {
+      constructor(...args) { super(...(args.length === 0 ? [clock] : args)); }
+      static now() { return clock; }
+    };
+
+    const sandbox = {
+      window: contentEnv.win,
+      document: contentEnv.doc,
+      localStorage: contentEnv.localStorageMock,
+      chrome: tabChrome,
+      Date: FakeDate,
+      MutationObserver: class { observe() {} disconnect() {} },
+      setTimeout: (fn, delay) => {
+        const id = timerSeq++;
+        tabTimers.set(id, { fn, dueAt: clock + (delay || 0) });
+        return id;
+      },
+      clearTimeout: (id) => { tabTimers.delete(id); },
+      setInterval: (fn) => { tabHeartbeatFn = fn; return 1; },
+      clearInterval: () => { tabHeartbeatFn = null; },
+      WeakSet,
+      Set,
+      Map,
+      URL,
+      console
+    };
+    sandbox.globalThis = sandbox;
+    sandbox.self = sandbox;
+
+    for (const rel of ['defaults.js', 'hud.js', 'content.js']) {
+      vm.runInNewContext(fs.readFileSync(path.join(ROOT, rel), 'utf8'), sandbox, { filename: rel });
+    }
+
+    const flushTimers = (ms) => {
+      clock += ms;
+      for (const [id, entry] of Array.from(swTimers.entries())) {
+        if (entry.dueAt <= clock) { swTimers.delete(id); entry.fn(); }
+      }
+      for (const [id, entry] of Array.from(tabTimers.entries())) {
+        if (entry.dueAt <= clock) { tabTimers.delete(id); entry.fn(); }
+      }
+    };
+
+    // Build realistic Gemini page with Desktop Commander connecting, Stop button, Quill editor, Send button
+    const connSpan = contentEnv.doc.createElement('span', { text: '正在连接 Desktop Commander (5s)...' });
+    addTurn(contentEnv.doc, '', [connSpan]);
+
+    const mountStopBtn = () => {
+      const b = contentEnv.doc.createElement('button', {
+        className: 'send-button stop',
+        attrs: { 'aria-label': '停止回复' }
+      });
+      b.addEventListener('click', () => { b.remove(); connSpan.remove(); });
+      contentEnv.doc.body.appendChild(b);
+      return b;
+    };
+
+    const richTextarea = contentEnv.doc.createElement('rich-textarea');
+    const editor = contentEnv.doc.createElement('div', {
+      className: 'ql-editor ql-blank',
+      attrs: { contenteditable: 'true', role: 'textbox', 'aria-label': '输入提示' }
+    });
+    richTextarea.appendChild(editor);
+    contentEnv.doc.body.appendChild(richTextarea);
+
+    const sendBtn = contentEnv.doc.createElement('button', {
+      className: 'send-button',
+      attrs: { 'aria-label': '发送消息' },
+      disabled: true
+    });
+    editor.addEventListener('input', () => { sendBtn.disabled = false; });
+    sendBtn.addEventListener('click', () => { editor.textContent = ''; sendBtn.disabled = true; });
+    contentEnv.doc.body.appendChild(sendBtn);
+
+    // Scenario A: Hidden background tab stuck on Desktop Commander for 5 minutes -> SW drives full Stop -> Fill "继续" -> Send!
+    const stopBtn1 = mountStopBtn();
+    swIntervalFn(); // t = 0: starts tracking
+    clock += 2 * 60 * 1000 + 30 * 1000; // t = 2m30s
+    swIntervalFn();
+    const hudEl = contentEnv.doc.getElementById('gmah-hud');
+    assert.ok(hudEl, 'HUD must be mounted');
+    const waitBar = hudEl.querySelector('.gmah-wait-bar');
+    assert.ok(waitBar && waitBar.textContent.includes('2分30秒'), `HUD wait bar must show 2分30秒, got: "${waitBar && waitBar.textContent}"`);
+    assert.ok(waitBar.textContent.includes('Desktop Commander'));
+    assert.strictEqual(stopBtn1.clickCount, 0);
+
+    clock += 2 * 60 * 1000 + 30 * 1000; // t = 5m00s
+    swIntervalFn();
+    assert.strictEqual(stopBtn1.clickCount, 1, 'SW heartbeat at 5m00s must click Stop');
+    assert.deepStrictEqual(bg.getScheduledTickTabIds(), [301], 'Must schedule SW follow-up tick after Stop');
+
+    // Step through human-paced recovery in 250ms ticks: must NOT rush Send within 1.5s, must finish cleanly within 7s
+    const pumpTimers = (totalMs, stepMs) => {
+      const steps = Math.ceil(totalMs / stepMs);
+      for (let i = 0; i < steps; i++) {
+        flushTimers(stepMs);
+      }
+    };
+
+    pumpTimers(1500, 250);
+    assert.strictEqual(sendBtn.clickCount, 0, 'Human pacing must NOT rush Send immediately after Stop');
+
+    pumpTimers(5500, 250);
+    assert.strictEqual(sendBtn.clickCount, 1, 'SW human-paced ticks must complete Stop -> Type -> Pause -> Send');
+    assert.strictEqual(waitBar.style.display, 'none', 'Wait bar must hide after recovery completes');
+
+    // Scenario B: Foreground tab stuck for 10 seconds -> user clicks HUD "立即续接" button -> Stop -> human-paced Type -> Send!
+    contentEnv.doc.hidden = false;
+    contentEnv.doc._focused = true;
+    const stopBtn2 = mountStopBtn();
+    clock += 10 * 1000;
+    tabHeartbeatFn();
+    assert.strictEqual(stopBtn2.clickCount, 0);
+
+    const forceBtn = hudEl.querySelector('.gmah-pill-action');
+    assert.ok(forceBtn && forceBtn.textContent === '立即续接');
+    forceBtn.click();
+    assert.strictEqual(stopBtn2.clickCount, 1, 'Clicking HUD "立即续接" must click Stop immediately');
+
+    pumpTimers(1000, 200);
+    assert.strictEqual(sendBtn.clickCount, 1, 'Manual "立即续接" must also respect human anti-throttle pacing before Send');
+
+    pumpTimers(5000, 200);
+    assert.strictEqual(sendBtn.clickCount, 2, 'Clicking HUD "立即续接" must complete human-paced typing and auto-send "继续"');
+  });
+
+  // 10. Background tab frozen leave-animation spinner & noisy status mutations must NOT block Auto-Continue until tab focus
+  test('v1.0 background tab unblocks frozen leave-animation spinner without Stop button and ignores noisy status mutations', () => {
+    const { doc, win } = createEnv(GEMINI_ORIGIN + '/app/bg-frozen-spinner');
+    let now = 800000;
+    doc.hidden = true;
+    win.innerWidth = 1920; // Background tab in normal (non-minimized) window!
+    win.innerHeight = 1080;
+
+    // Gemini finished streaming: Stop button is GONE and "继续" button is mounted,
+    // BUT Chrome paused the CSS fade-out on mat-progress-spinner (opacity: 1, 24x24 rect)!
+    const frozenSpinner = doc.createElement('mat-progress-spinner', {
+      rect: { width: 24, height: 24 },
+      style: { opacity: '1' }
+    });
+    const statusTimer = doc.createElement('div', {
+      attrs: { role: 'status' },
+      text: '已连接 (5s)'
+    });
+    doc.body.appendChild(frozenSpinner);
+    doc.body.appendChild(statusTimer);
+
+    const contBtn = doc.createElement('button', { text: '继续' });
+    addTurn(doc, '本轮代码重构已完成，点击继续进入下一阶段。', [contBtn]);
+
+    // Noisy status/spinner elements must be ignored by isNoisyMutationTarget
+    assert.strictEqual(isNoisyMutationTarget(frozenSpinner), true);
+    assert.strictEqual(isNoisyMutationTarget(statusTimer), true);
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      settings: { idleSettleMs: 1800 }
+    });
+
+    // t = 0: brief grace wait, and MUST return retryInMs > 0 so SW wakes tab automatically
+    const r0 = engine.scanOnce();
+    assert.strictEqual(r0.action, 'wait');
+    assert.strictEqual(r0.reason, 'generating');
+    assert.ok(r0.retryInMs >= 2000, `Expected SW retryInMs >= 2000, got ${r0.retryInMs}`);
+    assert.strictEqual(contBtn.clickCount, 0);
+
+    // t + 2300ms (still hidden in background tab!): frozen spinner unblocks and Auto-Continue clicks!
+    now += 2300;
+    const r1 = engine.scanOnce();
+    assert.strictEqual(r1.action, 'clicked_continue', 'Auto-Continue must click in background tab without waiting for user focus');
+    assert.strictEqual(contBtn.clickCount, 1);
+
+    // Contrast: when a REAL Stop button IS present in background tab, NEVER click Continue even after 10s
+    const stopBtn = doc.createElement('button', { className: 'send-button stop', attrs: { 'aria-label': '停止回复' } });
+    doc.body.appendChild(stopBtn);
+    const contBtn2 = doc.createElement('button', { text: '继续' });
+    addTurn(doc, '新一轮正在流式输出中...', [contBtn2]);
+
+    now += 5000;
+    assert.strictEqual(engine.scanOnce().reason, 'generating');
+    now += 10000;
+    assert.strictEqual(engine.scanOnce().reason, 'generating');
+    assert.strictEqual(contBtn2.clickCount, 0, 'Active Stop button must ALWAYS block Continue in background');
+  });
+
+  // 11. Multi-layer background recovery: late thaw retries (attempts 3-4 + Enter), zombie port force-rotate, and Web Lock shield
+  test('v1.0 background multi-layer hardening: late thaw retries, zombie port force-recovery, and Web Lock anti-freeze shield', () => {
+    // Part A: Late background thaw retries (attempts 3 & 4 after 12s & 15s) when hidden tab was briefly throttled
+    const { doc, win } = createEnv(GEMINI_ORIGIN + '/app/bg-late-retry');
+    let now = 100000;
+    doc.hidden = true;
+
+    const stubbornAllow = doc.createElement('button', { text: '始终允许' });
+    doc.body.appendChild(stubbornAllow);
+    const engine = new GmahEngine({ doc, win, now: () => now });
+
+    assert.strictEqual(engine.scanOnce().action, 'clicked_allow');
+    assert.strictEqual(stubbornAllow.clickCount, 1);
+
+    // Attempt 2 after 2.5s
+    now += 2600;
+    const r2 = engine.scanOnce();
+    assert.strictEqual(r2.action, 'retried_allow');
+    assert.strictEqual(r2.attempt, 2);
+    assert.strictEqual(stubbornAllow.clickCount, 2);
+
+    // At +5s: still resting (doesn't spam)
+    now += 5000;
+    assert.strictEqual(engine.scanOnce().action, 'noop');
+
+    // Attempt 3 (late thaw retry) after 12s since attempt 2 -> clicks AND sends Enter key fallback!
+    now += 7500; // total 12.5s since attempt 2
+    const r3 = engine.scanOnce();
+    assert.strictEqual(r3.action, 'retried_allow');
+    assert.strictEqual(r3.attempt, 3);
+    assert.strictEqual(stubbornAllow.clickCount, 3);
+    assert.ok(
+      stubbornAllow.dispatchedEvents.some((ev) => ev && (ev === 'keydown' || ev.type === 'keydown')),
+      'Attempt 3 must dispatch Enter key activation'
+    );
+    assert.strictEqual(engine.stats.allowCount, 1, 'Retries must NEVER double-count stats');
+
+    // Attempt 4 after 15s -> final retry, then stops cleanly
+    now += 15500;
+    const r4 = engine.scanOnce();
+    assert.strictEqual(r4.action, 'retried_allow');
+    assert.strictEqual(r4.attempt, 4);
+
+    now += 30000;
+    assert.strictEqual(engine.scanOnce().action, 'noop', 'Must stop after MAX_BG_HIDDEN_ATTEMPTS (4)');
+
+    // Part B: VM sandbox test of Zombie-Port force-recovery + Web Lock anti-freeze shield
+    let lockAcquired = 0;
+    let lockReleased = 0;
+    let portConnectCount = 0;
+    let portDisconnectCount = 0;
+    const tabMsgListeners = [];
+
+    const env = createEnv(GEMINI_ORIGIN + '/app/bg-zombie-lock');
+    env.doc.hidden = true;
+    env.doc._focused = false;
+    const fakeNav = {
+      locks: {
+        request(_name, opts, cb) {
+          assert.strictEqual(opts.mode, 'shared');
+          lockAcquired += 1;
+          const p = cb();
+          if (p && typeof p.then === 'function') {
+            p.then(() => { lockReleased += 1; });
+          }
+          return Promise.resolve();
+        }
+      }
+    };
+    env.win.navigator = fakeNav;
+
+    const chromeMock = {
+      runtime: {
+        id: 'zombie-lock-test',
+        lastError: null,
+        connect() {
+          portConnectCount += 1;
+          return {
+            postMessage() {},
+            disconnect() { portDisconnectCount += 1; },
+            onMessage: { addListener() {} },
+            onDisconnect: { addListener() {} }
+          };
+        },
+        sendMessage(_m, cb) { if (cb) cb({ ok: true }); },
+        onMessage: { addListener(fn) { tabMsgListeners.push(fn); } }
+      },
+      storage: {
+        local: {
+          get(_k, cb) { cb({ [D.STORAGE_KEY]: D.mergeSettings({ enabled: true, backgroundMode: true }) }); },
+          set(_o, cb) { if (cb) cb(); }
+        },
+        onChanged: { addListener() {} }
+      }
+    };
+
+    const sandbox = {
+      window: env.win,
+      document: env.doc,
+      navigator: fakeNav,
+      localStorage: env.localStorageMock,
+      chrome: chromeMock,
+      Date,
+      MutationObserver: class { observe() {} disconnect() {} },
+      setTimeout: () => 1,
+      clearTimeout: () => {},
+      setInterval: () => 1,
+      clearInterval: () => {},
+      WeakSet,
+      Set,
+      Map,
+      URL,
+      console
+    };
+    sandbox.globalThis = sandbox;
+    sandbox.self = sandbox;
+    for (const rel of ['defaults.js', 'hud.js', 'content.js']) {
+      vm.runInNewContext(fs.readFileSync(path.join(ROOT, rel), 'utf8'), sandbox, { filename: rel });
+    }
+
+    assert.strictEqual(lockAcquired, 1, 'Must acquire shared Web Lock shield when backgroundMode is ON');
+    assert.strictEqual(portConnectCount, 1);
+
+    // Simulate zombie-port watchdog sending GMAH_BG_TICK (source: 'pong_recovery') via tabs.sendMessage
+    const allowBtn = env.doc.createElement('button', { text: '始终允许' });
+    env.doc.body.appendChild(allowBtn);
+    let resp = null;
+    for (const fn of tabMsgListeners) {
+      fn({ type: 'GMAH_BG_TICK', source: 'pong_recovery' }, {}, (r) => { resp = r; });
+    }
+    assert.strictEqual(portDisconnectCount, 1, 'pong_recovery must force-disconnect the stale zombie port');
+    assert.strictEqual(portConnectCount, 2, 'pong_recovery must open a fresh background port');
+    assert.strictEqual(allowBtn.clickCount, 1, 'pong_recovery tick must immediately click Allow in hidden tab');
+    assert.ok(resp && resp.ok);
+
+    // Turning backgroundMode OFF releases Web Lock cleanly
+    for (const fn of tabMsgListeners) {
+      fn({ type: 'GMAH_APPLY_SETTINGS', settings: { backgroundMode: false } }, {}, () => {});
+    }
+    assert.strictEqual(lockAcquired, 1);
+  });
 }
 
 module.exports = { runTests };

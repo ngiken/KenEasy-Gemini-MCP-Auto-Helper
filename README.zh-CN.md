@@ -4,7 +4,7 @@
   <h1>KenEasy Gemini MCP Auto Helper</h1>
 
   <p>
-    专为 <b>Google Gemini</b> 网页端打造的 MCP 工具自动化辅助与智能连续交互扩展：自动点击「始终允许」权限、智能点击「继续 / Yes」追问芯片，支持<b>简体中文 / 繁體中文 / English / 日本語</b>四语言实时切换与<b>黑白深浅双模式</b>、修复按住拖拽悬浮窗、多浏览器与非对话页防误触护卫，内置 6 层防刷额度熔断保护。
+    专为 <b>Google Gemini</b> 网页端打造的 MCP 工具自动化放行与连续对话扩展（<b>v1.0.0 正式版</b>）：自动点击「始终允许」权限与「继续 / Yes」追问芯片，配备<b>连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、一键立即续接、拟人防降速节流</b>及<b>MV3 永不断线后台保活引擎与智能点击重试</b>，支持<b>简体中文 / 繁體中文 / English / 日本語</b>四语言实时切换、<b>黑白深浅双模式</b>、零飞角按住拖拽悬浮窗、超时桌面通知及 6 层防刷额度熔断保护。
   </p>
 
   <p>
@@ -16,18 +16,18 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v0.3_Beta-3b82f6?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v1.0.0-16a34a?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
   </p>
 </div>
 
-> [!WARNING]
-> ### ⚠️ Beta 版本说明 (v0.3 Beta Preview)
-> 本扩展目前处于 **公开测试 Beta 阶段（v0.3 Beta）**。
-> 核心自动化引擎、MV3 永不断线后台保活与智能点击重试、6 层防刷熔断器、按住拖拽 HUD、多语言与黑白模式、多浏览器防误触守卫及桌面通知均已通过 64 项自动化与端到端沙盒测试验证（64/64）。由于 Google Gemini 网页端（`gemini.google.com`）界面与 Material Web Components 组件会不定期更新，可能存在偶发交互变动：
-> - 若在使用中遇到未识别的新型确认弹窗、或误触发跳过，欢迎随时在设置面板的「自定义匹配词」中补充关键词，并前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 提交反馈与截图。
+> [!NOTE]
+> ### ✅ v1.0.0 正式发布版
+> **KenEasy Gemini MCP Auto Helper v1.0.0** 现已正式发布！
+> 核心自动化引擎、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、一键立即续接、拟人防降速节流、MV3 永不断线后台保活、6 层防刷熔断器、按住拖拽 HUD、4 语言黑白双模式及桌面通知均已通过全部自动化与端到端沙盒测试验证。
+> - 如遇到 Gemini 页面新弹窗或想补充自定义续接话术，可直接在设置面板中自定义，或前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 反馈。
 > - 欢迎各位开发者 Star 🌟 与提交 PR，共同完善 Gemini 网页端自动化生态！
 
 ---
@@ -44,8 +44,8 @@
 
 直接点击下方任意一个下载链接即可**一键自动下载 `.zip` 安装包**：
 
-- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.3.0/KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
-- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v0.3.0/KenEasy-Gemini-MCP-Auto-Helper-v0.3.0-store.zip)**（解压即根目录 `manifest.json`）
+- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.0/KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
+- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.0/KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-store.zip)**（解压即根目录 `manifest.json`）
 
 安装步骤：
 1. 点击上方链接下载 `.zip` 压缩包并解压到本地目录（例如 `E:\code\KenEasy-Gemini-MCP-Auto-Helper`）。
@@ -59,9 +59,12 @@
 
 ---
 
-## 🎬 核心功能实操演示（v0.3 重点升级）
+## 🎬 核心功能实操演示（v1.0.0 重点升级）
 
-### 1. 按住拖拽悬浮窗 · 修复悬停粘连与折叠响应 🆕
+### 0. 连接卡死实时计时、超时自动续接、一键立即续接 & 拟人防降速节流 🆕
+> 悬浮窗与弹窗实时显示 MCP（如 Desktop Commander）或 Gemini 连接/等待耗时；一旦超过设定阈值（默认 5 分钟），自动终止卡死回合、保护用户未发送草稿，并自动填入发送自定义续接话术（默认「继续，刚才mcp连接断开了」）。同时提供**一键「立即续接」**按钮，以及**拟人防降速节流**（自然随机停顿、分段输入、安全偏移点击与 60 秒防突发节流）。
+
+### 1. 按住拖拽悬浮窗 · 修复悬停粘连与折叠响应
 > 严格左键按住标题栏才启动拖动——鼠标仅仅悬停或经过标题栏时绝不粘连跟随！超过 4px 拖动阈值后才触发指针捕获，标题栏的折叠/主题/语言按钮独立响应无干扰，离开窗口释放自动落位，并在 Popup 面板支持一键「复位悬浮窗」。
 
 <div align="center">
@@ -170,20 +173,20 @@ popup.js, popup.html, popup.css
 
 ---
 
-## ❓ 常见问题与排查指南 (FAQ)
+## ❓ 常见问题与排查指南
 
 <details>
 <summary><b>Q1: 为什么打开 Gemini 后看不到悬浮窗？</b></summary>
 
-1. 确认当前访问的 URL 是否以 `https://gemini.google.com/` 开头；
-2. 点击右上角扩展图标打开 Popup 面板，确认总开关与「在 Gemini 页面显示右下角悬浮窗」均处于开启状态；
-3. 若之前曾将悬浮窗拖出屏幕边缘，可点击 Popup 中的「保存设置」或刷新页面，悬浮窗将自适应复位到视口内。
+1. 确认当前访问的地址是否位于 `gemini.google.com`；
+2. 点击右上角扩展图标打开设置弹窗，确认总开关与「在 Gemini 页面显示悬浮窗」均处于开启状态；
+3. 若之前曾将悬浮窗拖至边缘或屏幕外，可点击设置弹窗中的 **「复位悬浮窗」** 按钮，将其立即归位到右下角默认位置。
 </details>
 
 <details>
-<summary><b>Q2: 自由拖拽悬浮窗刷新后位置会保留吗？</b></summary>
+<summary><b>Q2: 自由拖拽悬浮窗刷新或最小化后位置会保留吗？</b></summary>
 
-会。悬浮窗落位后会自动将当前 `(left, top)` 坐标持久化保存到浏览器的本地存储中，无论刷新页面、切换对话还是重启浏览器，悬浮窗都会准确出现在您上次安放的位置。
+会。悬浮窗落位后会自动将当前 `(left, top)` 坐标同步保存到 `chrome.storage.local` 与 `localStorage` 中，无论刷新页面、切换对话、最小化还原还是重启浏览器，悬浮窗都会准确保持在您上次安放的位置。
 </details>
 
 <details>
@@ -209,6 +212,12 @@ popup.js, popup.html, popup.css
 ---
 
 ## 📝 更新记录
+
+### v1.0.0 正式版 - 2026-11-23
+- **连接卡死自动终止与自定义续接**：超过设定阈值（默认 5 分钟）自动终止卡死的 MCP/Gemini 回合，保护用户草稿并发送可自定义续接话术（默认「继续，刚才mcp连接断开了」），支持单任务最大恢复次数上限。
+- **实时等待计时与一键「立即续接」**：HUD 与弹窗实时显示当前连接/等待耗时，并新增一键「立即续接」按钮，无需干等超时即可立即恢复对话。
+- **拟人防降速节流**：内置随机停顿缓冲、分段打字输入、悬停偏移点击与 60 秒滚动防突发节流，避免高频触发风控降速。
+- **熔断桌面通知接线与后台防冻结加固**：完整接通安全熔断角标与桌面通知（点击直达对应标签页）、新增 Web Lock 防冻结护盾与 8 秒僵尸端口快恢复，自动化测试扩展至 **76/76 全通过**。
 
 ### [v0.3.0 (v0.3 Beta)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v0.3.0) - 2026-11-22
 - **MV3 永不断线后台引擎**：新增 ~19.5 秒 Service Worker 保活、4 分钟无感 Port 轮换、不受后台定时器限速的 SW 延迟停稳/冷却回拨（`GMAH_SCHEDULE_TICK`），以及切分页/切应用即时唤醒，彻底解决切去后台或其他应用后停止自动点击的问题。

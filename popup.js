@@ -73,8 +73,9 @@
       }, 2400);
     }
 
-    function renderSettings(settings) {
+    function renderSettings(settings, opts) {
       const s = D.mergeSettings(settings);
+      const preserveActiveInput = Boolean(opts && opts.preserveActiveInput);
       currentSettings = s;
       applyTheme(s.theme);
       applyI18n(s.language);
@@ -91,7 +92,9 @@
         'stopOnCompletionCues',
         'stopOnStagnantOutput',
         'stopOnQuotaOrError',
-        'stallAlertEnabled'
+        'humanPacingEnabled',
+        'stallAlertEnabled',
+        'stallAutoRecoverEnabled'
       ];
       for (const id of boolIds) {
         const el = byId(id);
@@ -100,7 +103,9 @@
 
       const setVal = (id, val) => {
         const el = byId(id);
-        if (el) el.value = String(val);
+        if (!el) return;
+        if (preserveActiveInput && d && d.activeElement === el) return;
+        el.value = String(val);
       };
       setVal('language', s.language);
       setVal('maxContinuesPerTask', s.maxContinuesPerTask);
@@ -108,6 +113,9 @@
       setVal('continueCooldownSec', Number((s.continueCooldownMs / 1000).toFixed(1)));
       setVal('idleSettleSec', Number((s.idleSettleMs / 1000).toFixed(1)));
       setVal('stallAlertMinutes', s.stallAlertMinutes);
+      setVal('stallAutoRecoverMinutes', s.stallAutoRecoverMinutes);
+      setVal('maxStallRecoveriesPerTask', s.maxStallRecoveriesPerTask);
+      setVal('stallAutoRecoverPrompt', s.stallAutoRecoverPrompt);
       setVal('customAlwaysAllowKeywords', (s.customAlwaysAllowKeywords || []).join('\n'));
       setVal('customContinueKeywords', (s.customContinueKeywords || []).join('\n'));
 
@@ -154,6 +162,13 @@
         liveEl.className = 'badge-warn';
       } else if (tabState.stallAlertActive) {
         liveEl.textContent = tr('liveStall');
+        liveEl.className = 'badge-warn';
+      } else if (tabState.stallElapsedMs >= 1000) {
+        const elapsed =
+          typeof D.formatWaitDuration === 'function'
+            ? D.formatWaitDuration(tabState.stallElapsedMs, currentSettings.language)
+            : `${Math.floor(tabState.stallElapsedMs / 1000)}s`;
+        liveEl.textContent = tr('liveWaiting', { elapsed });
         liveEl.className = 'badge-warn';
       } else {
         liveEl.textContent = tabState.settings.backgroundMode ? tr('liveBgReady') : tr('liveMonitoring');
@@ -202,8 +217,25 @@
           stopOnCompletionCues: getBool('stopOnCompletionCues', D.DEFAULT_SETTINGS.stopOnCompletionCues),
           stopOnStagnantOutput: getBool('stopOnStagnantOutput', D.DEFAULT_SETTINGS.stopOnStagnantOutput),
           stopOnQuotaOrError: getBool('stopOnQuotaOrError', D.DEFAULT_SETTINGS.stopOnQuotaOrError),
+          humanPacingEnabled: getBool('humanPacingEnabled', D.DEFAULT_SETTINGS.humanPacingEnabled),
           stallAlertEnabled: getBool('stallAlertEnabled', D.DEFAULT_SETTINGS.stallAlertEnabled),
           stallAlertMinutes: getNum('stallAlertMinutes', D.DEFAULT_SETTINGS.stallAlertMinutes),
+          stallAutoRecoverEnabled: getBool(
+            'stallAutoRecoverEnabled',
+            D.DEFAULT_SETTINGS.stallAutoRecoverEnabled
+          ),
+          stallAutoRecoverMinutes: getNum(
+            'stallAutoRecoverMinutes',
+            D.DEFAULT_SETTINGS.stallAutoRecoverMinutes
+          ),
+          maxStallRecoveriesPerTask: getNum(
+            'maxStallRecoveriesPerTask',
+            D.DEFAULT_SETTINGS.maxStallRecoveriesPerTask
+          ),
+          stallAutoRecoverPrompt:
+            byId('stallAutoRecoverPrompt')
+              ? getStr('stallAutoRecoverPrompt')
+              : currentSettings.stallAutoRecoverPrompt,
           customAlwaysAllowKeywords: D.parseKeywordInput(getStr('customAlwaysAllowKeywords')),
           customContinueKeywords: D.parseKeywordInput(getStr('customContinueKeywords'))
         })
@@ -330,13 +362,13 @@
       });
     }
 
-    function saveSettings(customSettings, msg) {
+    function saveSettings(customSettings, msg, opts) {
       if (autoSaveTimer) {
         clearTimeout(autoSaveTimer);
         autoSaveTimer = null;
       }
       const next = customSettings ? D.mergeSettings(customSettings) : readSettingsFromForm();
-      renderSettings(next);
+      renderSettings(next, opts);
       if (!next.stallAlertEnabled && api && api.runtime && typeof api.runtime.sendMessage === 'function') {
         try {
           api.runtime.sendMessage({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' }, () => {
@@ -367,7 +399,7 @@
       if (autoSaveTimer) clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(() => {
         autoSaveTimer = null;
-        saveSettings(null, tr('toastSynced'));
+        saveSettings(null, tr('toastSynced'), { preserveActiveInput: true });
       }, 450);
     }
 
@@ -443,7 +475,9 @@
         'stopOnCompletionCues',
         'stopOnStagnantOutput',
         'stopOnQuotaOrError',
-        'stallAlertEnabled'
+        'humanPacingEnabled',
+        'stallAlertEnabled',
+        'stallAutoRecoverEnabled'
       ];
       for (const id of autoSyncToggleIds) {
         const el = byId(id);
@@ -460,6 +494,9 @@
         'continueCooldownSec',
         'idleSettleSec',
         'stallAlertMinutes',
+        'stallAutoRecoverMinutes',
+        'maxStallRecoveriesPerTask',
+        'stallAutoRecoverPrompt',
         'customAlwaysAllowKeywords',
         'customContinueKeywords'
       ];
@@ -524,6 +561,22 @@
             renderLiveStatus(state, meta);
             if (state) {
               showToast(tr('toastEmergencySent'), true);
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast(tr('toastNeedsReload'), true);
+            } else {
+              showToast(tr('toastNoGeminiTab'), true);
+            }
+          });
+        });
+      }
+
+      const btnForceRecover = byId('btnForceRecover');
+      if (btnForceRecover) {
+        btnForceRecover.addEventListener('click', () => {
+          sendToGeminiTabs({ type: 'GMAH_FORCE_STALL_RECOVER' }, (state, meta) => {
+            renderLiveStatus(state, meta);
+            if (state) {
+              showToast(tr('toastForceRecoverSent'));
             } else if (meta && meta.reason === 'needs_reload') {
               showToast(tr('toastNeedsReload'), true);
             } else {

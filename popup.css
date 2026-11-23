@@ -77,7 +77,7 @@ body {
 
 .beta-notice {
   font-size: 10px;
-  color: #fbbc04;
+  color: #81c995;
   margin-top: 2px;
   font-weight: 500;
 }
@@ -266,6 +266,7 @@ body {
 }
 
 .field input[type="number"],
+.field input[type="text"],
 .field textarea {
   width: 100%;
   background: rgba(0, 0, 0, 0.35);
@@ -279,6 +280,7 @@ body {
 }
 
 .field input[type="number"]:focus,
+.field input[type="text"]:focus,
 .field textarea:focus {
   border-color: #8ab4f8;
 }
@@ -387,7 +389,7 @@ body.theme-light .badge-beta {
 }
 
 body.theme-light .beta-notice {
-  color: #b45309;
+  color: #15803d;
 }
 
 body.theme-light .appearance-bar,
@@ -400,6 +402,7 @@ body.theme-light .card {
 
 body.theme-light .select-lang,
 body.theme-light .field input[type="number"],
+body.theme-light .field input[type="text"],
 body.theme-light .field textarea {
   background: #f8fafc;
   border-color: rgba(15, 23, 42, 0.16);
@@ -408,6 +411,7 @@ body.theme-light .field textarea {
 
 body.theme-light .select-lang:focus,
 body.theme-light .field input[type="number"]:focus,
+body.theme-light .field input[type="text"]:focus,
 body.theme-light .field textarea:focus {
   border-color: #2563eb;
 }

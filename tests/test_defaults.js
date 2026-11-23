@@ -177,6 +177,45 @@ function runTests(test) {
     assert.strictEqual(D.mergeSettings({ stallAlertMinutes: 100 }).stallAlertMinutes, 60);
   });
 
+  test('stall auto-recovery settings are validated, clamped, sanitized, and migrated cleanly in mergeSettings', () => {
+    assert.strictEqual(D.DEFAULT_SETTINGS.stallAutoRecoverEnabled, true);
+    assert.strictEqual(D.DEFAULT_SETTINGS.stallAutoRecoverMinutes, 5);
+    assert.strictEqual(D.DEFAULT_SETTINGS.stallAutoRecoverPrompt, '继续，刚才mcp连接断开了');
+    assert.strictEqual(D.DEFAULT_SETTINGS.maxStallRecoveriesPerTask, 3);
+    assert.strictEqual(D.DEFAULT_SETTINGS.humanPacingEnabled, true);
+
+    const custom = D.mergeSettings({
+      stallAutoRecoverEnabled: false,
+      stallAutoRecoverMinutes: 8,
+      stallAutoRecoverPrompt: '  continue please\nnow  ',
+      maxStallRecoveriesPerTask: 5,
+      humanPacingEnabled: false
+    });
+    assert.strictEqual(custom.stallAutoRecoverEnabled, false);
+    assert.strictEqual(custom.stallAutoRecoverMinutes, 8);
+    assert.strictEqual(custom.stallAutoRecoverPrompt, 'continue please now');
+    assert.strictEqual(custom.maxStallRecoveriesPerTask, 5);
+    assert.strictEqual(custom.humanPacingEnabled, false);
+
+    // Clamping & empty fallback & 200-char limit
+    assert.strictEqual(D.mergeSettings({ stallAutoRecoverMinutes: 0 }).stallAutoRecoverMinutes, 1);
+    assert.strictEqual(D.mergeSettings({ stallAutoRecoverMinutes: 999 }).stallAutoRecoverMinutes, 60);
+    assert.strictEqual(D.mergeSettings({ maxStallRecoveriesPerTask: 0 }).maxStallRecoveriesPerTask, 1);
+    assert.strictEqual(D.mergeSettings({ maxStallRecoveriesPerTask: 99 }).maxStallRecoveriesPerTask, 20);
+    assert.strictEqual(D.mergeSettings({ stallAutoRecoverPrompt: '   ' }).stallAutoRecoverPrompt, '继续，刚才mcp连接断开了');
+    assert.strictEqual(D.mergeSettings({ stallAutoRecoverPrompt: 'a'.repeat(260) }).stallAutoRecoverPrompt.length, 200);
+
+    // v4 -> v5 migration updates old default '继续' to '继续，刚才mcp连接断开了', while preserving custom prompts
+    const migOldDefault = D.migrateStoredSettings({ settingsVersion: 4, stallAutoRecoverPrompt: '继续' });
+    assert.strictEqual(migOldDefault.migrated, true);
+    assert.strictEqual(migOldDefault.settings.settingsVersion, D.SETTINGS_VERSION);
+    assert.strictEqual(migOldDefault.settings.stallAutoRecoverPrompt, '继续，刚才mcp连接断开了');
+
+    const migCustom = D.migrateStoredSettings({ settingsVersion: 4, stallAutoRecoverPrompt: '请继续刚才的构建' });
+    assert.strictEqual(migCustom.migrated, true);
+    assert.strictEqual(migCustom.settings.stallAutoRecoverPrompt, '请继续刚才的构建');
+  });
+
   test('multi-language i18n, theme validation, and Japanese/Cantonese keywords work properly', () => {
     const def = D.mergeSettings(null);
     assert.strictEqual(def.language, 'zh-CN');
@@ -205,6 +244,12 @@ function runTests(test) {
     assert.strictEqual(D.t('ja', 'hudTitle'), 'MCP ヘルパー');
     assert.strictEqual(D.t('zh-TW', 'btnEmergency'), '緊急停止');
     assert.ok(D.t('en', 'bgNotifStallTitle', { mins: 7 }).includes('7'));
+
+    assert.strictEqual(D.formatWaitDuration(45000, 'zh-CN'), '45秒');
+    assert.strictEqual(D.formatWaitDuration(135000, 'zh-CN'), '2分15秒');
+    assert.strictEqual(D.formatWaitDuration(305000, 'en'), '5m 05s');
+    assert.strictEqual(D.formatWaitDuration(42000, 'en'), '42s');
+    assert.strictEqual(D.formatWaitDuration(125000, 'ja'), '2分05秒');
   });
 }
 

@@ -16,8 +16,10 @@
   const STORAGE_KEY = 'gmah_settings_v1';
   const HEARTBEAT_INTERVAL_MS = 1500;
   const KEEPALIVE_EVERY_N_TICKS = 13; // ~19.5s: resets Chrome MV3 30s SW idle timer
-  const RESYNC_EVERY_N_TICKS = 10; // ~15s: rediscovers any unattached Gemini tabs
+  const RESYNC_EVERY_N_TICKS = 6; // ~9s: rediscovers & wakes any unattached background Gemini tabs
   const PORT_ROTATE_MS = 4 * 60 * 1000; // Rotate long-lived MV3 port before Chrome's 5-min hard disconnect
+  const PONG_TIMEOUT_MS = 8 * 1000; // Fast 8s zombie-port watchdog so background tabs never stall
+  const PONG_RECOVERY_COOLDOWN_MS = 5 * 1000;
   const MIN_SCHEDULED_TICK_MS = 150;
   const MAX_SCHEDULED_TICK_MS = 30000;
 
@@ -186,7 +188,17 @@
               // pingTab already probes via port or sendMessage and falls back to injectIntoTab if missing
               pingTab(tab.id, 'alarm');
             } else if (autoInject && !ports.has(tab.id)) {
-              ensureTabInjected(tab.id);
+              if (
+                settings.enabled &&
+                settings.backgroundMode &&
+                api.tabs &&
+                typeof api.tabs.sendMessage === 'function'
+              ) {
+                // Wake unattached background tab via tabs.sendMessage (also auto-injects if missing)
+                pingTab(tab.id, 'resync');
+              } else {
+                ensureTabInjected(tab.id);
+              }
             }
           }
         });
@@ -309,9 +321,35 @@
           meta.rotateSent = true;
           try {
             port.postMessage({ type: 'GMAH_ROTATE_PORT', ts: now });
+            continue;
           } catch (_) {
             ports.delete(tabId);
             portMeta.delete(tabId);
+          }
+        }
+        // Zombie-port watchdog: if tab hasn't returned PONG in >= 20s, poke via tabs.sendMessage
+        if (
+          meta &&
+          now - meta.lastPongAt >= PONG_TIMEOUT_MS &&
+          (!meta.lastRecoveryAt || now - meta.lastRecoveryAt >= PONG_RECOVERY_COOLDOWN_MS)
+        ) {
+          meta.lastRecoveryAt = now;
+          if (api && api.tabs && typeof api.tabs.sendMessage === 'function') {
+            try {
+              const res = api.tabs.sendMessage(
+                tabId,
+                { type: 'GMAH_BG_TICK', source: 'pong_recovery', ts: now },
+                () => {
+                  const hadErr = Boolean(api.runtime && api.runtime.lastError);
+                  if (hadErr) {
+                    injectIntoTab(tabId, (ok) => {
+                      if (ok) pingTab(tabId, 'post_inject');
+                    });
+                  }
+                }
+              );
+              if (res && typeof res.catch === 'function') res.catch(() => {});
+            } catch (_) {}
           }
         }
         pingTab(tabId, 'heartbeat');
@@ -359,9 +397,11 @@
     }
 
     const STALL_NOTIF_PREFIX = 'gmah_stall_';
+    const BREAKER_NOTIF_PREFIX = 'gmah_breaker_';
     const notifTabMap = new Map(); // notificationId -> tabId
+    const breakerBadgeMap = new Map(); // tabId -> { text, color }
 
-    function setTabBadge(tabId, text) {
+    function setTabBadge(tabId, text, bgColor) {
       if (!api || !api.action || typeof api.action.setBadgeText !== 'function') return;
       if (typeof tabId !== 'number') return;
       try {
@@ -370,7 +410,7 @@
         });
         if (res && typeof res.catch === 'function') res.catch(() => {});
         if (text && typeof api.action.setBadgeBackgroundColor === 'function') {
-          const colorRes = api.action.setBadgeBackgroundColor({ tabId, color: '#ea4335' }, () => {
+          const colorRes = api.action.setBadgeBackgroundColor({ tabId, color: bgColor || '#ea4335' }, () => {
             void (api.runtime && api.runtime.lastError);
           });
           if (colorRes && typeof colorRes.catch === 'function') colorRes.catch(() => {});
@@ -380,12 +420,90 @@
       }
     }
 
+    function showBreakerAlert(tabId, payload) {
+      if (typeof tabId !== 'number') return;
+      const reasonCode = (payload && payload.reasonCode) || 'breaker';
+      const reason = (payload && payload.reason) || '';
+      const isEmergency = reasonCode === 'emergency_stop';
+      const badgeText = isEmergency ? '!' : '!!';
+      const badgeColor = isEmergency ? '#ea4335' : '#fbbc04';
+      breakerBadgeMap.set(tabId, { text: badgeText, color: badgeColor });
+      setTabBadge(tabId, badgeText, badgeColor);
+
+      const shouldNotify = Boolean(payload && payload.notify && settings.stallAlertEnabled && !isEmergency);
+      if (!shouldNotify) return;
+
+      const notifId = `${BREAKER_NOTIF_PREFIX}${tabId}`;
+      notifTabMap.set(notifId, tabId);
+      if (!api || !api.notifications || typeof api.notifications.create !== 'function') return;
+      const iconUrl =
+        api.runtime && typeof api.runtime.getURL === 'function'
+          ? api.runtime.getURL('icons/icon128.png')
+          : 'icons/icon128.png';
+      try {
+        const res = api.notifications.create(
+          notifId,
+          {
+            type: 'basic',
+            iconUrl,
+            title: trBg('bgNotifBreakerTitle', null, 'Gemini 自动助手已触发安全熔断'),
+            message: trBg(
+              'bgNotifBreakerMsg',
+              { reason: reason || reasonCode },
+              `${reason || reasonCode}。点击此处切回对应 Gemini 标签页查看。`
+            ),
+            priority: 2,
+            requireInteraction: true
+          },
+          () => {
+            void (api.runtime && api.runtime.lastError);
+          }
+        );
+        if (res && typeof res.catch === 'function') res.catch(() => {});
+      } catch (_) {
+        // Ignore notification errors
+      }
+    }
+
+    function clearBreakerAlert(tabId, keepBadge) {
+      if (typeof tabId !== 'number') return;
+      const notifId = `${BREAKER_NOTIF_PREFIX}${tabId}`;
+      notifTabMap.delete(notifId);
+      if (!keepBadge) {
+        breakerBadgeMap.delete(tabId);
+        if (notifTabMap.has(`${STALL_NOTIF_PREFIX}${tabId}`)) {
+          setTabBadge(tabId, '!', '#ea4335');
+        } else {
+          setTabBadge(tabId, '');
+        }
+      }
+      if (!api || !api.notifications || typeof api.notifications.clear !== 'function') return;
+      try {
+        const res = api.notifications.clear(notifId, () => {
+          void (api.runtime && api.runtime.lastError);
+        });
+        if (res && typeof res.catch === 'function') res.catch(() => {});
+      } catch (_) {}
+    }
+
+    function clearAllBreakerAlerts(keepBadge) {
+      const tabIds = new Set(breakerBadgeMap.keys());
+      for (const [notifId, tabId] of notifTabMap.entries()) {
+        if (notifId.startsWith(BREAKER_NOTIF_PREFIX)) {
+          tabIds.add(tabId);
+        }
+      }
+      for (const tabId of tabIds) {
+        clearBreakerAlert(tabId, keepBadge);
+      }
+    }
+
     function showStallNotification(tabId, payload) {
       if (typeof tabId !== 'number') return;
       const mins = Math.max(1, Number((payload && payload.minutes) || 5));
       const notifId = `${STALL_NOTIF_PREFIX}${tabId}`;
       notifTabMap.set(notifId, tabId);
-      setTabBadge(tabId, '!');
+      setTabBadge(tabId, '!', '#ea4335');
 
       if (!api || !api.notifications || typeof api.notifications.create !== 'function') return;
       const iconUrl =
@@ -421,7 +539,12 @@
       if (typeof tabId !== 'number') return;
       const notifId = `${STALL_NOTIF_PREFIX}${tabId}`;
       notifTabMap.delete(notifId);
-      setTabBadge(tabId, '');
+      const activeBreakerBadge = breakerBadgeMap.get(tabId);
+      if (activeBreakerBadge) {
+        setTabBadge(tabId, activeBreakerBadge.text, activeBreakerBadge.color);
+      } else {
+        setTabBadge(tabId, '');
+      }
       if (!api || !api.notifications || typeof api.notifications.clear !== 'function') return;
       try {
         const res = api.notifications.clear(notifId, () => {
@@ -434,10 +557,15 @@
     }
 
     function clearAllStallNotifications() {
-      for (const tabId of Array.from(notifTabMap.values())) {
+      const stallTabIds = [];
+      for (const [notifId, tabId] of notifTabMap.entries()) {
+        if (notifId.startsWith(STALL_NOTIF_PREFIX)) {
+          stallTabIds.push(tabId);
+        }
+      }
+      for (const tabId of stallTabIds) {
         clearStallNotification(tabId);
       }
-      notifTabMap.clear();
     }
 
     function showTestNotification(sendResponse) {
@@ -515,15 +643,24 @@
     }
 
     function handleNotificationClicked(notifId) {
-      if (typeof notifId !== 'string' || !notifId.startsWith(STALL_NOTIF_PREFIX)) return;
+      if (typeof notifId !== 'string') return;
+      const isStall = notifId.startsWith(STALL_NOTIF_PREFIX);
+      const isBreaker = notifId.startsWith(BREAKER_NOTIF_PREFIX);
+      if (!isStall && !isBreaker) return;
+
+      const prefix = isStall ? STALL_NOTIF_PREFIX : BREAKER_NOTIF_PREFIX;
       let tabId = notifTabMap.get(notifId);
       if (typeof tabId !== 'number') {
-        const parsed = Number(notifId.slice(STALL_NOTIF_PREFIX.length));
+        const parsed = Number(notifId.slice(prefix.length));
         if (Number.isFinite(parsed)) tabId = parsed;
       }
       if (typeof tabId !== 'number') return;
 
-      clearStallNotification(tabId);
+      if (isStall) {
+        clearStallNotification(tabId);
+      } else {
+        clearBreakerAlert(tabId);
+      }
       if (!api || !api.tabs) return;
       try {
         if (typeof api.tabs.get === 'function') {
@@ -559,6 +696,7 @@
         stopHeartbeat();
       }
       clearStallNotification(tabId);
+      clearBreakerAlert(tabId);
     }
 
     function handleTabActivated() {
@@ -592,6 +730,12 @@
           ensureAlarm();
           if (settings.enabled && settings.backgroundMode) {
             keepServiceWorkerAlive();
+            if (ports.size > 0 && heartbeatTimer === null) {
+              startHeartbeat();
+            }
+            if (!ports.has(tabId)) {
+              pingTab(tabId, 'keepalive_sync');
+            }
           }
           if (typeof sendResponse === 'function') sendResponse({ ok: true, connected: ports.has(tabId) });
         });
@@ -602,8 +746,18 @@
       } else if (msg.type === 'GMAH_STALL_CLEAR' && typeof tabId === 'number') {
         clearStallNotification(tabId);
         if (typeof sendResponse === 'function') sendResponse({ ok: true });
+      } else if (msg.type === 'GMAH_BREAKER_ALERT' && typeof tabId === 'number') {
+        withLoadedSettings(() => {
+          showBreakerAlert(tabId, msg);
+          if (typeof sendResponse === 'function') sendResponse({ ok: true });
+        });
+        return true;
+      } else if (msg.type === 'GMAH_BREAKER_CLEAR' && typeof tabId === 'number') {
+        clearBreakerAlert(tabId);
+        if (typeof sendResponse === 'function') sendResponse({ ok: true });
       } else if (msg.type === 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS') {
         clearAllStallNotifications();
+        clearAllBreakerAlerts(true);
         if (typeof sendResponse === 'function') sendResponse({ ok: true });
       } else if (msg.type === 'GMAH_TEST_NOTIFICATION') {
         showTestNotification(sendResponse);
@@ -626,6 +780,12 @@
           if (!msg.stallAlertActive) {
             clearStallNotification(tabId);
           }
+          if (
+            !msg.breakerTripped &&
+            (breakerBadgeMap.has(tabId) || notifTabMap.has(`${BREAKER_NOTIF_PREFIX}${tabId}`))
+          ) {
+            clearBreakerAlert(tabId);
+          }
           withLoadedSettings(() => {
             applyDiscardProtection(tabId);
             pingTab(tabId, 'hello_ack');
@@ -643,8 +803,15 @@
           showStallNotification(tabId, msg);
         } else if (msg.type === 'GMAH_STALL_CLEAR') {
           clearStallNotification(tabId);
+        } else if (msg.type === 'GMAH_BREAKER_ALERT') {
+          withLoadedSettings(() => {
+            showBreakerAlert(tabId, msg);
+          });
+        } else if (msg.type === 'GMAH_BREAKER_CLEAR') {
+          clearBreakerAlert(tabId);
         } else if (msg.type === 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS') {
           clearAllStallNotifications();
+          clearAllBreakerAlerts(true);
         }
       });
 
@@ -674,6 +841,9 @@
       if (!alarm || alarm.name !== ALARM_NAME) return;
       loadSettings(() => {
         syncAllGeminiTabs(true, true);
+        if (settings.enabled && settings.backgroundMode && ports.size > 0 && heartbeatTimer === null) {
+          startHeartbeat();
+        }
       });
     }
 
@@ -698,8 +868,12 @@
       if (area !== 'local') return;
       if (changes && changes[STORAGE_KEY] && changes[STORAGE_KEY].newValue) {
         applyRawSettings(changes[STORAGE_KEY].newValue);
-        if (!settings.enabled || !settings.stallAlertEnabled) {
+        if (!settings.enabled) {
           clearAllStallNotifications();
+          clearAllBreakerAlerts(false);
+        } else if (!settings.stallAlertEnabled) {
+          clearAllStallNotifications();
+          clearAllBreakerAlerts(true);
         }
         ensureAlarm();
         if (settings.enabled && settings.backgroundMode && ports.size > 0) {
@@ -785,6 +959,9 @@
       tickConnectedPorts,
       clearAllStallNotifications,
       clearStallNotification,
+      showBreakerAlert,
+      clearBreakerAlert,
+      clearAllBreakerAlerts,
       getConnectedTabIds: () => Array.from(ports.keys()),
       getScheduledTickTabIds: () => Array.from(scheduledTicks.keys()),
       getPortMeta: (tabId) => (portMeta.has(tabId) ? Object.assign({}, portMeta.get(tabId)) : null),
@@ -792,7 +969,8 @@
       getSettings: () => Object.assign({}, settings),
       ALARM_NAME,
       PORT_ROTATE_MS,
-      STALL_NOTIF_PREFIX
+      STALL_NOTIF_PREFIX,
+      BREAKER_NOTIF_PREFIX
     };
   }
 

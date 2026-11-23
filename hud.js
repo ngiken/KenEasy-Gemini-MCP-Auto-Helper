@@ -245,6 +245,26 @@
       btnNotification.type = 'button';
       rowNotification.appendChild(btnNotification);
 
+      // Row 6: Stall Auto-Recovery Toggle + Immediate Force-Recover Action Button
+      const rowStallRecover = el('div', 'gmah-row');
+      const lblStallRecover = el('span', '', tr('hudRowStallRecover'));
+      rowStallRecover.appendChild(lblStallRecover);
+      const stallRecoverControls = el('div', 'gmah-row-controls');
+      const btnForceRecover = el('button', 'gmah-pill gmah-pill-action', tr('btnForceRecover'));
+      btnForceRecover.type = 'button';
+      btnForceRecover.title = tr('btnForceRecoverTip', {
+        prompt: (D && D.DEFAULT_SETTINGS && D.DEFAULT_SETTINGS.stallAutoRecoverPrompt) || '继续，刚才mcp连接断开了'
+      });
+      const btnStallRecover = el('button', 'gmah-pill');
+      btnStallRecover.type = 'button';
+      stallRecoverControls.appendChild(btnForceRecover);
+      stallRecoverControls.appendChild(btnStallRecover);
+      rowStallRecover.appendChild(stallRecoverControls);
+
+      // Live connection / wait elapsed timer bar (shown when waiting/connecting)
+      const waitBar = el('div', 'gmah-wait-bar');
+      waitBar.style.display = 'none';
+
       // Status box
       const statusBox = el('div', 'gmah-status', tr('hudInit'));
       statusBox.style.whiteSpace = 'pre-line';
@@ -269,6 +289,8 @@
       body.appendChild(rowContinue);
       body.appendChild(rowBackground);
       body.appendChild(rowNotification);
+      body.appendChild(rowStallRecover);
+      body.appendChild(waitBar);
       body.appendChild(statusBox);
       body.appendChild(actions);
       body.appendChild(panel);
@@ -562,6 +584,12 @@
       btnNotification.addEventListener('click', () => {
         if (cb.onToggleNotification) cb.onToggleNotification();
       });
+      btnStallRecover.addEventListener('click', () => {
+        if (cb.onToggleStallRecover) cb.onToggleStallRecover();
+      });
+      btnForceRecover.addEventListener('click', () => {
+        if (cb.onForceStallRecover) cb.onForceStallRecover();
+      });
       btnEmergency.addEventListener('click', () => {
         if (currentState && currentState.circuitBreaker && currentState.circuitBreaker.tripped) {
           if (cb.onResetBreaker) cb.onResetBreaker();
@@ -599,6 +627,10 @@
         btnBackground,
         lblNotification,
         btnNotification,
+        lblStallRecover,
+        btnStallRecover,
+        btnForceRecover,
+        waitBar,
         statusBox,
         btnEmergency,
         btnInspect,
@@ -703,6 +735,8 @@
 
       const logs = (state && state.logs) || [];
       const logSig = logs.length > 0 ? `${logs.length}|${logs[0].time}|${logs[0].message}` : '0';
+      const waitSec = Math.floor((state.stallElapsedMs || 0) / 1000);
+      const waitLabel = state.stallConnectingLabel || '';
       const renderSig = [
         s.showHud ? 1 : 0,
         s.theme,
@@ -713,6 +747,9 @@
         s.autoContinue ? 1 : 0,
         s.backgroundMode ? 1 : 0,
         s.stallAlertEnabled ? 1 : 0,
+        s.stallAutoRecoverEnabled ? 1 : 0,
+        s.stallAutoRecoverMinutes || 5,
+        s.stallAutoRecoverPrompt || '',
         s.maxContinuesPerTask,
         s.dailyContinueLimit,
         stats.allowCount,
@@ -721,6 +758,10 @@
         state.isGenerating ? 1 : 0,
         state.isNonChatPage ? 1 : 0,
         state.stallAlertActive ? 1 : 0,
+        state.stallRecoveryActive ? 1 : 0,
+        state.stallRecoveryCount || 0,
+        waitSec,
+        waitLabel,
         cbState.tripped ? 1 : 0,
         cbState.reasonCode || '',
         cbState.reason || '',
@@ -763,6 +804,9 @@
       els.lblContinue.textContent = tr('hudRowContinue');
       els.lblBackground.textContent = tr('hudRowBackground');
       els.lblNotification.textContent = tr('hudRowNotif');
+      if (els.lblStallRecover) {
+        els.lblStallRecover.textContent = tr('hudRowStallRecover');
+      }
       els.btnInspect.textContent = tr('btnInspect');
       els.btnLogs.textContent = tr('btnLogs');
 
@@ -786,7 +830,7 @@
       let dotClass = 'gmah-dot';
       if (cbState.tripped) {
         dotClass += cbState.reasonCode === 'emergency_stop' ? ' stopped' : ' warn';
-      } else if (state.stallAlertActive) {
+      } else if (state.stallAlertActive || state.stallRecoveryActive) {
         dotClass += ' warn';
       } else if (s.enabled && (s.autoAllow || s.autoContinue)) {
         dotClass += ' active';
@@ -819,6 +863,60 @@
         els.btnNotification.title = notifOn ? tr('notifPillDisableTip') : tr('notifPillEnableTip');
       }
 
+      // Stall Auto-Recovery pill & immediate action button
+      if (els.btnStallRecover) {
+        const recOn = Boolean(s.stallAutoRecoverEnabled);
+        els.btnStallRecover.textContent = recOn ? tr('stateOn') : tr('stateOff');
+        els.btnStallRecover.className = recOn ? 'gmah-pill on' : 'gmah-pill';
+        els.btnStallRecover.title = recOn ? tr('stallRecoverPillDisableTip') : tr('stallRecoverPillEnableTip');
+      }
+      if (els.btnForceRecover) {
+        const promptText =
+          s.stallAutoRecoverPrompt ||
+          (D && D.DEFAULT_SETTINGS && D.DEFAULT_SETTINGS.stallAutoRecoverPrompt) ||
+          '继续，刚才mcp连接断开了';
+        els.btnForceRecover.textContent = tr('btnForceRecover');
+        els.btnForceRecover.title = tr('btnForceRecoverTip', { prompt: promptText });
+        els.btnForceRecover.disabled = Boolean(
+          state.isNonChatPage ||
+            (cbState.tripped && cbState.reasonCode === 'emergency_stop')
+        );
+      }
+
+      // Live connection / wait elapsed duration bar
+      if (els.waitBar) {
+        const elapsedMs = Number(state.stallElapsedMs) || 0;
+        const showWaitBar = Boolean(
+          s.enabled &&
+            !state.isNonChatPage &&
+            !cbState.tripped &&
+            !state.stallRecoveryActive &&
+            (elapsedMs >= 1000 || Boolean(waitLabel))
+        );
+        if (showWaitBar) {
+          const elapsedStr =
+            D && typeof D.formatWaitDuration === 'function'
+              ? D.formatWaitDuration(elapsedMs, lang)
+              : `${Math.floor(elapsedMs / 1000)}s`;
+          const limitMins = Math.max(1, Number(s.stallAutoRecoverMinutes) || 5);
+          if (s.stallAutoRecoverEnabled) {
+            els.waitBar.textContent = waitLabel
+              ? tr('hudWaitConnecting', { label: waitLabel, elapsed: elapsedStr, limit: limitMins })
+              : tr('hudWaitElapsed', { elapsed: elapsedStr, limit: limitMins });
+          } else {
+            els.waitBar.textContent = waitLabel
+              ? tr('hudWaitConnectingNoLimit', { label: waitLabel, elapsed: elapsedStr })
+              : tr('hudWaitElapsedNoLimit', { elapsed: elapsedStr });
+          }
+          const nearThreshold = s.stallAutoRecoverEnabled && elapsedMs >= limitMins * 60 * 1000 * 0.6;
+          els.waitBar.className = nearThreshold || state.stallAlertActive ? 'gmah-wait-bar warn' : 'gmah-wait-bar';
+          els.waitBar.style.display = 'block';
+        } else {
+          els.waitBar.style.display = 'none';
+          els.waitBar.textContent = '';
+        }
+      }
+
       // Emergency / Reset button
       if (cbState.tripped) {
         els.btnEmergency.textContent = tr('btnResetBreaker');
@@ -843,6 +941,9 @@
       } else if (!s.enabled) {
         els.statusBox.className = 'gmah-status';
         els.statusBox.textContent = `${tr('hudStatusPaused')}\n${countsText}`;
+      } else if (state.stallRecoveryActive) {
+        els.statusBox.className = 'gmah-status alert';
+        els.statusBox.textContent = `${state.lastStatusText || tr('hudStatusStallFallback')}\n${countsText}`;
       } else if (state.stallAlertActive) {
         els.statusBox.className = 'gmah-status alert';
         els.statusBox.textContent = `${state.lastStatusText || tr('hudStatusStallFallback')}\n${countsText}`;
