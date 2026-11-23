@@ -151,7 +151,7 @@ html_s1 = f"""<!DOCTYPE html>
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
       <div class="title-area">
-        <h1>Google Gemini MCP 智能自动放行 · 连续追问芯片 <span class="badge">v0.2 Beta</span> <span class="badge-g">4 语言 + 黑白双模式</span></h1>
+        <h1>Google Gemini MCP 智能自动放行 · 连续追问芯片 <span class="badge">v1.0.0</span> <span class="badge-g">4 语言 + 黑白双模式</span></h1>
         <p class="subtitle">穿透 Shadow DOM 与下拉菜单自动点击「始终允许」，严格过滤非对话页与历史旧芯片，零误触干扰</p>
       </div>
     </div>
@@ -188,7 +188,7 @@ html_s1 = f"""<!DOCTYPE html>
     <div class="hud-preview-card">
       <div>
         <div class="hud-top">
-          <div class="hud-title"><span class="hud-dot"></span> MCP 助手 <span class="badge" style="font-size:9.5px; padding:1px 6px;">v0.2 Beta</span></div>
+          <div class="hud-title"><span class="hud-dot"></span> MCP 助手 <span class="badge" style="font-size:9.5px; padding:1px 6px;">v1.0.0</span></div>
           <div class="hud-chips"><span class="hc">简体</span><span class="hc">☀</span><span class="hc">−</span></div>
         </div>
         <div class="hud-rows">
@@ -303,7 +303,7 @@ html_s2 = f"""<!DOCTYPE html>
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
       <div class="title-area">
-        <h1>按住自由拖拽悬浮窗 · 黑白深浅主题随心切换 <span class="badge-new">v0.2 Beta 重磅升级</span></h1>
+        <h1>按住自由拖拽悬浮窗 · 黑白深浅主题随心切换 <span class="badge-new">v1.0.0 重磅升级</span></h1>
         <p class="subtitle">严格左键按住拖拽（鼠标悬停绝不粘连跟随），支持深色/浅色模式与 简体 / 繁體 / EN / 日本語 标题栏一键切换</p>
       </div>
     </div>
@@ -330,7 +330,7 @@ html_s2 = f"""<!DOCTYPE html>
         <div class="hud-dark">
           <div class="drag-pill">✊ 左键按住拖拽中 (深色模式)</div>
           <div class="h-top">
-            <span>🟢 MCP 助手 <small style="color:#93c5fd;">v0.2</small></span>
+            <span>🟢 MCP 助手 <small style="color:#93c5fd;">v1.0.0</small></span>
             <span style="font-size:10px; opacity:0.8;">简体 ☀ −</span>
           </div>
           <div class="h-r"><span>插件状态</span><span class="p-d">运行中</span></div>
@@ -342,7 +342,7 @@ html_s2 = f"""<!DOCTYPE html>
         <div class="hud-light">
           <div class="drag-pill" style="background:#0f172a; border:1px solid rgba(255,255,255,0.2);">☀️ 浅色模式 (English)</div>
           <div class="h-top">
-            <span>🟢 MCP Helper <small style="color:#1d4ed8;">v0.2</small></span>
+            <span>🟢 MCP Helper <small style="color:#1d4ed8;">v1.0.0</small></span>
             <span style="font-size:10px; opacity:0.8;">EN ☾ −</span>
           </div>
           <div class="h-r"><span>Extension</span><span class="p-l">Active</span></div>
@@ -519,7 +519,7 @@ html_s4 = f"""<!DOCTYPE html>
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
       <div class="title-area">
-        <h1>黑白深浅双模式 · 多语言全功能设定面板 <span class="badge">v0.2 Beta</span></h1>
+        <h1>黑白深浅双模式 · 多语言全功能设定面板 <span class="badge">v1.0.0</span></h1>
         <p class="subtitle">实时监控今日自动放行统计、灵活调整熔断阈值与关键词库，深色/浅色主题与 4 国语言同步切换</p>
       </div>
     </div>
@@ -528,7 +528,7 @@ html_s4 = f"""<!DOCTYPE html>
   <div class="stage">
     <div class="p-card-shell dark">
       <div class="p-h">
-        <div style="font-weight:700; font-size:13px;">Gemini MCP 助手 <small style="color:#93c5fd;">v0.2 Beta</small></div>
+        <div style="font-weight:700; font-size:13px;">Gemini MCP 助手 <small style="color:#93c5fd;">v1.0.0</small></div>
         <div class="sw"></div>
       </div>
       <div class="bar"><span>🌐 简体中文 ▾</span><span>🌙 深色模式</span></div>
@@ -554,7 +554,7 @@ html_s4 = f"""<!DOCTYPE html>
 
     <div class="p-card-shell light">
       <div class="p-h">
-        <div style="font-weight:700; font-size:13px;">Gemini MCP Helper <small style="color:#1d4ed8;">v0.2 Beta</small></div>
+        <div style="font-weight:700; font-size:13px;">Gemini MCP Helper <small style="color:#1d4ed8;">v1.0.0</small></div>
         <div class="sw"></div>
       </div>
       <div class="bar"><span>🌐 English ▾</span><span>☀️ Light</span></div>
@@ -723,7 +723,7 @@ html_s5 = f"""<!DOCTYPE html>
 
   <div class="guard-banner">
     <div>
-      <div style="font-size:14.5px; font-weight:700; color:#f8fafc;">🆕 v0.2 多浏览器 &amp; 非对话页安全守卫</div>
+      <div style="font-size:14.5px; font-weight:700; color:#f8fafc;">🆕 v1.0.0 多浏览器 &amp; 非对话页安全守卫</div>
       <div style="font-size:12px; color:#94a3b8; margin-top:2px;">自动屏蔽 <code>/gems</code>、<code>/extensions</code>、<code>/settings</code> 与 0 回复首页；第 2 浏览器恢复历史会话时自动忽略陈旧芯片。</div>
     </div>
     <span style="background:rgba(16,185,129,0.2); color:#6ee7b7; border:1px solid rgba(16,185,129,0.45); padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap;">✓ 零误触保护</span>
@@ -783,7 +783,7 @@ html_p_small = f"""<!DOCTYPE html>
 
   <div class="footer-row">
     <span>KenEasy · Google Gemini 专用</span>
-    <span style="color: #60a5fa; font-weight: 700;">v0.2 Beta</span>
+    <span style="color: #60a5fa; font-weight: 700;">v1.0.0</span>
   </div>
 </body>
 </html>
@@ -844,7 +844,7 @@ html_p_marquee = f"""<!DOCTYPE html>
       <img src="{icon_b64}" alt="logo">
       <div>
         <div style="font-size: 12.5px; font-weight: 700; color: #60a5fa; letter-spacing: 1px; text-transform: uppercase;">Google Gemini MCP Automation</div>
-        <span class="v-pill">v0.2 Beta · 4 Languages · Dark &amp; Light Mode</span>
+        <span class="v-pill">v1.0.0 · 4 Languages · Dark &amp; Light Mode</span>
       </div>
     </div>
     <h1 class="hero-title">KenEasy Gemini MCP Auto Helper</h1>
@@ -860,7 +860,7 @@ html_p_marquee = f"""<!DOCTYPE html>
 
   <div class="dual-stage">
     <div class="card-dark">
-      <div class="ct"><span>🟢 MCP 助手 <small style="color:#93c5fd;">v0.2</small></span><span style="font-size:10.5px;opacity:0.8;">简体 ☀</span></div>
+      <div class="ct"><span>🟢 MCP 助手 <small style="color:#93c5fd;">v1.0.0</small></span><span style="font-size:10.5px;opacity:0.8;">简体 ☀</span></div>
       <div class="cr"><span>插件状态</span><span class="pd">运行中</span></div>
       <div class="cr"><span>自动始终允许</span><span class="pd">已开启</span></div>
       <div class="cr"><span>自动点击继续</span><span class="pd">已开启</span></div>
@@ -870,7 +870,7 @@ html_p_marquee = f"""<!DOCTYPE html>
     </div>
 
     <div class="card-light">
-      <div class="ct"><span>🟢 MCP Helper <small style="color:#1d4ed8;">v0.2</small></span><span style="font-size:10.5px;opacity:0.8;">EN ☾</span></div>
+      <div class="ct"><span>🟢 MCP Helper <small style="color:#1d4ed8;">v1.0.0</small></span><span style="font-size:10.5px;opacity:0.8;">EN ☾</span></div>
       <div class="cr"><span>Extension</span><span class="pl">Active</span></div>
       <div class="cr"><span>Auto Always Allow</span><span class="pl">On</span></div>
       <div class="cr"><span>Auto Continue</span><span class="pl">On</span></div>

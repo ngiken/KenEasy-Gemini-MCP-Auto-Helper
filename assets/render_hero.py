@@ -405,7 +405,7 @@ def build_hero_banner():
       <div class="top-meta">
         <div class="logo-badge"><img src="{icon_b64}" alt="logo"></div>
         <div class="pill-group">
-          <span class="ver-pill"><span class="ver-dot"></span>v0.2 Beta Release</span>
+          <span class="ver-pill"><span class="ver-dot"></span>v1.0.0 Official Release</span>
           <span class="lang-pill">🌐 简 / 繁 / EN / 日本語</span>
           <span class="lang-pill">🌗 Dark &amp; Light Mode</span>
         </div>
@@ -468,7 +468,7 @@ def build_hero_banner():
       <span class="theme-tag tag-dark">🌙 深色夜间 · 简体中文</span>
       <div class="hud-card-dark">
         <div class="h-top">
-          <div class="h-title"><span class="h-dot"></span><span>MCP 助手</span><span class="h-beta-dark">v0.2 Beta</span></div>
+          <div class="h-title"><span class="h-dot"></span><span>MCP 助手</span><span class="h-beta-dark">v1.0.0</span></div>
           <div class="h-icons"><span class="h-chip-dark">简体</span><span class="h-chip-dark">☀</span><span class="h-chip-dark">−</span></div>
         </div>
         <div class="h-rows">
@@ -488,7 +488,7 @@ def build_hero_banner():
       <span class="theme-tag tag-light">☀️ 浅色白昼 · English</span>
       <div class="hud-card-light">
         <div class="h-top">
-          <div class="h-title"><span class="h-dot"></span><span>MCP Helper</span><span class="h-beta-light">v0.2 Beta</span></div>
+          <div class="h-title"><span class="h-dot"></span><span>MCP Helper</span><span class="h-beta-light">v1.0.0</span></div>
           <div class="h-icons"><span class="h-chip-light">EN</span><span class="h-chip-light">☾</span><span class="h-chip-light">−</span></div>
         </div>
         <div class="h-rows">

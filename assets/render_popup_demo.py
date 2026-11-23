@@ -232,7 +232,7 @@ def render_popup_demo():
       <div>
         <div class="h-title">
           <span>双主题控制中心全景 · 黑白模式与多语言同步</span>
-          <span class="v-badge">v0.2 Beta</span>
+          <span class="v-badge">v1.0.0</span>
         </div>
         <div class="h-sub">支持 简体中文 / 繁體中文 / English / 日本語 实时切换 · 深色/浅色模式双端同步</div>
       </div>
@@ -249,7 +249,7 @@ def render_popup_demo():
           <div class="p-brand">
             <img src="{icon_b64}" alt="icon">
             <div>
-              <div class="p-h1">Gemini MCP 助手 <span class="p-beta-d">v0.2 Beta</span></div>
+              <div class="p-h1">Gemini MCP 助手 <span class="p-beta-d">v1.0.0</span></div>
               <div class="p-sub">自动允许 · 多语言黑白模式 · 防误触</div>
             </div>
           </div>
@@ -305,7 +305,7 @@ def render_popup_demo():
           <div class="p-brand">
             <img src="{icon_b64}" alt="icon">
             <div>
-              <div class="p-h1">Gemini MCP Helper <span class="p-beta-l">v0.2 Beta</span></div>
+              <div class="p-h1">Gemini MCP Helper <span class="p-beta-l">v1.0.0</span></div>
               <div class="p-sub">Auto-Allow · Multi-Lang &amp; Theme</div>
             </div>
           </div>

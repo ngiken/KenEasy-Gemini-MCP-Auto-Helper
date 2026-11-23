@@ -267,7 +267,7 @@ def render_notification_demo():
       <div>
         <div class="top-title">
           <span>一键启停桌面通知 · 卡死超时主动预警</span>
-          <span class="tag-pill">v0.2 Beta · 多语言本地通知</span>
+          <span class="tag-pill">v1.0.0 · 多语言本地通知</span>
         </div>
         <div class="top-sub">HUD 悬浮窗与 Popup 双向秒切静音 · 超时无进展系统弹窗提醒 · 点击直达并唤醒对应窗口标签页</div>
       </div>

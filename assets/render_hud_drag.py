@@ -317,7 +317,7 @@ def render_hud_drag_demo():
       <div>
         <div class="title-row">
           <h1 class="top-title">按住自由拖拽悬浮窗 (Hold-to-Drag Floating HUD)</h1>
-          <span class="v-tag">v0.2 Beta · 拖拽重构</span>
+          <span class="v-tag">v1.0.0 · 拖拽重构</span>
         </div>
         <div class="top-sub">左键按住标题栏才跟随移动 · 彻底修复鼠标悬停粘连问题 · 折叠/主题/语言按键独立响应</div>
       </div>
@@ -374,7 +374,7 @@ def render_hud_drag_demo():
         <div class="hud-floating">
           <div class="drag-pill">✊ 左键按住标题栏拖拽中</div>
           <div class="hud-hdr">
-            <div class="hud-hdr-title"><span class="g-dot"></span><span>MCP 助手</span><span class="b-v02">v0.2 Beta</span></div>
+            <div class="hud-hdr-title"><span class="g-dot"></span><span>MCP 助手</span><span class="b-v02">v1.0.0</span></div>
             <div class="hdr-btns"><span class="hdr-btn">简体</span><span class="hdr-btn">☀</span><span class="hdr-btn">−</span></div>
           </div>
           <div class="hud-rows">

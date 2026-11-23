@@ -1,0 +1,31 @@
+【Chrome Web Store 更新說明 · v1.0.0 Official Release】
+
+============================================================
+English (Release Notes / Update Summary)
+============================================================
+v1.0.0 Official Stable Release:
+• Stall Auto-Recovery & Custom Reconnect Prompt: Automatically detects hung MCP/Gemini turns past the configured threshold (default 5 min), cancels the stuck turn, protects unsent user drafts, and sends a customizable reconnect prompt.
+• Live Connection Wait Timer & One-Click "Resume Now": Real-time wait elapsed display in the floating HUD and Popup, plus an immediate one-click Resume Now button.
+• Human-Like Anti-Throttling Pacing: Randomized pauses, chunked typing, natural hover/click jitter, and a 60-second rolling anti-burst governor.
+• Circuit Breaker Desktop Alerts & Badge Wiring: End-to-end amber "!!" / red "!" toolbar badges and localized desktop notifications that jump straight to the affected Gemini tab when clicked.
+• Never-Sleep MV3 Background Hardening: ~19.5s SW keepalive, 4-min seamless port rotation, fast 8s zombie-port recovery, and Web Lock anti-freeze shield (76/76 automated & E2E tests passing).
+
+============================================================
+繁體中文（更新說明）
+============================================================
+v1.0.0 正式版發佈：
+• 連線卡死自動終止與自訂續接：超時（預設 5 分鐘）自動停止卡死回合、保護未送出草稿，並發送自訂續接文案（預設「继续，刚才mcp连接断开了」）。
+• 即時連線計時與一鍵「立即續接」：HUD 與彈窗即時顯示 MCP/Gemini 等待耗時，免乾等即可一鍵恢復。
+• 擬人防降速節流：隨機自然停頓、分段輸入、懸停偏移點擊與 60 秒防突發節流。
+• 安全熔斷桌面通知與角標接線：非緊急熔斷顯示黃色 !! 角標與系統通知（點擊直達分頁），手動緊急停止顯示靜默紅色 ! 角標。
+• 背景多層防凍結加固：MV3 保活心跳、4 分鐘埠輪換、8 秒殭屍連線快恢復與 Web Lock 防凍結護盾（76/76 自動化測試全數通過）。
+
+============================================================
+简体中文（更新说明）
+============================================================
+v1.0.0 正式版发布：
+• 连接卡死自动终止与自定义续接：超时（默认 5 分钟）自动停止卡死回合、保护未发送草稿，并发送自定义续接话术（默认「继续，刚才mcp连接断开了」）。
+• 实时连接计时与一键「立即续接」：HUD 与弹窗实时显示 MCP/Gemini 等待耗时，无需干等即可一键恢复。
+• 拟人防降速节流：随机自然停顿、分段输入、悬停偏移点击与 60 秒防突发节流。
+• 安全熔断桌面通知与角标接线：非紧急熔断显示黄色 !! 角标与系统通知（点击直达标签页），手动紧急停止显示静默红色 ! 角标。
+• 后台多层防冻结加固：MV3 保活心跳、4 分钟端口轮换、8 秒僵尸连接快恢复与 Web Lock 防冻结护盾（76/76 自动化测试全数通过）。

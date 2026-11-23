@@ -35,7 +35,7 @@ Required to dynamically inject content scripts into already-opened Google Gemini
 
 7. Permission: notifications (桌面通知权限):
 --------------------------------------------------------------------------------
-Required solely to display native desktop alert notifications when an MCP tool execution or Gemini text generation hangs or stalls longer than the user-configured timeout threshold (default 5 minutes).
+Required solely to display native desktop alert notifications when an MCP tool execution or Gemini text generation hangs/stalls longer than the user-configured timeout threshold (default 5 minutes) or when a safety circuit breaker trips, allowing the user to click the alert and jump straight back to the Gemini tab.
 
 
 8. Remote Code Execution Declaration (远程代码执行声明):

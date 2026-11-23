@@ -8,7 +8,7 @@ KenEasy Gemini MCP Auto Helper
 ============================================================
 2. Summary / Short Description (max 132 chars)
 ============================================================
-Auto-click Gemini MCP Always Allow & Continue chips with 4-language UI, Dark/Light mode, hold-to-drag HUD, and 6-layer circuit breaker.
+Auto-click Gemini MCP Always Allow & Continue chips with stall auto-recovery, 4-language HUD, Dark/Light themes & 6-layer breaker.
 
 ============================================================
 3. Detailed Description (Paste everything below into description box)
@@ -21,38 +21,38 @@ It automates repetitive MCP (Model Context Protocol) tool permission dialogs and
 ✨ KEY FEATURES (V1.0.0 OFFICIAL RELEASE)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚡ 0. STALL AUTO-RECOVERY, LIVE WAIT TIMER & HUMAN PACING 🆕
+⚡ 1. STALL AUTO-RECOVERY, LIVE WAIT TIMER & HUMAN PACING 🆕
 • Live connection/wait elapsed timer right inside the floating HUD and Popup.
 • Automatically stops stuck MCP/Gemini turns after your timeout (default 5 min) and sends your customizable reconnect prompt (default: "继续，刚才mcp连接断开了") with draft protection and a one-click "Resume Now" button.
 • Built-in human-like anti-throttling pacing (natural delays, chunked typing, safe off-center hover clicks, and a 60s anti-burst governor).
 
-⚡ 1. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)
+⚡ 2. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)
 • Automatically detects and clicks "Always allow / 始终允许 / 常に許可" permission confirmation dialogs.
 • Pierces through Material Web Components Shadow DOM, <slot> projections, and role="menu" dropdown items.
 • Safe fallback: Optionally falls back to clicking single "Allow once" with strict sibling approval context checks.
 • Strict context guard: Never clicks destructive buttons like Deny, Cancel, Delete, or Block, and skips non-chat routes (/gems, /extensions, /settings) and secondary browser restored-tab stale chips.
 
-🖱️ 2. HOLD-TO-DRAG FLOATING HUD 🆕
+🖱️ 3. HOLD-TO-DRAG FLOATING HUD
 • Left-click and hold the HUD header to position it anywhere across the browser viewport — hovering never traps or sticks the HUD!
 • Deferred pointer capture beyond the 4px movement deadzone keeps collapse, theme, and language header buttons immediately clickable.
 • Viewport boundary clamping + one-click Reset HUD Position in the popup.
 
-🌗 3. 4-LANGUAGE UI + DARK & LIGHT DUAL MODES 🆕
+🌗 4. 4-LANGUAGE UI + DARK & LIGHT DUAL MODES
 • Instant switching across Simplified Chinese, Traditional Chinese, English, and Japanese (UI, notifications, and keywords).
 • Synchronized Dark Night and Light Daylight themes across both the floating HUD and popup control panel.
 
-🔔 3. ANTI-STALL DESKTOP NOTIFICATIONS 🆕
-• Get instant Windows/macOS native desktop alerts when tool execution or AI response generation stalls longer than your threshold (default 5 minutes).
-• Browser action icon badge updates to a red "!" warning badge.
-• 1-Click mute toggle available directly on the HUD (5th pill button) and inside the popup settings panel.
+🔔 5. ANTI-STALL & CIRCUIT BREAKER DESKTOP NOTIFICATIONS
+• Get instant Windows/macOS native desktop alerts when tool execution or AI response generation stalls longer than your threshold (default 5 minutes), or when a safety circuit breaker trips.
+• Browser action icon badge updates to a red "!" (stall / emergency) or amber "!!" (breaker) warning badge.
+• 1-Click mute toggle available directly on the HUD and inside the popup settings panel.
 • Disabling notifications immediately revokes and clears all pending desktop alerts.
 • Clicking the notification brings your Gemini tab into focus instantly.
 
-🤖 4. AUTOMATIC CONTINUE & YES CHIP CLICKING
+🤖 6. AUTOMATIC CONTINUE & YES CHIP CLICKING
 • Automatically clicks confirmation follow-up chips (such as "↪ Yes") and bottom "Continue" generation buttons.
 • Intelligently ignores satisfaction surveys, questionnaires, long prompt chips, and sidebar history.
 
-🛡️ 5. INDUSTRIAL 6-LAYER CIRCUIT BREAKER PROTECTION
+🛡️ 7. INDUSTRIAL 6-LAYER CIRCUIT BREAKER PROTECTION
 Prevents runaway infinite loops, token waste, and accidental quota burnout:
 • Layer 1 (Immediate Error Trip): Instantly halts on quota exhaustion, rate limit, or server error cues.
 • Layer 2 (Per-Task Limit): Caps consecutive continue clicks per conversation task (default 10).
@@ -61,8 +61,8 @@ Prevents runaway infinite loops, token waste, and accidental quota burnout:
 • Layer 5 (Completion Semantics): Pauses on cues like "Task completed" unless explicit truncation occurred.
 • Layer 6 (Stagnant & Duplicate Breaker): Computes turn content hashes and trips if output stagnates or loops.
 
-💻 6. BACKGROUND & MINIMIZED OPERATION
-• Keeps Gemini active when minimized or running in background tabs through port heartbeats and discard prevention.
+💻 8. NEVER-SLEEP MV3 BACKGROUND OPERATION
+• Keeps Gemini active when minimized or running in background tabs through MV3 keepalive heartbeats, 4-minute seamless port rotation, Web Lock anti-freeze shield, and tab discard prevention.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔒 PRIVACY & SECURITY COMMITMENT
