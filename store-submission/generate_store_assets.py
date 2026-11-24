@@ -8,16 +8,17 @@ STORE_DIR = os.path.join(ROOT, 'store-submission')
 SCREENSHOTS_DIR = os.path.join(STORE_DIR, '03-screenshots')
 PROMO_DIR = os.path.join(STORE_DIR, '04-promotional-tiles')
 ICONS_DIR = os.path.join(ROOT, 'icons')
+ASSETS_DIR = os.path.join(ROOT, 'assets')
 CHROME_PATH = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+GEMINI_SAMPLE_URL = 'https://' + 'gemini.' + 'google.' + 'com/app/a1b2c3d4e5'
 
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 os.makedirs(PROMO_DIR, exist_ok=True)
 
 
-def get_icon_b64(name='icon128.png'):
-    p = os.path.join(ICONS_DIR, name)
-    if os.path.exists(p):
-        with open(p, 'rb') as f:
+def file_to_b64(path):
+    if os.path.exists(path):
+        with open(path, 'rb') as f:
             return 'data:image/png;base64,' + base64.b64encode(f.read()).decode('utf-8')
     return ''
 
@@ -54,160 +55,269 @@ def render_html_to_png(html_content, output_png_path, width=1280, height=800, dp
     print(f"Generated: {os.path.basename(output_png_path)} ({os.path.getsize(output_png_path)} bytes, {width}x{height})")
 
 
-icon_b64 = get_icon_b64('icon128.png')
+icon_b64 = file_to_b64(os.path.join(ICONS_DIR, 'icon128.png'))
+popup_light_b64 = file_to_b64(os.path.join(ASSETS_DIR, 'notion-popup-light.png'))
+popup_dark_b64 = file_to_b64(os.path.join(ASSETS_DIR, 'notion-popup-dark.png'))
+
+NOTION_FONT = 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "PingFang SC", "Microsoft YaHei", sans-serif'
+
+BASE_STYLE = f"""
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    font-family: {NOTION_FONT};
+    background: #f7f6f3;
+    color: #37352f;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }}
+  .top-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(55, 53, 47, 0.1);
+  }}
+  .brand {{ display: flex; align-items: center; gap: 14px; }}
+  .brand img {{
+    width: 44px; height: 44px; border-radius: 10px;
+    border: 1px solid rgba(55, 53, 47, 0.12);
+    background: #ffffff;
+  }}
+  .title-line {{ display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }}
+  .title-line h1 {{ font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: #37352f; }}
+  .subtitle {{ font-size: 13px; color: #787774; margin-top: 3px; }}
+  .tag {{
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 5px;
+    border: 1px solid rgba(55, 53, 47, 0.12); background: #ffffff; color: #37352f;
+    white-space: nowrap;
+  }}
+  .tag-blue {{ background: #ebf3fb; border-color: rgba(35, 131, 226, 0.28); color: #2383e2; }}
+  .tag-green {{ background: #edf6f3; border-color: rgba(15, 123, 108, 0.25); color: #0f7b6c; }}
+  .tag-amber {{ background: #faebdd; border-color: rgba(217, 115, 13, 0.28); color: #b35c07; }}
+  .tag-red {{ background: #fdebeb; border-color: rgba(235, 87, 87, 0.28); color: #d44c47; }}
+  .card {{
+    background: #ffffff;
+    border: 1px solid rgba(55, 53, 47, 0.11);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(15, 15, 15, 0.04);
+  }}
+"""
 
 # -------------------------------------------------------------
-# SCREENSHOT 1: MCP Auto-Approval in Action (1280x800)
+# SCREENSHOT 1: MCP Auto-Approval + MAIN-World BG Clicking + Notion HUD (1280x800)
 # -------------------------------------------------------------
 html_s1 = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  {BASE_STYLE}
   body {{
     width: 1280px; height: 800px;
-    background: #070b14;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f8fafc;
-    overflow: hidden; position: relative;
-    padding: 34px 44px;
-    display: flex; flex-direction: column; justify-content: space-between; gap: 22px;
+    padding: 30px 40px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
   }}
-  .aura {{
-    position: absolute; width: 680px; height: 680px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 68%);
-    top: -180px; left: -120px; pointer-events: none;
+  .stage {{
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 334px;
+    gap: 24px;
+    min-height: 0;
   }}
-  .header-bar {{
-    position: relative; z-index: 2;
+  .chat-card {{
+    padding: 24px 26px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 16px;
+  }}
+  .browser-strip {{
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 12px; border-bottom: 1px solid rgba(55, 53, 47, 0.08);
+    font-size: 12px; color: #787774;
+  }}
+  .url-pill {{
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.09);
+    border-radius: 6px; padding: 4px 12px; color: #37352f; font-size: 12px;
+  }}
+  .user-bubble {{
+    align-self: flex-end;
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.1);
+    border-radius: 12px 12px 4px 12px;
+    padding: 11px 16px; font-size: 13.5px; color: #37352f; max-width: 82%;
+  }}
+  .ai-block {{ display: flex; flex-direction: column; gap: 13px; }}
+  .ai-head {{ display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: #37352f; }}
+  .ai-text {{ font-size: 13.5px; color: #5b5954; line-height: 1.55; }}
+  .code-chip {{
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.1);
+    color: #d44c47; padding: 1px 6px; border-radius: 4px; font-size: 12px;
+  }}
+  .mcp-box {{
+    background: #f7f9fc; border: 1px solid rgba(35, 131, 226, 0.28);
+    border-radius: 10px; padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 11px;
+  }}
+  .mcp-top {{ display: flex; justify-content: space-between; align-items: center; }}
+  .mcp-title {{ font-size: 14px; font-weight: 600; color: #37352f; }}
+  .mcp-desc {{ font-size: 12.5px; color: #787774; line-height: 1.45; }}
+  .mcp-btns {{ display: flex; justify-content: flex-end; gap: 9px; }}
+  .btn-flat {{
+    background: #ffffff; border: 1px solid rgba(55, 53, 47, 0.14);
+    color: #787774; padding: 6px 13px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  }}
+  .btn-primary {{
+    background: #2383e2; border: 1px solid #2383e2; color: #ffffff;
+    padding: 6px 15px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  }}
+  .followup {{ display: flex; align-items: center; gap: 10px; }}
+  .chip-yes {{
+    background: #edf6f3; border: 1px solid rgba(15, 123, 108, 0.28);
+    color: #0f7b6c; padding: 5px 13px; border-radius: 6px; font-size: 12.5px; font-weight: 600;
+  }}
+  .foot-strip {{
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding-top: 12px; border-top: 1px solid rgba(55, 53, 47, 0.08);
+  }}
+  .foot-item {{
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.08);
+    border-radius: 7px; padding: 8px 10px; font-size: 11.5px; color: #5b5954;
+  }}
+  .foot-item strong {{ display: block; color: #37352f; font-size: 12px; margin-bottom: 2px; }}
+
+  .hud-shell {{
+    padding: 16px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 12px;
+  }}
+  .hud-top {{
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 10px; border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+  }}
+  .hud-name {{ display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; }}
+  .dot-g {{ width: 8px; height: 8px; border-radius: 50%; background: #0f7b6c; }}
+  .hud-tools {{ display: flex; gap: 4px; }}
+  .ht {{
+    font-size: 10.5px; color: #787774; background: #f7f6f3;
+    border: 1px solid rgba(55, 53, 47, 0.1); border-radius: 4px; padding: 2px 6px;
+  }}
+  .scope-box {{
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.09);
+    border-radius: 8px; padding: 7px; display: flex; flex-direction: column; gap: 6px;
+  }}
+  .scope-tabs {{
+    display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+    background: rgba(55, 53, 47, 0.07); padding: 2px; border-radius: 6px;
+    font-size: 11.5px; text-align: center;
+  }}
+  .st-on {{ background: #ffffff; color: #37352f; font-weight: 600; padding: 4px; border-radius: 4px; box-shadow: 0 1px 2px rgba(15,15,15,0.08); }}
+  .st-off {{ color: #787774; padding: 4px; }}
+  .scope-meta {{ display: flex; justify-content: space-between; align-items: center; font-size: 11px; }}
+  .rows {{ display: flex; flex-direction: column; gap: 8px; }}
+  .row {{
     display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 18px;
+    padding: 3px 6px; border-radius: 6px; font-size: 12.5px; color: #37352f;
   }}
-  .brand {{ display: flex; align-items: center; gap: 14px; }}
-  .brand img {{ width: 46px; height: 46px; border-radius: 12px; box-shadow: 0 8px 20px rgba(59,130,246,0.35); }}
-  .title-area h1 {{ font-size: 22px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }}
-  .badge {{ background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(96,165,250,0.45); font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 700; }}
-  .badge-g {{ background: rgba(16,185,129,0.18); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.45); font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 700; }}
-  .subtitle {{ font-size: 13.5px; color: #94a3b8; margin-top: 3px; }}
-
-  .main-stage {{
-    position: relative; z-index: 2; flex: 1;
-    display: grid; grid-template-columns: 1fr 340px; gap: 26px;
+  .row-custom {{ background: #f7f9fc; }}
+  .bdot {{ display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #2383e2; margin-left: 5px; vertical-align: middle; }}
+  .pill-on {{ background: #edf6f3; border: 1px solid rgba(15, 123, 108, 0.25); color: #0f7b6c; padding: 2px 9px; border-radius: 5px; font-size: 11px; font-weight: 600; }}
+  .pill-off {{ background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.12); color: #787774; padding: 2px 9px; border-radius: 5px; font-size: 11px; font-weight: 500; }}
+  .pill-act {{ background: #ebf3fb; border: 1px solid rgba(35, 131, 226, 0.25); color: #2383e2; padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; margin-right: 4px; }}
+  .status-callout {{
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.09);
+    border-radius: 7px; padding: 9px 10px; font-size: 11.5px; color: #6b6a66; line-height: 1.5;
   }}
-  .gemini-chat {{
-    background: #111520; border: 1px solid rgba(255,255,255,0.12); border-radius: 18px;
-    padding: 26px; display: flex; flex-direction: column; justify-content: space-between;
-    box-shadow: 0 22px 54px rgba(0,0,0,0.5);
-  }}
-  .user-msg {{
-    align-self: flex-end; background: #1e2534; border-radius: 16px 16px 4px 16px;
-    padding: 13px 18px; font-size: 14px; max-width: 82%; border: 1px solid rgba(255,255,255,0.08); color: #f1f5f9;
-  }}
-  .ai-turn {{ display: flex; flex-direction: column; gap: 14px; }}
-  .ai-badge {{ display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 14.5px; color: #93c5fd; }}
-  .ai-text {{ font-size: 14px; line-height: 1.6; color: #cbd5e1; }}
-  .mcp-card {{
-    background: #182030; border: 1.5px solid rgba(96,165,250,0.55); border-radius: 14px;
-    padding: 20px 22px; box-shadow: 0 12px 32px rgba(37,99,235,0.2);
-    display: flex; flex-direction: column; gap: 12px;
-  }}
-  .mcp-header {{ display: flex; justify-content: space-between; align-items: center; }}
-  .mcp-title {{ font-size: 14.5px; font-weight: 700; color: #f8fafc; }}
-  .mcp-desc {{ font-size: 13px; color: #94a3b8; line-height: 1.45; }}
-  .mcp-actions {{ display: flex; gap: 10px; justify-content: flex-end; align-items: center; }}
-  .btn-deny {{ background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #94a3b8; padding: 8px 15px; border-radius: 9px; font-size: 12.5px; }}
-  .btn-single {{ background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #e2e8f0; padding: 8px 15px; border-radius: 9px; font-size: 12.5px; }}
-  .btn-always {{
-    background: linear-gradient(135deg, #2563eb, #1d4ed8); border: 1px solid #60a5fa; color: #ffffff;
-    padding: 9px 18px; border-radius: 9px; font-size: 12.5px; font-weight: 700;
-    box-shadow: 0 0 20px rgba(37,99,235,0.55);
-  }}
-  .chip-row {{ display: flex; gap: 10px; align-items: center; }}
-  .chip-yes {{ background: rgba(16,185,129,0.16); border: 1px solid rgba(16,185,129,0.45); color: #6ee7b7; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }}
-  .chip-hint {{ font-size: 12px; color: #64748b; }}
-
-  .hud-preview-card {{
-    background: rgba(19, 22, 29, 0.96); border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 18px; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.55);
-    display: flex; flex-direction: column; justify-content: space-between;
-  }}
-  .hud-top {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; }}
-  .hud-title {{ font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }}
-  .hud-dot {{ width: 9px; height: 9px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; }}
-  .hud-chips {{ display: flex; gap: 5px; font-size: 10.5px; }}
-  .hc {{ padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,0.08); color: #cbd5e1; }}
-  .hud-rows {{ margin: 16px 0; display: flex; flex-direction: column; gap: 13px; }}
-  .hud-row {{ display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #e2e8f0; }}
-  .pill {{ background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.45); padding: 3px 11px; border-radius: 999px; font-size: 11px; font-weight: 700; }}
-  .hud-status-box {{ background: rgba(255,255,255,0.04); border-radius: 10px; padding: 11px 13px; font-size: 11.5px; color: #94a3b8; line-height: 1.55; }}
-  .feature-points {{ border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }}
-  .f-item {{ font-size: 12px; color: #93c5fd; display: flex; align-items: center; gap: 8px; }}
+  .hud-acts {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; font-size: 11.5px; font-weight: 500; }}
+  .act-stop {{ background: #fdf2f2; border: 1px solid rgba(235, 87, 87, 0.25); color: #d44c47; padding: 6px; border-radius: 6px; }}
+  .act-std {{ background: #ffffff; border: 1px solid rgba(55, 53, 47, 0.12); color: #37352f; padding: 6px; border-radius: 6px; }}
 </style>
 </head>
 <body>
-  <div class="aura"></div>
-  <div class="header-bar">
+  <div class="top-header">
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
-      <div class="title-area">
-        <h1>Google Gemini MCP 智能自动放行 · 连续追问芯片 <span class="badge">v1.0.0</span> <span class="badge-g">4 语言 + 黑白双模式</span></h1>
-        <p class="subtitle">穿透 Shadow DOM 与下拉菜单自动点击「始终允许」，严格过滤非对话页与历史旧芯片，零误触干扰</p>
+      <div>
+        <div class="title-line">
+          <h1>Google Gemini MCP 智能自动放行 · 全新 Notion 极简风格</h1>
+          <span class="tag tag-blue">v1.0.1</span>
+          <span class="tag tag-green">后台最小化稳定点击</span>
+        </div>
+        <div class="subtitle">自动点击「始终允许」与「继续 / Yes」追问芯片，切屏或窗口最小化自动升级 MAIN 世界点击不中断</div>
       </div>
     </div>
   </div>
 
-  <div class="main-stage">
-    <div class="gemini-chat">
-      <div class="user-msg">请调用已连接的 MCP 文件系统工具扫描工作区代码，并持续输出完整重构计划。</div>
-      <div class="ai-turn">
-        <div class="ai-badge">✦ Gemini · MCP Workflow</div>
-        <p class="ai-text">我将调用本地 MCP 工具 <code>filesystem:list_directory</code> 获取目录结构，请授权权限：</p>
-        <div class="mcp-card">
-          <div class="mcp-header">
-            <div class="mcp-title">⚙️ filesystem-mcp · 工具权限确认请求</div>
-            <span class="badge-g">⚡ 0.6s 自动命中</span>
+  <div class="stage">
+    <div class="card chat-card">
+      <div class="browser-strip">
+        <span class="url-pill">🔒 {GEMINI_SAMPLE_URL}</span>
+        <span class="tag tag-green">⚡ 后台保活 + MAIN 世界穿透就绪</span>
+      </div>
+
+      <div class="user-bubble">请调用本地 Desktop Commander MCP 扫描工程目录，完成 UI 重构并持续跑完所有自动化测试。</div>
+
+      <div class="ai-block">
+        <div class="ai-head">✦ Gemini · MCP Tool Workflow</div>
+        <div class="ai-text">正在请求执行 <span class="code-chip">desktop-commander:start_process</span>，请确认工具权限：</div>
+
+        <div class="mcp-box">
+          <div class="mcp-top">
+            <span class="mcp-title">⚙️ Desktop Commander · MCP 工具权限确认</span>
+            <span class="tag tag-green">✓ 0.6s 自动命中</span>
           </div>
-          <div class="mcp-desc">允许当前对话中调用本地只读扫描工具（严格避让「拒绝 / 删除 / 取消」等反向黑名单按钮）。</div>
-          <div class="mcp-actions">
-            <span class="btn-deny">拒绝</span>
-            <span class="btn-single">允许一次</span>
-            <span class="btn-always">✓ 在此对话中始终允许</span>
+          <div class="mcp-desc">穿透 Shadow DOM、Material 芯片与下拉菜单，严格过滤「拒绝 / 删除 / 取消」等黑名单按钮。</div>
+          <div class="mcp-btns">
+            <span class="btn-flat">拒绝</span>
+            <span class="btn-flat">允许一次</span>
+            <span class="btn-primary">✓ 在此对话中始终允许</span>
           </div>
         </div>
-        <div class="chip-row">
+
+        <div class="followup">
           <span class="chip-yes">↪ Yes</span>
-          <span class="chip-hint">停稳等待后自动点击确认追问芯片，忽略普通长句推荐</span>
+          <span style="font-size: 12.5px; color: #787774;">输出停稳后自动点击确认芯片，不误触普通推荐问题</span>
         </div>
       </div>
-      <div style="font-size: 12px; color: #64748b; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 14px;">
-        ✓ 支持后台切屏 / 最小化保持运行 · ✓ 屏蔽 /gems、/settings 等非对话页与未聚焦第 2 浏览器误点击
+
+      <div class="foot-strip">
+        <div class="foot-item"><strong>⚡ MAIN 世界点击升级</strong>隐藏/最小化点击被节流时自动穿透 ShadowRoot</div>
+        <div class="foot-item"><strong>🛌 最小化 1.2s 跟进唤醒</strong>窗口失焦或最小化立即调度保底扫描不漏点</div>
+        <div class="foot-item"><strong>🛡️ 防休眠按对话隔离</strong>仅对开启后台模式的对话关闭标签页自动休眠</div>
       </div>
     </div>
 
-    <div class="hud-preview-card">
+    <div class="card hud-shell">
       <div>
         <div class="hud-top">
-          <div class="hud-title"><span class="hud-dot"></span> MCP 助手 <span class="badge" style="font-size:9.5px; padding:1px 6px;">v1.0.0</span></div>
-          <div class="hud-chips"><span class="hc">简体</span><span class="hc">☀</span><span class="hc">−</span></div>
+          <div class="hud-name"><span class="dot-g"></span> MCP 助手 <span class="tag" style="font-size:10px;padding:1px 5px;">v1.0.1</span></div>
+          <div class="hud-tools"><span class="ht">简体</span><span class="ht">☾</span><span class="ht">−</span></div>
         </div>
-        <div class="hud-rows">
-          <div class="hud-row"><span>插件状态</span><span class="pill">运行中</span></div>
-          <div class="hud-row"><span>自动始终允许</span><span class="pill">已开启</span></div>
-          <div class="hud-row"><span>自动点击继续</span><span class="pill">已开启</span></div>
-          <div class="hud-row"><span>后台切屏运行</span><span class="pill">已开启</span></div>
-          <div class="hud-row"><span>桌面通知</span><span class="pill">已开启</span></div>
+
+        <div class="scope-box" style="margin-top: 10px;">
+          <div class="scope-tabs"><div class="st-on">本对话</div><div class="st-off">全局默认</div></div>
+          <div class="scope-meta">
+            <span class="tag tag-blue" style="font-size:10.5px;padding:1px 6px;">对话 #a1b2c3d4</span>
+            <span class="ht" style="background:#ffffff;">恢复全局</span>
+          </div>
         </div>
-        <div class="hud-status-box">
-          允许 42 · 本次继续 3/10 · 今日 18/∞<br>
-          当前状态: <span style="color: #6ee7b7; font-weight:600;">监控中 · 后台就绪</span>
+
+        <div class="rows" style="margin-top: 10px;">
+          <div class="row"><span>插件状态</span><span class="pill-on">运行中</span></div>
+          <div class="row"><span>自动始终允许</span><span class="pill-on">已开启</span></div>
+          <div class="row row-custom"><span>自动点击继续<span class="bdot"></span></span><span class="pill-off">已关闭</span></div>
+          <div class="row"><span>后台切屏运行</span><span class="pill-on">已开启</span></div>
+          <div class="row"><span>桌面通知</span><span class="pill-on">已开启</span></div>
+          <div class="row"><span>超时自动续接</span><span><span class="pill-act">立即续接</span><span class="pill-on">已开启</span></span></div>
         </div>
       </div>
 
-      <div class="feature-points">
-        <div class="f-item">✦ 优先点击「始终允许」，可选回退单次允许</div>
-        <div class="f-item">✦ 6 层防刷额度熔断（限流 / 停滞 / 完工识别）</div>
-        <div class="f-item">✦ 100% 本地浏览器执行，零网络上传</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="status-callout">
+          状态：<strong>监控中</strong>（本对话独立配置）<br>
+          允许 18 · 本次继续 3/10 · 今日 6/∞
+        </div>
+        <div class="hud-acts">
+          <div class="act-stop">紧急停止</div>
+          <div class="act-std">探测按钮</div>
+          <div class="act-std">日志</div>
+        </div>
       </div>
     </div>
   </div>
@@ -217,148 +327,178 @@ html_s1 = f"""<!DOCTYPE html>
 render_html_to_png(html_s1, os.path.join(SCREENSHOTS_DIR, 'screenshot-1-mcp-auto-approval-1280x800.png'), 1280, 800, dpr=2)
 
 # -------------------------------------------------------------
-# SCREENSHOT 2: Hold-to-Drag HUD + Dual Light/Dark Mode (1280x800)
+# SCREENSHOT 2: Per-Chat Independent Controls & Isolated E-Stop + Notion Dual HUD (1280x800)
 # -------------------------------------------------------------
 html_s2 = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  {BASE_STYLE}
   body {{
     width: 1280px; height: 800px;
-    background: #070b14;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f8fafc; overflow: hidden; position: relative;
-    padding: 32px 44px;
+    padding: 30px 40px;
     display: flex; flex-direction: column; justify-content: space-between; gap: 18px;
   }}
-  .header-bar {{
+  .stage {{
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    min-height: 0;
+  }}
+  .chat-pane {{
+    padding: 20px 22px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 14px;
+  }}
+  .chat-pane.dark-pane {{
+    background: #191919; border-color: rgba(255, 255, 255, 0.1); color: #e6e6e4;
+  }}
+  .pane-top {{
     display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid rgba(55, 53, 47, 0.09);
   }}
-  .brand {{ display: flex; align-items: center; gap: 14px; }}
-  .brand img {{ width: 44px; height: 44px; border-radius: 11px; }}
-  .title-area h1 {{ font-size: 21px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }}
-  .badge-new {{ background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.45); font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight:700; }}
-  .subtitle {{ font-size: 13px; color: #94a3b8; margin-top: 3px; }}
+  .dark-pane .pane-top {{ border-bottom-color: rgba(255, 255, 255, 0.08); }}
+  .pane-url {{ font-size: 12px; font-weight: 600; color: #37352f; }}
+  .dark-pane .pane-url {{ color: #e6e6e4; }}
 
-  .browser-box {{
-    flex: 1; background: #10131b; border: 1px solid rgba(255,255,255,0.12); border-radius: 18px;
-    display: flex; flex-direction: column; overflow: hidden;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+  .mini-hud-light {{
+    background: #ffffff; border: 1px solid rgba(55, 53, 47, 0.13); border-radius: 10px;
+    padding: 13px 14px; box-shadow: 0 6px 20px rgba(15, 15, 15, 0.07);
+    display: flex; flex-direction: column; gap: 8px;
   }}
-  .b-top {{ background: #181c26; padding: 10px 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }}
-  .dots {{ display: flex; gap: 7px; }}
-  .dot {{ width: 10px; height: 10px; border-radius: 50%; }}
-  .url {{ flex:1; max-width: 560px; background: #0d1017; padding: 5px 12px; border-radius: 7px; font-size: 12px; color: #94a3b8; }}
+  .mini-hud-dark {{
+    background: #1f1f1f; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px;
+    padding: 13px 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    display: flex; flex-direction: column; gap: 8px; color: #e6e6e4;
+  }}
+  .mh-head {{ display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 600; padding-bottom: 7px; border-bottom: 1px solid rgba(55,53,47,0.08); }}
+  .mini-hud-dark .mh-head {{ border-bottom-color: rgba(255,255,255,0.08); }}
+  .mh-scope {{
+    background: #f7f6f3; border: 1px solid rgba(55,53,47,0.09); border-radius: 7px; padding: 6px;
+    display: flex; flex-direction: column; gap: 5px;
+  }}
+  .mini-hud-dark .mh-scope {{ background: #262626; border-color: rgba(255,255,255,0.08); }}
+  .mh-tabs {{ display: grid; grid-template-columns: 1fr 1fr; gap: 3px; background: rgba(55,53,47,0.07); padding: 2px; border-radius: 5px; font-size: 11px; text-align: center; }}
+  .mini-hud-dark .mh-tabs {{ background: rgba(0,0,0,0.28); }}
+  .mt-on {{ background: #ffffff; color: #37352f; font-weight: 600; padding: 3px; border-radius: 4px; }}
+  .mini-hud-dark .mt-on {{ background: #333333; color: #f1f1ef; }}
+  .mt-off {{ color: #787774; padding: 3px; }}
+  .mini-hud-dark .mt-off {{ color: #9b9a97; }}
 
-  .canvas {{
-    flex: 1; display: grid; grid-template-columns: 520px 1fr; padding: 26px 32px; gap: 28px; position: relative;
-    background: radial-gradient(circle at 75% 40%, rgba(30,41,59,0.3) 0%, #10131b 70%);
-  }}
-  .left-chat {{ display: flex; flex-direction: column; gap: 16px; }}
-  .u-msg {{ align-self: flex-end; background: #202533; padding: 11px 16px; border-radius: 16px 16px 4px 16px; font-size: 13px; color: #e2e8f0; }}
-  .ai-card {{ background: #171c28; border: 1px solid rgba(96,165,250,0.35); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }}
-  .a-btn {{ background: #2563eb; color: #fff; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; display: inline-block; align-self: flex-start; }}
+  .mh-row {{ display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 2px 4px; border-radius: 5px; }}
+  .p-l-on {{ background: #edf6f3; color: #0f7b6c; border: 1px solid rgba(15,123,108,0.24); padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; }}
+  .p-l-off {{ background: #f7f6f3; color: #787774; border: 1px solid rgba(55,53,47,0.12); padding: 2px 8px; border-radius: 5px; font-size: 11px; }}
+  .p-l-red {{ background: #fdebeb; color: #d44c47; border: 1px solid rgba(235,87,87,0.28); padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; }}
+  .p-d-on {{ background: rgba(45,170,126,0.15); color: #6bc9a4; border: 1px solid rgba(45,170,126,0.3); padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; }}
 
-  .drag-stage {{ position: relative; border-left: 1px dashed rgba(255,255,255,0.1); padding-left: 24px; }}
-  .ghost {{
-    position: absolute; right: 20px; bottom: 10px; width: 220px; height: 96px;
-    border: 2px dashed rgba(148,163,184,0.28); border-radius: 14px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: 11.5px; color: #64748b; gap: 3px;
+  .alert-box-light {{
+    background: #fdebeb; border: 1px solid rgba(235, 87, 87, 0.25);
+    color: #b91c1c; border-radius: 6px; padding: 7px 9px; font-size: 11px; line-height: 1.45;
   }}
-  .arc {{ position: absolute; left: 260px; bottom: 92px; width: 170px; height: 150px; }}
-
-  /* Light HUD + Dark HUD */
-  .hud-dark {{
-    position: absolute; top: 34px; left: 26px; width: 262px;
-    background: rgba(22,25,32,0.96); border: 1px solid rgba(96,165,250,0.55); border-radius: 14px;
-    padding: 11px 13px; box-shadow: 0 20px 46px rgba(0,0,0,0.65);
+  .ok-box-dark {{
+    background: #262626; border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #9b9a97; border-radius: 6px; padding: 7px 9px; font-size: 11px; line-height: 1.45;
   }}
-  .hud-light {{
-    position: absolute; top: 130px; right: 24px; width: 262px;
-    background: rgba(255,255,255,0.97); color: #111827; border: 1px solid rgba(15,23,42,0.15); border-radius: 14px;
-    padding: 11px 13px; box-shadow: 0 22px 50px rgba(0,0,0,0.55);
-  }}
-  .drag-pill {{
-    position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
-    background: #2563eb; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px; white-space: nowrap;
-  }}
-  .h-top {{ display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 12px; font-weight: 700; }}
-  .hud-light .h-top {{ border-bottom-color: rgba(15,23,42,0.08); }}
-  .h-r {{ display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin: 6px 0; }}
-  .p-d {{ padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: rgba(52,168,83,0.2); color: #86efac; border: 1px solid rgba(52,168,83,0.5); }}
-  .p-l {{ padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: rgba(22,163,74,0.14); color: #15803d; border: 1px solid rgba(22,163,74,0.45); }}
-
-  .bottom-specs {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }}
-  .sp {{ background: rgba(15,23,42,0.75); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; padding: 12px 14px; }}
-  .sp h4 {{ font-size: 12.5px; color: #93c5fd; margin-bottom: 3px; }}
-  .sp p {{ font-size: 11px; color: #94a3b8; line-height: 1.4; }}
+  .mh-acts {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; font-size: 11px; text-align: center; font-weight: 500; }}
+  .specs {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }}
+  .sp {{ padding: 11px 13px; }}
+  .sp h4 {{ font-size: 12.5px; color: #37352f; margin-bottom: 3px; }}
+  .sp p {{ font-size: 11px; color: #787774; line-height: 1.45; }}
 </style>
 </head>
 <body>
-  <div class="header-bar">
+  <div class="top-header">
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
-      <div class="title-area">
-        <h1>按住自由拖拽悬浮窗 · 黑白深浅主题随心切换 <span class="badge-new">v1.0.0 重磅升级</span></h1>
-        <p class="subtitle">严格左键按住拖拽（鼠标悬停绝不粘连跟随），支持深色/浅色模式与 简体 / 繁體 / EN / 日本語 标题栏一键切换</p>
+      <div>
+        <div class="title-line">
+          <h1>单对话独立控制 &amp; 隔离紧急停止 · 浅色纸感 / 深色炭灰</h1>
+          <span class="tag tag-blue">v1.0.1 新特性</span>
+          <span class="tag tag-red">单对话独立急停</span>
+        </div>
+        <div class="subtitle">每个 Gemini 对话均可单独开启/关闭功能或紧急停止，切到其他对话完全不受影响，切回自动恢复</div>
       </div>
     </div>
   </div>
 
-  <div class="browser-box">
-    <div class="b-top">
-      <div class="dots"><span class="dot" style="background:#ff5f56"></span><span class="dot" style="background:#ffbd2e"></span><span class="dot" style="background:#27c93f"></span></div>
-      <div class="url">🔒 https://gemini.google.com/app/workspace-mcp-session</div>
-    </div>
-    <div class="canvas">
-      <div class="left-chat">
-        <div class="u-msg">自动执行工程代码扫描并保持后台监听确认</div>
-        <div class="ai-card">
-          <div style="font-size:13px; font-weight:700; color:#93c5fd;">🛡️ MCP 工具权限请求已自动放行</div>
-          <div style="font-size:12px; color:#94a3b8; line-height:1.5;">悬浮窗支持拖拽至屏幕任意角落，左侧对话区完全无遮挡。</div>
-          <span class="a-btn">✓ 在此对话中始终允许</span>
+  <div class="stage">
+    <div class="card chat-pane">
+      <div class="pane-top">
+        <span class="pane-url">📄 对话 A · /app/chat-a1b2c3</span>
+        <span class="tag tag-red">🛑 仅停本对话（浅色纸感）</span>
+      </div>
+
+      <div class="mini-hud-light">
+        <div class="mh-head">
+          <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#eb5757;margin-right:6px;"></span>MCP 助手 <span class="tag" style="font-size:10px;padding:0 4px;">v1.0.1</span></span>
+          <span style="font-size:10.5px;color:#787774;">简体 &nbsp; ☾ &nbsp; −</span>
+        </div>
+        <div class="mh-scope">
+          <div class="mh-tabs"><div class="mt-on">本对话</div><div class="mt-off">全局默认</div></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;">
+            <span class="tag tag-blue" style="font-size:10px;padding:1px 5px;">对话 #chat-a1b</span>
+            <span style="color:#787774;border:1px solid rgba(55,53,47,0.14);padding:1px 6px;border-radius:4px;background:#fff;">恢复全局</span>
+          </div>
+        </div>
+        <div class="mh-row"><span>插件状态</span><span class="p-l-on">运行中</span></div>
+        <div class="mh-row"><span>自动始终允许</span><span class="p-l-on">已开启</span></div>
+        <div class="mh-row" style="background:#f7f9fc;"><span>自动点击继续 <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#2383e2;"></span></span><span class="p-l-off">已关闭</span></div>
+        <div class="mh-row"><span>后台切屏运行</span><span class="p-l-on">已开启</span></div>
+        <div class="alert-box-light"><strong>熔断: 用户手动紧急停止（仅锁定此对话）</strong><br>允许 12 · 本次继续 0/10 · 今日 18/∞</div>
+        <div class="mh-acts">
+          <div class="p-l-red" style="padding:5px;">解除熔断</div>
+          <div style="border:1px solid rgba(55,53,47,0.12);border-radius:5px;padding:5px;">探测按钮</div>
+          <div style="border:1px solid rgba(55,53,47,0.12);border-radius:5px;padding:5px;">日志</div>
         </div>
       </div>
 
-      <div class="drag-stage">
-        <div class="ghost"><span>📍 默认右下角位置</span><span style="font-size:10px;">支持弹窗一键复位</span></div>
+      <div style="font-size:12px;color:#787774;">
+        ✓ 对话 A 触发「紧急停止」后自动持久化，切回该对话时依然保持停机保护。
+      </div>
+    </div>
 
-        <div class="hud-dark">
-          <div class="drag-pill">✊ 左键按住拖拽中 (深色模式)</div>
-          <div class="h-top">
-            <span>🟢 MCP 助手 <small style="color:#93c5fd;">v1.0.0</small></span>
-            <span style="font-size:10px; opacity:0.8;">简体 ☀ −</span>
-          </div>
-          <div class="h-r"><span>插件状态</span><span class="p-d">运行中</span></div>
-          <div class="h-r"><span>自动始终允许</span><span class="p-d">已开启</span></div>
-          <div class="h-r"><span>自动点击继续</span><span class="p-d">已开启</span></div>
-          <div class="h-r"><span>桌面通知</span><span class="p-d">已开启</span></div>
-        </div>
+    <div class="card chat-pane dark-pane">
+      <div class="pane-top">
+        <span class="pane-url">📄 对话 B · /app/chat-x9y8z7</span>
+        <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;background:rgba(45,170,126,0.16);border:1px solid rgba(45,170,126,0.32);color:#6bc9a4;">✅ 继续全自动运行（深色炭灰）</span>
+      </div>
 
-        <div class="hud-light">
-          <div class="drag-pill" style="background:#0f172a; border:1px solid rgba(255,255,255,0.2);">☀️ 浅色模式 (English)</div>
-          <div class="h-top">
-            <span>🟢 MCP Helper <small style="color:#1d4ed8;">v1.0.0</small></span>
-            <span style="font-size:10px; opacity:0.8;">EN ☾ −</span>
-          </div>
-          <div class="h-r"><span>Extension</span><span class="p-l">Active</span></div>
-          <div class="h-r"><span>Always Allow</span><span class="p-l">On</span></div>
-          <div class="h-r"><span>Auto Continue</span><span class="p-l">On</span></div>
-          <div class="h-r"><span>Desktop Alert</span><span class="p-l">On</span></div>
+      <div class="mini-hud-dark">
+        <div class="mh-head">
+          <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#2daa7e;margin-right:6px;"></span>MCP Helper <span style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,0.06);color:#9b9a97;border:1px solid rgba(255,255,255,0.09);">v1.0.1</span></span>
+          <span style="font-size:10.5px;color:#9b9a97;">EN &nbsp; ☀ &nbsp; −</span>
         </div>
+        <div class="mh-scope">
+          <div class="mh-tabs"><div class="mt-on">This chat</div><div class="mt-off">Global</div></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;">
+            <span style="color:#9b9a97;background:rgba(255,255,255,0.05);padding:1px 6px;border-radius:4px;">Chat #chat-x9y</span>
+            <span style="color:#9b9a97;">Following global</span>
+          </div>
+        </div>
+        <div class="mh-row"><span>Extension</span><span class="p-d-on">Active</span></div>
+        <div class="mh-row"><span>Auto Always Allow</span><span class="p-d-on">On</span></div>
+        <div class="mh-row"><span>Auto Continue</span><span class="p-d-on">On</span></div>
+        <div class="mh-row"><span>Background Run</span><span class="p-d-on">On</span></div>
+        <div class="ok-box-dark"><strong style="color:#6bc9a4;">Monitoring · Background Ready</strong><br>Allow 12 · Task 4/10 · Today 18/∞</div>
+        <div class="mh-acts">
+          <div style="background:rgba(235,87,87,0.1);border:1px solid rgba(235,87,87,0.25);color:#f08080;border-radius:5px;padding:5px;">E-Stop</div>
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:#d4d4d1;border-radius:5px;padding:5px;">Inspect</div>
+          <div style="background:rgba(35,131,226,0.16);border:1px solid rgba(35,131,226,0.34);color:#6eaef5;border-radius:5px;padding:5px;">Logs</div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:#9b9a97;">
+        ✓ 对话 B 与其他已打开标签页完全不受对话 A 急停影响，后台继续稳定执行。
       </div>
     </div>
   </div>
 
-  <div class="bottom-specs">
-    <div class="sp"><h4>① 悬停零粘连修复</h4><p>仅左键按住标题栏才启动拖动，左键轻点立即展开/折叠。</p></div>
-    <div class="sp"><h4>② 黑白双模式同步</h4><p>点击标题栏 ☀/☾ 即可即时切换浅色/深色主题并同步弹窗。</p></div>
-    <div class="sp"><h4>③ 四语言快捷切换</h4><p>一键轮换 简体中文 / 繁體中文 / English / 日本語。</p></div>
-    <div class="sp"><h4>④ 坐标记忆与复位</h4><p>自动存储屏幕坐标并防溢出边界，支持弹窗一键复位右下角。</p></div>
+  <div class="specs">
+    <div class="card sp"><h4>① 本对话 / 全局切换</h4><p>HUD 顶部一键切换作用域，6 项开关独立生效并以蓝点标示。</p></div>
+    <div class="card sp"><h4>② 隔离紧急停止</h4><p>默认仅停当前对话；弹窗底部另设「停止全部对话」广播急停。</p></div>
+    <div class="card sp"><h4>③ 新对话自动迁移</h4><p>/app 落地页的独立设置发送后自动迁移至新会话 ID。</p></div>
+    <div class="card sp"><h4>④ 左键按住自由拖拽</h4><p>4px 消抖防悬停粘连，记忆屏幕坐标并支持一键复位。</p></div>
   </div>
 </body>
 </html>
@@ -366,95 +506,105 @@ html_s2 = f"""<!DOCTYPE html>
 render_html_to_png(html_s2, os.path.join(SCREENSHOTS_DIR, 'screenshot-2-draggable-hud-1280x800.png'), 1280, 800, dpr=2)
 
 # -------------------------------------------------------------
-# SCREENSHOT 3: Desktop Notifications & Stall Alert (1280x800)
+# SCREENSHOT 3: Live Wait Timer, Stall Auto-Recovery & OS Notifications (1280x800)
 # -------------------------------------------------------------
 html_s3 = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  {BASE_STYLE}
   body {{
     width: 1280px; height: 800px;
-    background: #070b14;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f8fafc; overflow: hidden; position: relative;
-    padding: 34px 44px;
-    display: flex; flex-direction: column; justify-content: space-between; gap: 22px;
+    padding: 30px 40px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
   }}
-  .header-bar {{
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 18px;
+  .stage {{
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
   }}
-  .brand {{ display: flex; align-items: center; gap: 14px; }}
-  .brand img {{ width: 46px; height: 46px; border-radius: 12px; }}
-  .title-area h1 {{ font-size: 22px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }}
-  .badge {{ background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.5); font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight:700; }}
-  .subtitle {{ font-size: 13.5px; color: #94a3b8; margin-top: 3px; }}
-
-  .stage {{ flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: stretch; }}
   .panel {{
-    background: rgba(15,23,42,0.65); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px;
-    padding: 26px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;
+    padding: 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;
   }}
-  .p-head {{ font-size: 15px; font-weight: 700; color: #93c5fd; }}
-
+  .sec-title {{ font-size: 14px; font-weight: 700; color: #37352f; display: flex; align-items: center; justify-content: space-between; }}
+  .wait-callout {{
+    background: #faebdd; border: 1px solid rgba(217, 115, 13, 0.28);
+    border-radius: 8px; padding: 12px 14px; color: #b35c07; font-size: 13px; font-weight: 600;
+  }}
   .notif-card {{
-    background: #1c222e; border: 1px solid rgba(255,255,255,0.15); border-left: 5px solid #f59e0b;
-    border-radius: 14px; padding: 20px 22px; box-shadow: 0 18px 44px rgba(0,0,0,0.55);
+    background: #ffffff; border: 1px solid rgba(55, 53, 47, 0.14);
+    border-left: 4px solid #d9730d; border-radius: 10px;
+    padding: 18px 20px; box-shadow: 0 6px 18px rgba(15, 15, 15, 0.06);
   }}
-  .n-top {{ display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #94a3b8; margin-bottom: 12px; }}
-  .n-title {{ font-size: 15.5px; font-weight: 700; color: #fff; margin-bottom: 6px; }}
-  .n-body {{ font-size: 13px; color: #cbd5e1; line-height: 1.55; }}
-  .n-cta {{ margin-top: 14px; display: inline-block; background: #2563eb; color: #fff; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; }}
-
+  .n-meta {{ display: flex; justify-content: space-between; font-size: 11.5px; color: #787774; margin-bottom: 8px; }}
+  .n-title {{ font-size: 15px; font-weight: 700; color: #37352f; margin-bottom: 6px; }}
+  .n-body {{ font-size: 12.5px; color: #5b5954; line-height: 1.55; }}
+  .n-cta {{
+    margin-top: 12px; display: inline-block; background: #2383e2; color: #ffffff;
+    padding: 6px 13px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  }}
   .tab-bar {{
-    background: #131823; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 18px;
-    display: flex; align-items: center; justify-content: space-between;
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.1);
+    border-radius: 8px; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;
   }}
   .badge-ico {{ position: relative; }}
   .badge-ico img {{ width: 26px; height: 26px; border-radius: 6px; }}
-  .red-dot {{ position: absolute; top:-4px; right:-4px; width:15px; height:15px; border-radius:50%; background:#ea4335; color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; }}
-
-  .ctrl-row {{
-    background: #131823; border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; padding: 15px 18px;
-    display: flex; justify-content: space-between; align-items: center; font-size: 13.5px;
+  .red-dot {{
+    position: absolute; top: -4px; right: -5px; width: 15px; height: 15px; border-radius: 50%;
+    background: #eb5757; color: #fff; font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
   }}
-  .pill-on {{ background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.45); padding: 4px 13px; border-radius: 999px; font-size: 12px; font-weight: 700; }}
+  .ctrl-row {{
+    background: #f7f6f3; border: 1px solid rgba(55, 53, 47, 0.09);
+    border-radius: 8px; padding: 13px 15px;
+    display: flex; justify-content: space-between; align-items: center; font-size: 13px;
+  }}
+  .prompt-preview {{
+    background: #ebf3fb; border: 1px solid rgba(35, 131, 226, 0.25);
+    border-radius: 8px; padding: 13px 15px; font-size: 12.5px; color: #1d4ed8; line-height: 1.55;
+  }}
 </style>
 </head>
 <body>
-  <div class="header-bar">
+  <div class="top-header">
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
-      <div class="title-area">
-        <h1>卡死超时桌面通知 · 一键启闭与红点唤醒 <span class="badge">多语言原生提醒</span></h1>
-        <p class="subtitle">MCP 调用挂起或响应停滞超过设定阈值自动弹窗报警，HUD 与设置面板随时秒切静音</p>
+      <div>
+        <div class="title-line">
+          <h1>连接卡死实时计时 · 超时自动续接 &amp; 桌面通知提醒</h1>
+          <span class="tag tag-amber">超时自动恢复</span>
+          <span class="tag tag-blue">一键立即续接</span>
+        </div>
+        <div class="subtitle">实时监控 MCP 工具连接耗时，超时自动终止并拟人发送自定义续接话术，同时支持系统级桌面告警</div>
       </div>
     </div>
   </div>
 
   <div class="stage">
-    <div class="panel">
-      <div class="p-head">🖥️ 系统级桌面告警与标签聚焦</div>
+    <div class="card panel">
+      <div class="sec-title"><span>🖥️ 系统级桌面告警 &amp; 点击唤醒标签页</span><span class="tag tag-amber">4 语言通知</span></div>
+      <div class="wait-callout">⏳ 正在连接 Desktop Commander · 已等 4分52秒 / 阈值 5分钟</div>
       <div class="notif-card">
-        <div class="n-top"><span>🔵 Google Chrome · 桌面通知</span><span>✕</span></div>
+        <div class="n-meta"><span>Google Chrome · 桌面通知</span><span>刚刚</span></div>
         <div class="n-title">⚠️ Gemini 连接已超过 5 分钟</div>
-        <div class="n-body">检测到该对话连续连接/等待超过 5 分钟仍无新进展，点击此处立即切回对应标签页检查。</div>
-        <span class="n-cta">👉 点击还原最小化窗口并激活 Gemini 标签页</span>
+        <div class="n-body">检测到该对话连续连接/等待超过 5 分钟仍无新进展，��击此处立即还原最小化窗口并切回对应标签页。</div>
+        <span class="n-cta">👉 点击直达对应 Gemini 对话标签页</span>
       </div>
       <div class="tab-bar">
-        <span style="font-size:13px; color:#e2e8f0;">✦ Gemini - 工作区会话 <small style="color:#fbbf24;">(停滞报警中)</small></span>
+        <span style="font-size:12.5px;font-weight:500;">✦ Gemini · 对话 #a1b2c3d4 <span style="color:#b35c07;">(停滞告警中)</span></span>
         <div class="badge-ico"><img src="{icon_b64}" alt="ext"><span class="red-dot">!</span></div>
       </div>
     </div>
 
-    <div class="panel">
-      <div class="p-head">🔔 双向控制台与防误报机制</div>
-      <div class="ctrl-row"><span>悬浮窗 / 弹窗一键开关</span><span class="pill-on">已开启 · 点击秒静音</span></div>
-      <div class="ctrl-row"><span>超时提醒阈值设置</span><span style="color:#93c5fd; font-weight:700;">5 分钟 (支持 1~60 分钟)</span></div>
-      <div class="ctrl-row"><span>多语言通知文案</span><span style="color:#6ee7b7; font-weight:700;">简 / 繁 / EN / 日本語 自动匹配</span></div>
-      <div class="ctrl-row"><span>动态读秒倒计时过滤</span><span style="color:#cbd5e1;">仅真实无新文本进展时计时</span></div>
+    <div class="card panel">
+      <div class="sec-title"><span>🔄 超时自动终止续接 &amp; 拟人防降速节流</span><span class="tag tag-green">草稿安全保护</span></div>
+      <div class="prompt-preview">
+        <strong>默认自动续接文案（支持自定义 200 字）：</strong><br>
+        「继续，刚才mcp连接断开了」<br>
+        <span style="font-size:11.5px;color:#5b5954;">发送前自动检查输入框是否有用户未发送草稿，绝不覆盖；后台隐藏态发送按钮支持 MAIN 世界点击兜底。</span>
+      </div>
+      <div class="ctrl-row"><span>一键立即续接（免等待阈值）</span><span class="tag tag-blue">立即续接</span></div>
+      <div class="ctrl-row"><span>拟人防降速节流</span><span class="tag tag-green">随机延迟 + 分段输入</span></div>
+      <div class="ctrl-row"><span>单对话独立开关通知与续接</span><span class="tag">互不干扰其他标签页</span></div>
     </div>
   </div>
 </body>
@@ -463,137 +613,102 @@ html_s3 = f"""<!DOCTYPE html>
 render_html_to_png(html_s3, os.path.join(SCREENSHOTS_DIR, 'screenshot-3-desktop-notifications-1280x800.png'), 1280, 800, dpr=2)
 
 # -------------------------------------------------------------
-# SCREENSHOT 4: Dark/Light Popup & Multi-Language Settings (1280x800)
+# SCREENSHOT 4: Real-DOM Notion Popup Showcase (Light + Dark) (1280x800)
 # -------------------------------------------------------------
 html_s4 = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  {BASE_STYLE}
   body {{
     width: 1280px; height: 800px;
-    background: #070b14;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f8fafc; overflow: hidden; position: relative;
-    padding: 32px 44px;
-    display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
+    padding: 28px 40px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 18px;
   }}
-  .header-bar {{
+  .stage {{
+    flex: 1;
+    display: grid;
+    grid-template-columns: 356px 356px 1fr;
+    gap: 22px;
+    min-height: 0;
+  }}
+  .popup-frame {{
+    border-radius: 11px;
+    overflow: hidden;
+    border: 1px solid rgba(55, 53, 47, 0.14);
+    box-shadow: 0 8px 24px rgba(15, 15, 15, 0.08);
+    background: #ffffff;
+    display: flex; flex-direction: column;
+  }}
+  .popup-frame.dark {{
+    background: #191919;
+    border-color: rgba(15, 15, 15, 0.35);
+    box-shadow: 0 10px 28px rgba(15, 15, 15, 0.16);
+  }}
+  .frame-bar {{
+    padding: 7px 12px;
+    font-size: 11px; font-weight: 600; color: #787774;
+    background: #f7f6f3; border-bottom: 1px solid rgba(55, 53, 47, 0.09);
     display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;
   }}
-  .brand {{ display: flex; align-items: center; gap: 14px; }}
-  .brand img {{ width: 44px; height: 44px; border-radius: 11px; }}
-  .title-area h1 {{ font-size: 21px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }}
-  .badge {{ background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(96,165,250,0.45); font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight:700; }}
-  .subtitle {{ font-size: 13px; color: #94a3b8; margin-top: 3px; }}
-
-  .stage {{ flex: 1; display: grid; grid-template-columns: 375px 375px 1fr; gap: 22px; }}
-  .p-card-shell {{
-    border-radius: 16px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px;
+  .popup-frame.dark .frame-bar {{
+    background: #202020; color: #9b9a97; border-bottom-color: rgba(255, 255, 255, 0.08);
   }}
-  .dark {{ background: #14161a; border: 1px solid rgba(255,255,255,0.15); color: #e8eaed; box-shadow: 0 22px 50px rgba(0,0,0,0.6); }}
-  .light {{ background: #f4f6fb; border: 1px solid rgba(255,255,255,0.35); color: #111827; box-shadow: 0 22px 50px rgba(0,0,0,0.55); }}
+  .img-wrap {{ flex: 1; overflow: hidden; }}
+  .img-wrap img {{ width: 100%; height: auto; display: block; }}
 
-  .p-h {{ display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid rgba(148,163,184,0.18); }}
-  .sw {{ width: 34px; height: 18px; border-radius: 999px; background: #34a853; position: relative; }}
-  .sw::after {{ content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fff; right: 2px; top: 2px; }}
-  .bar {{ display: flex; justify-content: space-between; align-items: center; padding: 6px 9px; border-radius: 9px; }}
-  .dark .bar, .dark .sec, .dark .st {{ background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }}
-  .light .bar, .light .sec, .light .st {{ background: #ffffff; border: 1px solid rgba(15,23,42,0.1); }}
-  .sts {{ display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }}
-  .st {{ border-radius: 9px; padding: 7px; text-align: center; }}
-  .sec {{ border-radius: 11px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; }}
-  .row {{ display: flex; justify-content: space-between; align-items: center; font-size: 11px; }}
-  .btn-save {{ background: #1a73e8; color: #fff; text-align: center; padding: 7px; border-radius: 8px; font-weight: 700; }}
-
-  .notes {{ display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }}
-  .note {{ background: rgba(15,23,42,0.72); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px 18px; flex: 1; display:flex; flex-direction:column; justify-content:center; gap:5px; }}
-  .note h3 {{ font-size: 14.5px; color: #93c5fd; }}
-  .note p {{ font-size: 12px; color: #94a3b8; line-height: 1.5; }}
+  .notes {{ display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }}
+  .note {{
+    padding: 15px 17px; flex: 1;
+    display: flex; flex-direction: column; justify-content: center; gap: 5px;
+  }}
+  .note h3 {{ font-size: 14px; font-weight: 700; color: #37352f; }}
+  .note p {{ font-size: 12px; color: #6b6a66; line-height: 1.5; }}
 </style>
 </head>
 <body>
-  <div class="header-bar">
+  <div class="top-header">
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
-      <div class="title-area">
-        <h1>黑白深浅双模式 · 多语言全功能设定面板 <span class="badge">v1.0.0</span></h1>
-        <p class="subtitle">实时监控今日自动放行统计、灵活调整熔断阈值与关键词库，深色/浅色主题与 4 国语言同步切换</p>
+      <div>
+        <div class="title-line">
+          <h1>Notion 极简设定中心 · 单对话卡片 + 全局配置</h1>
+          <span class="tag tag-blue">v1.0.1 真实界面</span>
+          <span class="tag tag-green">浅色纸感 / 深色炭灰</span>
+        </div>
+        <div class="subtitle">顶部专属「当前对话独立控制」卡片，支持 6 项独立开关、仅停本对话、恢复全局与 4 语言实时联动</div>
       </div>
     </div>
   </div>
 
   <div class="stage">
-    <div class="p-card-shell dark">
-      <div class="p-h">
-        <div style="font-weight:700; font-size:13px;">Gemini MCP 助手 <small style="color:#93c5fd;">v1.0.0</small></div>
-        <div class="sw"></div>
-      </div>
-      <div class="bar"><span>🌐 简体中文 ▾</span><span>🌙 深色模式</span></div>
-      <div class="sts">
-        <div class="st"><small style="opacity:0.65">今日允许</small><div style="font-weight:700;font-size:13px;">42</div></div>
-        <div class="st"><small style="opacity:0.65">今日继续</small><div style="font-weight:700;font-size:13px;">18 / ∞</div></div>
-        <div class="st"><small style="opacity:0.65">当前状态</small><div style="font-weight:700;color:#81c995;">后台就绪</div></div>
-      </div>
-      <div class="sec">
-        <div style="font-weight:700;color:#aecbfa;">⚡ 核心自动化</div>
-        <div class="row"><span>自动点击 MCP「始终允许」</span><span>☑</span></div>
-        <div class="row"><span>自动点击下方「继续」按钮</span><span>☑</span></div>
-        <div class="row"><span>后台静默运行（防休眠）</span><span>☑</span></div>
-        <div class="row"><span>显示网页自由拖拽悬浮窗</span><span>☑</span></div>
-      </div>
-      <div class="sec">
-        <div style="font-weight:700;color:#aecbfa;">🛡️ 防刷熔断保护</div>
-        <div class="row"><span>单次任务上限 / 每日上限</span><span>10 / ∞</span></div>
-        <div class="row"><span>超时桌面通知提醒 (分钟)</span><span>5 分钟</span></div>
-      </div>
-      <div class="btn-save">保存设置并同步到 Gemini</div>
+    <div class="popup-frame">
+      <div class="frame-bar"><span>☀️ 浅色纸感模式 (Paper Light)</span><span>真实 DOM</span></div>
+      <div class="img-wrap"><img src="{popup_light_b64}" alt="Notion Popup Light"></div>
     </div>
 
-    <div class="p-card-shell light">
-      <div class="p-h">
-        <div style="font-weight:700; font-size:13px;">Gemini MCP Helper <small style="color:#1d4ed8;">v1.0.0</small></div>
-        <div class="sw"></div>
-      </div>
-      <div class="bar"><span>🌐 English ▾</span><span>☀️ Light</span></div>
-      <div class="sts">
-        <div class="st"><small style="opacity:0.65">Allowed</small><div style="font-weight:700;font-size:13px;">42</div></div>
-        <div class="st"><small style="opacity:0.65">Continued</small><div style="font-weight:700;font-size:13px;">18 / ∞</div></div>
-        <div class="st"><small style="opacity:0.65">Status</small><div style="font-weight:700;color:#15803d;">BG Ready</div></div>
-      </div>
-      <div class="sec">
-        <div style="font-weight:700;color:#1d4ed8;">⚡ Core Automation</div>
-        <div class="row"><span>Auto-click MCP "Always allow"</span><span>☑</span></div>
-        <div class="row"><span>Auto-click "Continue / Yes"</span><span>☑</span></div>
-        <div class="row"><span>Run silently in background</span><span>☑</span></div>
-        <div class="row"><span>Show floating draggable HUD</span><span>☑</span></div>
-      </div>
-      <div class="sec">
-        <div style="font-weight:700;color:#1d4ed8;">🛡️ 6-Layer Circuit Breaker</div>
-        <div class="row"><span>Max per task / Daily cap</span><span>10 / ∞</span></div>
-        <div class="row"><span>Desktop stall alert threshold</span><span>5 mins</span></div>
-      </div>
-      <div class="btn-save">Save Settings</div>
+    <div class="popup-frame dark">
+      <div class="frame-bar"><span>🌙 深色炭灰模式 (Charcoal Dark)</span><span>真实 DOM</span></div>
+      <div class="img-wrap"><img src="{popup_dark_b64}" alt="Notion Popup Dark"></div>
     </div>
 
     <div class="notes">
-      <div class="note">
-        <h3>🌐 4 语言原生适配</h3>
-        <p>内置 简体中文、繁體中文、English、日本語，同步适配对应语言的 MCP 权限与继续关键词。</p>
+      <div class="card note">
+        <h3>🎛️ 顶部单对话独立卡片</h3>
+        <p>自动识别当前聚焦 Gemini 标签页，支持独立开关 6 项功能、一键「仅停本对话」或「恢复全局」。</p>
       </div>
-      <div class="note">
-        <h3>🌗 黑白深浅主题切换</h3>
-        <p>一键在深色护眼与浅色白昼模式间切换，Popup 面板与页面悬浮 HUD 实时联动。</p>
+      <div class="card note">
+        <h3>🛑 紧急停止精细分层</h3>
+        <p>清晰区分「仅停本对话（紧急停止）」与「停止全部对话」，不再牵连其他正在跑任务的标签页。</p>
       </div>
-      <div class="note">
-        <h3>📍 悬浮窗复位 &amp; 应急停止</h3>
-        <p>支持一键重置悬浮窗坐标至默认右下角，提供「紧急停止」与「解除熔断」快捷控制。</p>
+      <div class="card note">
+        <h3>🌐 4 语言 + 双主题同步</h3>
+        <p>原生支持 简体中文、繁體中文、English、日本語，深浅主题在弹窗与悬浮窗间秒级同步。</p>
       </div>
-      <div class="note">
-        <h3>🔒 100% 本地离线安全</h3>
-        <p>所有配置与统计均保存在 Chrome 原生 <code>storage.local</code>，无第三方统计与外联请求。</p>
+      <div class="card note">
+        <h3>🔒 100% 本地安全存储</h3>
+        <p>所有全局配置、单对话覆写与计数均保存在 Chrome 本地 <code>storage.local</code>，零外联采集。</p>
       </div>
     </div>
   </div>
@@ -603,130 +718,113 @@ html_s4 = f"""<!DOCTYPE html>
 render_html_to_png(html_s4, os.path.join(SCREENSHOTS_DIR, 'screenshot-4-popup-settings-1280x800.png'), 1280, 800, dpr=2)
 
 # -------------------------------------------------------------
-# SCREENSHOT 5: 6-Layer Circuit Breaker + Multi-Window Guard (1280x800)
+# SCREENSHOT 5: 6-Layer Circuit Breaker + Per-Chat & Background Safeguards (1280x800)
 # -------------------------------------------------------------
 html_s5 = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  {BASE_STYLE}
   body {{
     width: 1280px; height: 800px;
-    background: #070b14;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f8fafc; overflow: hidden; position: relative;
-    padding: 34px 44px;
-    display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
+    padding: 30px 40px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 18px;
   }}
-  .header-bar {{
-    display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;
+  .grid {{ flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }}
+  .layer {{
+    padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
   }}
-  .brand {{ display: flex; align-items: center; gap: 14px; }}
-  .brand img {{ width: 44px; height: 44px; border-radius: 11px; }}
-  .title-area h1 {{ font-size: 21px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px; }}
-  .badge {{ background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.5); font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight:700; }}
-  .subtitle {{ font-size: 13px; color: #94a3b8; margin-top: 3px; }}
-
-  .layers-grid {{ flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }}
-  .layer-card {{
-    background: rgba(15,23,42,0.72); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
-    padding: 20px; display: flex; flex-direction: column; justify-content: space-between;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+  .layer-title {{ font-size: 15.5px; font-weight: 700; color: #37352f; margin: 8px 0 6px; }}
+  .layer-desc {{ font-size: 12.5px; color: #6b6a66; line-height: 1.55; }}
+  .layer-foot {{
+    padding: 6px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; text-align: center;
+    background: #edf6f3; border: 1px solid rgba(15, 123, 108, 0.22); color: #0f7b6c;
   }}
-  .layer-tag {{
-    display: inline-block; font-size: 11px; font-weight: 700; color: #93c5fd;
-    background: rgba(59,130,246,0.18); border: 1px solid rgba(96,165,250,0.35);
-    padding: 3px 10px; border-radius: 999px; margin-bottom: 10px;
-  }}
-  .layer-title {{ font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 7px; }}
-  .layer-desc {{ font-size: 12.5px; color: #94a3b8; line-height: 1.55; }}
-  .layer-badge {{
-    margin-top: 12px; padding: 6px 12px; border-radius: 8px; font-size: 11.5px; font-weight: 700;
-    background: rgba(16,185,129,0.14); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); text-align: center;
-  }}
-
-  .guard-banner {{
-    background: linear-gradient(135deg, rgba(30,58,138,0.28), rgba(15,23,42,0.85));
-    border: 1px solid rgba(96,165,250,0.35); border-radius: 14px;
-    padding: 15px 22px; display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  .guard-bar {{
+    padding: 15px 20px;
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    background: #ffffff; border: 1px solid rgba(35, 131, 226, 0.26); border-radius: 10px;
   }}
 </style>
 </head>
 <body>
-  <div class="header-bar">
+  <div class="top-header">
     <div class="brand">
       <img src="{icon_b64}" alt="logo">
-      <div class="title-area">
-        <h1>6 层防刷额度熔断 + 多浏览器防误点护卫 <span class="badge">安全防误触</span></h1>
-        <p class="subtitle">全面防止无限循环消耗配额、误触非对话页按钮或第 2 浏览器恢复旧会话时自动误点击</p>
+      <div>
+        <div class="title-line">
+          <h1>6 层防刷额度熔断 + 115 项自动化防线</h1>
+          <span class="tag tag-red">防误触熔断</span>
+          <span class="tag tag-green">115/115 测试通过</span>
+        </div>
+        <div class="subtitle">严防死循环消耗额度、Shadow DOM 异常结构与非对话页误点击，兼顾后台高可靠与极致安全</div>
       </div>
     </div>
   </div>
 
-  <div class="layers-grid">
-    <div class="layer-card">
+  <div class="grid">
+    <div class="card layer">
       <div>
-        <span class="layer-tag">Layer 1</span>
+        <span class="tag tag-blue">Layer 1</span>
         <div class="layer-title">配额超限与报错瞬时熔断</div>
-        <p class="layer-desc">实时检测「达到上限」「配额用完」「Too many requests」等字样，0 秒切断自动点击。</p>
+        <p class="layer-desc">实时检测「达到上限」「配额用完」「Too many requests」等字样，0 秒切断自动点击并告警。</p>
       </div>
-      <div class="layer-badge">✓ 报错即时熔断停机</div>
+      <div class="layer-foot">✓ 报错即时熔断停机</div>
     </div>
 
-    <div class="layer-card">
+    <div class="card layer">
       <div>
-        <span class="layer-tag">Layer 2</span>
+        <span class="tag tag-blue">Layer 2</span>
         <div class="layer-title">单任务继续上限</div>
-        <p class="layer-desc">限制单次对话任务连续点击继续的次数（默认 10 次），发送新提问时自动清零复位。</p>
+        <p class="layer-desc">限制单次对话任务连续点击继续次数（默认 10 次），发送新提问时自动清零复位。</p>
       </div>
-      <div class="layer-badge">✓ 单轮会话额度锁</div>
+      <div class="layer-foot">✓ 单轮会话额度锁</div>
     </div>
 
-    <div class="layer-card">
+    <div class="card layer">
       <div>
-        <span class="layer-tag">Layer 3</span>
-        <div class="layer-title">流式停稳与冷却守卫</div>
-        <p class="layer-desc">严格等待 Gemini 输出完全停稳（默认 1.8 秒）及冷却防抖（4 秒），绝不在打字途中抢点。</p>
+        <span class="tag tag-blue">Layer 3</span>
+        <div class="layer-title">流式停稳与拟人冷却</div>
+        <p class="layer-desc">严格等待输出停稳（默认 1.8 秒）并叠加随机冷却与 60 秒防突发节流，绝不抢点。</p>
       </div>
-      <div class="layer-badge">✓ 停稳防抖守卫</div>
+      <div class="layer-foot">✓ 停稳防抖 + 拟人节流</div>
     </div>
 
-    <div class="layer-card">
+    <div class="card layer">
       <div>
-        <span class="layer-tag">Layer 4</span>
+        <span class="tag tag-blue">Layer 4</span>
         <div class="layer-title">每日继续总配额上限</div>
-        <p class="layer-desc">支持自定义全天自动点击继续总额度（默认 0 为无上限），跨日零点自动重置计数。</p>
+        <p class="layer-desc">支持自定义全天继续上限（默认 0 为无上限），跨日零点自动归零，支持 Web Locks 原子计数。</p>
       </div>
-      <div class="layer-badge">✓ 跨天自动归零</div>
+      <div class="layer-foot">✓ 多标签并发零丢数</div>
     </div>
 
-    <div class="layer-card">
+    <div class="card layer">
       <div>
-        <span class="layer-tag">Layer 5</span>
-        <div class="layer-title">完工语义智能跳过</div>
-        <p class="layer-desc">识别「全部完成」「All tests passed」等结语，若无截断信号或明确追问则自动跳过继续。</p>
+        <span class="tag tag-blue">Layer 5</span>
+        <div class="layer-title">完工语义智能避让</div>
+        <p class="layer-desc">识别「全部完成」「All tests passed」等结语，若无截断信号或明确追问则自动跳过。</p>
       </div>
-      <div class="layer-badge">✓ 完工智能避让</div>
+      <div class="layer-foot">✓ 完工智能跳过</div>
     </div>
 
-    <div class="layer-card">
+    <div class="card layer">
       <div>
-        <span class="layer-tag">Layer 6</span>
-        <div class="layer-title">停滞与重复输出检测</div>
-        <p class="layer-desc">比对前后轮回答 Hash 指纹，若连续输出完全重复或 DOM 无新进展，立即自动熔断。</p>
+        <span class="tag tag-blue">Layer 6</span>
+        <div class="layer-title">停滞与重复指纹阻断</div>
+        <p class="layer-desc">比对前后轮输出指纹，连续重复或无新进展立即熔断，结合单对话隔离急停保护其他会话。</p>
       </div>
-      <div class="layer-badge">✓ 死循环自动阻断</div>
+      <div class="layer-foot">✓ 死循环自动阻断</div>
     </div>
   </div>
 
-  <div class="guard-banner">
+  <div class="guard-bar">
     <div>
-      <div style="font-size:14.5px; font-weight:700; color:#f8fafc;">🆕 v1.0.0 多浏览器 &amp; 非对话页安全守卫</div>
-      <div style="font-size:12px; color:#94a3b8; margin-top:2px;">自动屏蔽 <code>/gems</code>、<code>/extensions</code>、<code>/settings</code> 与 0 回复首页；第 2 浏览器恢复历史会话时自动忽略陈旧芯片。</div>
+      <div style="font-size:14px; font-weight:700; color:#37352f;">🛡️ v1.0.1 非对话页护卫 · 隔离急停 · 深层边界防线</div>
+      <div style="font-size:12px; color:#6b6a66; margin-top:3px;">自动屏蔽 /gems、/extensions、/settings 与 0 回复首页；内置 ShadowRoot 防环、时钟回拨保护、ReDoS 防护与零 innerHTML CSP 合规。</div>
     </div>
-    <span style="background:rgba(16,185,129,0.2); color:#6ee7b7; border:1px solid rgba(16,185,129,0.45); padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap;">✓ 零误触保护</span>
+    <span class="tag tag-green" style="padding:5px 12px;font-size:12px;">✓ 115 / 115 Pass</span>
   </div>
 </body>
 </html>
@@ -734,34 +832,35 @@ html_s5 = f"""<!DOCTYPE html>
 render_html_to_png(html_s5, os.path.join(SCREENSHOTS_DIR, 'screenshot-5-circuit-breaker-protection-1280x800.png'), 1280, 800, dpr=2)
 
 # -------------------------------------------------------------
-# PROMO TILE 1: Small Promo Tile (440x280)
+# PROMO TILE 1: Small Promo Tile (440x280) — Notion Paper Light
 # -------------------------------------------------------------
 html_p_small = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  {BASE_STYLE}
   body {{
     width: 440px; height: 280px;
-    background: radial-gradient(circle at 20% 20%, #172554 0%, #090d16 62%, #05070c 100%);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f8fafc; overflow: hidden; position: relative;
-    padding: 24px;
+    padding: 22px 24px;
+    background: #f7f6f3;
     display: flex; flex-direction: column; justify-content: space-between;
   }}
-  .top-row {{ display: flex; align-items: center; gap: 14px; }}
-  .top-row img {{ width: 52px; height: 52px; border-radius: 13px; box-shadow: 0 8px 22px rgba(59,130,246,0.45); }}
-  .title-area h1 {{ font-size: 18px; font-weight: 800; color: #fff; line-height: 1.2; }}
-  .title-area p {{ font-size: 11.5px; color: #93c5fd; margin-top: 4px; font-weight: 600; }}
+  .top-row {{ display: flex; align-items: center; gap: 13px; }}
+  .top-row img {{
+    width: 48px; height: 48px; border-radius: 11px;
+    border: 1px solid rgba(55, 53, 47, 0.12); background: #ffffff;
+  }}
+  .title-area h1 {{ font-size: 18px; font-weight: 700; color: #37352f; letter-spacing: -0.02em; }}
+  .title-area p {{ font-size: 11.5px; color: #787774; margin-top: 3px; font-weight: 500; }}
   .badge-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }}
   .pill {{
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-    font-size: 11px; padding: 7px 10px; border-radius: 10px; color: #e2e8f0; font-weight: 600; text-align: center;
+    background: #ffffff; border: 1px solid rgba(55, 53, 47, 0.11);
+    font-size: 11.5px; padding: 8px 10px; border-radius: 8px; color: #37352f; font-weight: 600; text-align: center;
   }}
   .footer-row {{
     display: flex; justify-content: space-between; align-items: center;
-    border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; font-size: 11px; color: #94a3b8;
+    border-top: 1px solid rgba(55, 53, 47, 0.1); padding-top: 10px; font-size: 11px; color: #787774;
   }}
 </style>
 </head>
@@ -770,20 +869,20 @@ html_p_small = f"""<!DOCTYPE html>
     <img src="{icon_b64}" alt="logo">
     <div class="title-area">
       <h1>Gemini MCP Helper</h1>
-      <p>自动放行 · 黑白双模式 · 4 语言</p>
+      <p>Notion 极简界面 · 单对话控制 · 后台稳定运行</p>
     </div>
   </div>
 
   <div class="badge-grid">
     <div class="pill">⚡ MCP 始终允许</div>
-    <div class="pill">🖱️ 按住自由拖拽</div>
-    <div class="pill">🌗 深色 / 浅色主题</div>
+    <div class="pill">🎛️ 单对话独立急停</div>
+    <div class="pill">🛌 后台最小化点击</div>
     <div class="pill">🛡️ 6 层防刷熔断</div>
   </div>
 
   <div class="footer-row">
     <span>KenEasy · Google Gemini 专用</span>
-    <span style="color: #60a5fa; font-weight: 700;">v1.0.0</span>
+    <span class="tag tag-blue" style="font-size:10.5px;padding:1px 7px;">v1.0.1</span>
   </div>
 </body>
 </html>
@@ -791,51 +890,55 @@ html_p_small = f"""<!DOCTYPE html>
 render_html_to_png(html_p_small, os.path.join(PROMO_DIR, 'small-promo-tile-440x280.png'), 440, 280, dpr=2)
 
 # -------------------------------------------------------------
-# PROMO TILE 2: Marquee Promo Tile (1400x560)
+# PROMO TILE 2: Marquee Promo Tile (1400x560) — Notion Showcase
 # -------------------------------------------------------------
 html_p_marquee = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <style>
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  {BASE_STYLE}
   body {{
     width: 1400px; height: 560px;
-    background: radial-gradient(circle at 18% 22%, #172554 0%, #090d16 55%, #05070c 100%);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-    color: #f8fafc; overflow: hidden; position: relative;
-    padding: 46px 64px;
-    display: grid; grid-template-columns: 650px 1fr; gap: 38px; align-items: center;
+    background: #f7f6f3;
+    padding: 44px 60px;
+    display: grid; grid-template-columns: 650px 1fr; gap: 40px; align-items: center;
   }}
-  .brand-row {{ display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }}
-  .brand-row img {{ width: 62px; height: 62px; border-radius: 15px; box-shadow: 0 10px 28px rgba(59,130,246,0.45); }}
-  .v-pill {{
-    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
-    background: rgba(59,130,246,0.2); border: 1px solid rgba(96,165,250,0.45); color: #93c5fd; margin-top: 4px;
+  .brand-row {{ display: flex; align-items: center; gap: 15px; margin-bottom: 18px; }}
+  .brand-row img {{
+    width: 58px; height: 58px; border-radius: 14px;
+    border: 1px solid rgba(55, 53, 47, 0.12); background: #ffffff;
   }}
-  .hero-title {{ font-size: 40px; font-weight: 800; color: #fff; line-height: 1.15; letter-spacing: -0.7px; }}
-  .hero-sub {{ font-size: 16px; color: #94a3b8; margin: 16px 0 24px; line-height: 1.6; }}
-  .pills-row {{ display: flex; flex-wrap: wrap; gap: 10px; }}
+  .hero-title {{ font-size: 38px; font-weight: 800; color: #37352f; line-height: 1.16; letter-spacing: -0.025em; }}
+  .hero-sub {{ font-size: 15.5px; color: #6b6a66; margin: 16px 0 24px; line-height: 1.65; }}
+  .pills-row {{ display: flex; flex-wrap: wrap; gap: 9px; }}
   .pill {{
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
-    color: #e2e8f0; font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: 999px;
+    background: #ffffff; border: 1px solid rgba(55, 53, 47, 0.12);
+    color: #37352f; font-size: 12.5px; font-weight: 600; padding: 7px 13px; border-radius: 7px;
   }}
 
-  .dual-stage {{ position: relative; height: 420px; }}
-  .card-dark {{
-    position: absolute; top: 18px; left: 0; width: 274px;
-    background: rgba(20,23,29,0.96); border: 1px solid rgba(255,255,255,0.16); border-radius: 16px;
-    padding: 15px; box-shadow: 0 24px 54px rgba(0,0,0,0.65);
-  }}
+  .dual-stage {{ position: relative; height: 430px; }}
   .card-light {{
-    position: absolute; bottom: 18px; right: 0; width: 274px;
-    background: rgba(255,255,255,0.97); color: #111827; border: 1px solid rgba(15,23,42,0.14); border-radius: 16px;
-    padding: 15px; box-shadow: 0 26px 60px rgba(0,0,0,0.55);
+    position: absolute; top: 10px; left: 0; width: 286px;
+    background: #ffffff; color: #37352f; border: 1px solid rgba(55, 53, 47, 0.13); border-radius: 12px;
+    padding: 14px 15px; box-shadow: 0 10px 28px rgba(15, 15, 15, 0.08);
   }}
-  .ct {{ display: flex; justify-content: space-between; align-items: center; padding-bottom: 9px; margin-bottom: 9px; border-bottom: 1px solid rgba(148,163,184,0.2); font-size: 12.5px; font-weight: 700; }}
-  .cr {{ display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; margin: 8px 0; }}
-  .pd {{ background: rgba(52,168,83,0.2); color: #86efac; border: 1px solid rgba(52,168,83,0.5); padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }}
-  .pl {{ background: rgba(22,163,74,0.14); color: #15803d; border: 1px solid rgba(22,163,74,0.45); padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }}
+  .card-dark {{
+    position: absolute; bottom: 10px; right: 0; width: 286px;
+    background: #1f1f1f; color: #e6e6e4; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
+    padding: 14px 15px; box-shadow: 0 16px 38px rgba(15, 15, 15, 0.24);
+  }}
+  .ct {{ display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(55,53,47,0.09); font-size: 12.5px; font-weight: 600; }}
+  .card-dark .ct {{ border-bottom-color: rgba(255,255,255,0.08); }}
+  .sc {{ display: grid; grid-template-columns: 1fr 1fr; gap: 3px; background: rgba(55,53,47,0.07); padding: 2px; border-radius: 5px; font-size: 10.5px; text-align: center; margin-bottom: 8px; }}
+  .card-dark .sc {{ background: rgba(0,0,0,0.28); }}
+  .sc-on {{ background: #ffffff; color: #37352f; font-weight: 600; padding: 3px; border-radius: 4px; }}
+  .card-dark .sc-on {{ background: #333333; color: #f1f1ef; }}
+  .sc-off {{ color: #787774; padding: 3px; }}
+  .card-dark .sc-off {{ color: #9b9a97; }}
+  .cr {{ display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; margin: 7px 0; }}
+  .pl {{ background: #edf6f3; color: #0f7b6c; border: 1px solid rgba(15,123,108,0.24); padding: 2px 8px; border-radius: 5px; font-size: 10.5px; font-weight: 600; }}
+  .pd {{ background: rgba(45,170,126,0.15); color: #6bc9a4; border: 1px solid rgba(45,170,126,0.3); padding: 2px 8px; border-radius: 5px; font-size: 10.5px; font-weight: 600; }}
 </style>
 </head>
 <body>
@@ -843,40 +946,46 @@ html_p_marquee = f"""<!DOCTYPE html>
     <div class="brand-row">
       <img src="{icon_b64}" alt="logo">
       <div>
-        <div style="font-size: 12.5px; font-weight: 700; color: #60a5fa; letter-spacing: 1px; text-transform: uppercase;">Google Gemini MCP Automation</div>
-        <span class="v-pill">v1.0.0 · 4 Languages · Dark &amp; Light Mode</span>
+        <div style="font-size: 12px; font-weight: 700; color: #787774; letter-spacing: 0.06em; text-transform: uppercase;">Google Gemini MCP Automation</div>
+        <div style="display:flex; gap:6px; margin-top:5px;">
+          <span class="tag tag-blue">v1.0.1</span>
+          <span class="tag tag-green">Notion 极简双主题</span>
+          <span class="tag">4 Languages</span>
+        </div>
       </div>
     </div>
     <h1 class="hero-title">KenEasy Gemini MCP Auto Helper</h1>
-    <p class="hero-sub">专为 Google Gemini 网页端打造的自动化放行与连续交互助手：智能点击「始终允许」、修复左键按住拖拽悬浮窗、支持 简/繁/EN/日 与黑白双模式、多窗口防误触及 6 层防刷熔断。</p>
+    <p class="hero-sub">专为 Google Gemini 网页端打造的 Notion 风格自动化助手：单对话独立开关与隔离紧急停止、后台最小化 MAIN 世界稳定点击、卡死自动续接与 6 层防刷熔断。</p>
     <div class="pills-row">
-      <span class="pill">⚡ MCP 始终允许放行</span>
-      <span class="pill">🖱️ 按住拖拽悬浮窗</span>
-      <span class="pill">🌗 黑白深浅主题</span>
-      <span class="pill">🌐 4 语言界面切换</span>
+      <span class="pill">⚡ MCP 始终允许</span>
+      <span class="pill">🎛️ 单对话独立控制</span>
+      <span class="pill">🛑 隔离紧急停止</span>
+      <span class="pill">🛌 后台最小化点击</span>
       <span class="pill">🛡️ 6 层防刷熔断</span>
     </div>
   </div>
 
   <div class="dual-stage">
-    <div class="card-dark">
-      <div class="ct"><span>🟢 MCP 助手 <small style="color:#93c5fd;">v1.0.0</small></span><span style="font-size:10.5px;opacity:0.8;">简体 ☀</span></div>
-      <div class="cr"><span>插件状态</span><span class="pd">运行中</span></div>
-      <div class="cr"><span>自动始终允许</span><span class="pd">已开启</span></div>
-      <div class="cr"><span>自动点击继续</span><span class="pd">已开启</span></div>
-      <div class="cr"><span>后台切屏运行</span><span class="pd">已开启</span></div>
-      <div class="cr"><span>桌面超时通知</span><span class="pd">已开启</span></div>
-      <div style="margin-top:10px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.05);font-size:11px;color:#94a3b8;">允许 42 · 本次 3/10 · 今日 18/∞</div>
+    <div class="card-light">
+      <div class="ct"><span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#0f7b6c;margin-right:6px;"></span>MCP 助手 <small style="color:#787774;">v1.0.1</small></span><span style="font-size:10.5px;color:#787774;">简体 ☾</span></div>
+      <div class="sc"><div class="sc-on">本对话</div><div class="sc-off">全局默认</div></div>
+      <div class="cr"><span>插件状态</span><span class="pl">运行中</span></div>
+      <div class="cr"><span>自动始终允许</span><span class="pl">已开启</span></div>
+      <div class="cr"><span>自动点击继续</span><span class="pl">已开启</span></div>
+      <div class="cr"><span>后台切屏运行</span><span class="pl">已开启</span></div>
+      <div class="cr"><span>超时自动续接</span><span class="pl">已开启</span></div>
+      <div style="margin-top:9px;padding:7px 8px;border-radius:6px;background:#f7f6f3;border:1px solid rgba(55,53,47,0.08);font-size:10.5px;color:#787774;">对话 #a1b2c3 · 允许 18 · 今日 6/∞</div>
     </div>
 
-    <div class="card-light">
-      <div class="ct"><span>🟢 MCP Helper <small style="color:#1d4ed8;">v1.0.0</small></span><span style="font-size:10.5px;opacity:0.8;">EN ☾</span></div>
-      <div class="cr"><span>Extension</span><span class="pl">Active</span></div>
-      <div class="cr"><span>Auto Always Allow</span><span class="pl">On</span></div>
-      <div class="cr"><span>Auto Continue</span><span class="pl">On</span></div>
-      <div class="cr"><span>Background Run</span><span class="pl">On</span></div>
-      <div class="cr"><span>Desktop Alert</span><span class="pl">On</span></div>
-      <div style="margin-top:10px;padding:8px;border-radius:8px;background:rgba(15,23,42,0.05);font-size:11px;color:#475569;">Allow 42 · Task 3/10 · Today 18/∞</div>
+    <div class="card-dark">
+      <div class="ct"><span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#2daa7e;margin-right:6px;"></span>MCP Helper <small style="color:#9b9a97;">v1.0.1</small></span><span style="font-size:10.5px;color:#9b9a97;">EN ☀</span></div>
+      <div class="sc"><div class="sc-on">This chat</div><div class="sc-off">Global</div></div>
+      <div class="cr"><span>Extension</span><span class="pd">Active</span></div>
+      <div class="cr"><span>Auto Always Allow</span><span class="pd">On</span></div>
+      <div class="cr"><span>Auto Continue</span><span class="pd">On</span></div>
+      <div class="cr"><span>Background Run</span><span class="pd">On</span></div>
+      <div class="cr"><span>Stall Auto-Resume</span><span class="pd">On</span></div>
+      <div style="margin-top:9px;padding:7px 8px;border-radius:6px;background:#262626;border:1px solid rgba(255,255,255,0.08);font-size:10.5px;color:#9b9a97;">Chat #x9y8z7 · Allow 18 · Today 6/∞</div>
     </div>
   </div>
 </body>
@@ -884,4 +993,4 @@ html_p_marquee = f"""<!DOCTYPE html>
 """
 render_html_to_png(html_p_marquee, os.path.join(PROMO_DIR, 'marquee-promo-tile-1400x560.png'), 1400, 560, dpr=2)
 
-print("All screenshots and promo tiles generated successfully!")
+print("All v1.0.1 Notion-style store screenshots and promo tiles generated successfully!")
