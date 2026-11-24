@@ -3,7 +3,18 @@
 
   const STORAGE_KEY = 'gmah_settings_v1';
   const STATS_KEY = 'gmah_stats_v1';
+  const CHAT_OVERRIDES_KEY = 'gmah_chat_overrides_v1';
   const SETTINGS_VERSION = 5;
+  const MAX_CHAT_OVERRIDES = 100;
+
+  const CHAT_OVERRIDE_KEYS = [
+    'enabled',
+    'autoAllow',
+    'autoContinue',
+    'backgroundMode',
+    'stallAlertEnabled',
+    'stallAutoRecoverEnabled'
+  ];
 
   const SUPPORTED_LANGUAGES = ['zh-CN', 'zh-TW', 'en', 'ja'];
   const SUPPORTED_THEMES = ['dark', 'light'];
@@ -230,6 +241,18 @@
       '繼續下一步',
       '點擊繼續',
       '請繼續',
+      '接續',
+      '接續生成',
+      '接續執行',
+      '接續輸出',
+      '接續回答',
+      '接續處理',
+      '接著',
+      '接著寫',
+      '接著說',
+      '接着',
+      '接着写',
+      '接着说',
       '好，繼續',
       '好的，繼續',
       '確認',
@@ -260,6 +283,10 @@
       'continue task',
       'click to continue',
       'keep going',
+      'keep writing',
+      'keep responding',
+      'continue answering',
+      'continue reply',
       'resume',
       '続ける',
       '続けて',
@@ -589,7 +616,40 @@
       bgNotifTestTitle: 'KenEasy Gemini MCP 助手 · 桌面通知正常',
       bgNotifTestMsg: '当 Gemini 连接或等待超时无进展时，系统将弹出此类提醒，点击即可切回对应标签页。',
       bgNotifBreakerTitle: 'Gemini 自动助手已触发安全熔断',
-      bgNotifBreakerMsg: '{reason}。点击此处切回对应 Gemini 标签页查看。'
+      bgNotifBreakerMsg: '{reason}。点击此处切回对应 Gemini 标签页查看。',
+      scopeChat: '本对话',
+      scopeGlobal: '全局默认',
+      scopeChatCustom: '本对话独立配置',
+      scopeFollowGlobal: '跟随全局',
+      scopeResetBtn: '恢复全局',
+      scopeResetTip: '清除本对话独立开关并恢复跟随全局设置',
+      scopeChatTip: '当前仅修改此对话的独立开关（不影响其他对话）',
+      scopeGlobalTip: '当前修改全局默认开关（对未单独配置的对话生效）',
+      chatLabelNew: '新对话',
+      chatLabelId: '对话 #{id}',
+      chatLabelGem: 'Gem · {id}',
+      secCurrentChat: '当前对话独立控制',
+      secGlobalSettings: '全局默认设置',
+      chatEmergencyBtn: '仅停本对话',
+      chatResumeBtn: '解除本对话',
+      btnEmergencyAll: '停止全部对话',
+      toastChatUpdated: '已更新当前对话的独立设置',
+      toastChatReset: '当前对话已恢复跟随全局默认',
+      toastEmergencyChatSent: '已单独紧急停止当前对话（其他对话不受影响）',
+      toastEmergencyAllSent: '已向全部 Gemini 标签页发送紧急停止指令',
+      logChatOverrideSet: '🎛️ 本对话独立设置：{key} -> {val}',
+      logChatOverrideCleared: '↩️ 本对话已恢复跟随全局默认设置',
+      logChatEmergencyRestored: '🛑 已恢复此对话的独立紧急停止状态',
+      logMainWorldRetry: '⚡ 后台主世界点击升级：「{label}」 ({attempt}/{max})',
+      chatNoActiveTab: '未检测到活动对话页',
+      chatOverrideTag: '独立',
+      chatEmergencyHint: '仅停止当前对话，不影响其他标签页或对话',
+      lblChatEnabled: '本对话总开关',
+      lblChatAllow: '自动始终允许',
+      lblChatContinue: '自动点击继续',
+      lblChatBackground: '后台 / 最小化运行',
+      lblChatNotif: '桌面超时通知',
+      lblChatRecover: '超时自动续接'
     },
     'zh-TW': {
       langLabel: '繁體',
@@ -776,7 +836,40 @@
       bgNotifTestTitle: 'KenEasy Gemini MCP 助手 · 桌面通知正常',
       bgNotifTestMsg: '當 Gemini 連線或等待逾時無進展時，系統將彈出此類提醒，點擊即可切回對應分頁。',
       bgNotifBreakerTitle: 'Gemini 自動助手已觸發安全熔斷',
-      bgNotifBreakerMsg: '{reason}。點擊此處切回對應 Gemini 分頁查看。'
+      bgNotifBreakerMsg: '{reason}。點擊此處切回對應 Gemini 分頁查看。',
+      scopeChat: '本對話',
+      scopeGlobal: '全域預設',
+      scopeChatCustom: '本對話獨立設定',
+      scopeFollowGlobal: '跟隨全域',
+      scopeResetBtn: '恢復全域',
+      scopeResetTip: '清除本對話獨立開關並恢復跟隨全域設定',
+      scopeChatTip: '目前僅修改此對話的獨立開關（不影響其他對話）',
+      scopeGlobalTip: '目前修改全域預設開關（對未單獨設定的對話生效）',
+      chatLabelNew: '新對話',
+      chatLabelId: '對話 #{id}',
+      chatLabelGem: 'Gem · {id}',
+      secCurrentChat: '目前對話獨立控制',
+      secGlobalSettings: '全域預設設定',
+      chatEmergencyBtn: '僅停本對話',
+      chatResumeBtn: '解除本對話',
+      btnEmergencyAll: '停止全部對話',
+      toastChatUpdated: '已更新目前對話的獨立設定',
+      toastChatReset: '目前對話已恢復跟隨全域預設',
+      toastEmergencyChatSent: '已單獨緊急停止目前對話（其他對話不受影響）',
+      toastEmergencyAllSent: '已向全部 Gemini 分頁發送緊急停止指令',
+      logChatOverrideSet: '🎛️ 本對話獨立設定：{key} -> {val}',
+      logChatOverrideCleared: '↩️ 本對話已恢復跟隨全域預設設定',
+      logChatEmergencyRestored: '🛑 已恢復此對話的獨立緊急停止狀態',
+      logMainWorldRetry: '⚡ 背景主世界點擊升級：「{label}」 ({attempt}/{max})',
+      chatNoActiveTab: '未偵測到活動對話頁',
+      chatOverrideTag: '獨立',
+      chatEmergencyHint: '僅停止目前對話，不影響其他分頁或對話',
+      lblChatEnabled: '本對話總開關',
+      lblChatAllow: '自動始終允許',
+      lblChatContinue: '自動點擊繼續',
+      lblChatBackground: '背景 / 最小化運行',
+      lblChatNotif: '桌面逾時通知',
+      lblChatRecover: '逾時自動續接'
     },
     en: {
       langLabel: 'EN',
@@ -963,7 +1056,40 @@
       bgNotifTestTitle: 'KenEasy Gemini MCP Helper · Alert Ready',
       bgNotifTestMsg: 'You will receive alerts like this when a Gemini tool call or reply stalls. Click to focus tab.',
       bgNotifBreakerTitle: 'Gemini MCP Helper Circuit Breaker Tripped',
-      bgNotifBreakerMsg: '{reason}. Click here to jump back to the Gemini tab.'
+      bgNotifBreakerMsg: '{reason}. Click here to jump back to the Gemini tab.',
+      scopeChat: 'This chat',
+      scopeGlobal: 'Global',
+      scopeChatCustom: 'Custom for this chat',
+      scopeFollowGlobal: 'Following global',
+      scopeResetBtn: 'Reset',
+      scopeResetTip: 'Clear per-chat overrides and follow global defaults',
+      scopeChatTip: 'Changes apply only to this conversation',
+      scopeGlobalTip: 'Changes apply globally to all conversations without overrides',
+      chatLabelNew: 'New chat',
+      chatLabelId: 'Chat #{id}',
+      chatLabelGem: 'Gem · {id}',
+      secCurrentChat: 'This Conversation',
+      secGlobalSettings: 'Global Defaults',
+      chatEmergencyBtn: 'Stop this chat',
+      chatResumeBtn: 'Resume chat',
+      btnEmergencyAll: 'Stop All Chats',
+      toastChatUpdated: 'Updated settings for this conversation only',
+      toastChatReset: 'Conversation reset to global defaults',
+      toastEmergencyChatSent: 'Emergency stopped this conversation only',
+      toastEmergencyAllSent: 'Emergency stop sent to all Gemini tabs',
+      logChatOverrideSet: '🎛️ Chat override: {key} -> {val}',
+      logChatOverrideCleared: '↩️ Conversation reset to global defaults',
+      logChatEmergencyRestored: '🛑 Restored emergency stop state for this chat',
+      logMainWorldRetry: '⚡ Background main-world click escalation: "{label}" ({attempt}/{max})',
+      chatNoActiveTab: 'No active chat tab',
+      chatOverrideTag: 'Custom',
+      chatEmergencyHint: 'Stops only this chat; other chats keep running',
+      lblChatEnabled: 'Enable in this chat',
+      lblChatAllow: 'Auto Always allow',
+      lblChatContinue: 'Auto Continue',
+      lblChatBackground: 'Run in background',
+      lblChatNotif: 'Stall desktop alerts',
+      lblChatRecover: 'Stall auto-resume'
     },
     ja: {
       langLabel: '日本語',
@@ -1150,7 +1276,40 @@
       bgNotifTestTitle: 'KenEasy Gemini MCP ヘルパー · 通知テスト',
       bgNotifTestMsg: '応答がタイムアウトした際にこのような通知が表示されます。クリックでタブへ移動します。',
       bgNotifBreakerTitle: 'Gemini MCP ヘルパーが安全遮断しました',
-      bgNotifBreakerMsg: '{reason}。クリックして該当のGeminiタブを確認します。'
+      bgNotifBreakerMsg: '{reason}。クリックして該当のGeminiタブを確認します。',
+      scopeChat: 'この会話',
+      scopeGlobal: '全体設定',
+      scopeChatCustom: 'この会話の個別設定',
+      scopeFollowGlobal: '全体設定を継承',
+      scopeResetBtn: '全体に戻す',
+      scopeResetTip: 'この会話の個別設定を解除して全体設定に戻す',
+      scopeChatTip: 'この会話のみに独立して設定を適用します',
+      scopeGlobalTip: '個別設定のない全会話に共通の既定値を変更します',
+      chatLabelNew: '新しい会話',
+      chatLabelId: '会話 #{id}',
+      chatLabelGem: 'Gem · {id}',
+      secCurrentChat: '現在の会話を個別制御',
+      secGlobalSettings: '全体の既定設定',
+      chatEmergencyBtn: 'この会話を停止',
+      chatResumeBtn: 'この会話を再開',
+      btnEmergencyAll: '全会話を停止',
+      toastChatUpdated: 'この会話の個別設定を更新しました',
+      toastChatReset: 'この会話を全体の既定設定に戻しました',
+      toastEmergencyChatSent: 'この会話のみ緊急停止しました（他の会話は継続）',
+      toastEmergencyAllSent: '全Geminiタブに緊急停止を送信しました',
+      logChatOverrideSet: '🎛️ 会話個別設定：{key} -> {val}',
+      logChatOverrideCleared: '↩️ この会話を全体設定に戻しました',
+      logChatEmergencyRestored: '🛑 この会話の緊急停止状態を復元しました',
+      logMainWorldRetry: '⚡ バックグラウンドMain Worldクリック昇格：「{label}」 ({attempt}/{max})',
+      chatNoActiveTab: 'アクティブな会話なし',
+      chatOverrideTag: '個別',
+      chatEmergencyHint: 'この会話のみ停止（他の会話は継続）',
+      lblChatEnabled: 'この会話で有効',
+      lblChatAllow: '常に許可',
+      lblChatContinue: '自動続行',
+      lblChatBackground: 'バックグラウンド',
+      lblChatNotif: '停滞通知',
+      lblChatRecover: '停滞自動再開'
     }
   };
 
@@ -1177,7 +1336,9 @@
   }
 
   function formatWaitDuration(ms, lang) {
-    const totalSec = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const num = Number(ms);
+    const validMs = Number.isFinite(num) && num > 0 ? num : 0;
+    const totalSec = Math.max(0, Math.floor(validMs / 1000));
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
     const code = resolveLanguage(lang);
@@ -1208,14 +1369,16 @@
     return cleaned.slice(0, 200);
   }
 
+  const DANGEROUS_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
   function sanitizeKeywordArray(val, fallback) {
-    if (!Array.isArray(val)) return fallback.slice();
+    if (!Array.isArray(val)) return Array.isArray(fallback) ? fallback.slice() : [];
     const seen = new Set();
     const out = [];
     for (const item of val) {
       if (typeof item !== 'string') continue;
       const cleaned = item.trim();
-      if (!cleaned) continue;
+      if (!cleaned || DANGEROUS_OBJECT_KEYS.has(cleaned.toLowerCase())) continue;
       const key = cleaned.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
@@ -1452,11 +1615,22 @@
     const norm = normalizeText(rawText);
     if (!norm || !Array.isArray(keywords)) return null;
     for (const kw of keywords) {
+      if (typeof kw !== 'string' || !kw) continue;
+      // Guard against huge strings that could cause ReDoS or Regexp too large
+      if (kw.length > 256) {
+        const nkw = normalizeText(kw);
+        if (nkw && norm.includes(nkw)) return kw;
+        continue;
+      }
       const nkw = normalizeText(kw);
       if (!nkw) continue;
       if (isAsciiWord(nkw)) {
-        const re = new RegExp(`(?:^|[^a-z0-9_])${escapeRegex(nkw)}(?:$|[^a-z0-9_])`, 'i');
-        if (re.test(norm)) return kw;
+        try {
+          const re = new RegExp(`(?:^|[^a-z0-9_])${escapeRegex(nkw)}(?:$|[^a-z0-9_])`, 'i');
+          if (re.test(norm)) return kw;
+        } catch (_) {
+          if (norm.includes(nkw)) return kw;
+        }
       } else if (norm.includes(nkw)) {
         return kw;
       }
@@ -1480,8 +1654,11 @@
 
     let partialMatch = null;
     for (const kw of keywords) {
+      if (typeof kw !== 'string' || !kw) continue;
+      // Keywords longer than maxLen can never match a stripped button label <= maxLen
+      if (kw.length > maxLen) continue;
       const nkw = stripEdgePunctuation(kw);
-      if (!nkw) continue;
+      if (!nkw || nkw.length > maxLen) continue;
 
       if (stripped === nkw) {
         return { keyword: kw, exact: true };
@@ -1490,18 +1667,30 @@
       if (!partialMatch) {
         if (mode === 'exact_or_prefix') {
           if (isAsciiWord(nkw)) {
-            const re = new RegExp(`^${escapeRegex(nkw)}(?:$|[^a-z0-9_])`, 'i');
-            if (re.test(stripped)) {
-              partialMatch = { keyword: kw, exact: false };
+            try {
+              const re = new RegExp(`^${escapeRegex(nkw)}(?:$|[^a-z0-9_])`, 'i');
+              if (re.test(stripped)) {
+                partialMatch = { keyword: kw, exact: false };
+              }
+            } catch (_) {
+              if (stripped.startsWith(nkw)) {
+                partialMatch = { keyword: kw, exact: false };
+              }
             }
           } else if (stripped.startsWith(nkw)) {
             partialMatch = { keyword: kw, exact: false };
           }
         } else if (mode === 'exact_or_contains') {
           if (isAsciiWord(nkw)) {
-            const re = new RegExp(`(?:^|[^a-z0-9_])${escapeRegex(nkw)}(?:$|[^a-z0-9_])`, 'i');
-            if (re.test(stripped)) {
-              partialMatch = { keyword: kw, exact: false };
+            try {
+              const re = new RegExp(`(?:^|[^a-z0-9_])${escapeRegex(nkw)}(?:$|[^a-z0-9_])`, 'i');
+              if (re.test(stripped)) {
+                partialMatch = { keyword: kw, exact: false };
+              }
+            } catch (_) {
+              if (stripped.includes(nkw)) {
+                partialMatch = { keyword: kw, exact: false };
+              }
             }
           } else if (stripped.includes(nkw)) {
             partialMatch = { keyword: kw, exact: false };
@@ -1532,9 +1721,127 @@
     };
   }
 
+  const NON_CHAT_SEGMENT_RE = /^(?:gems|extensions|saved-info|plugins|updates|sharing|settings|faq|advanced|pricing|about)$/i;
+
+  function extractConversationKey(url) {
+    if (typeof url !== 'string' || !url.trim()) return null;
+    let pathname = '';
+    try {
+      const parsed = new URL(url, 'https://gemini.google.com');
+      pathname = parsed.pathname || '';
+    } catch (_) {
+      const m = url.match(/^https?:\/\/[^/]+([^?#]*)/i);
+      pathname = m ? m[1] : url;
+    }
+    const stripped = pathname.replace(/^\/u\/\d+(?=\/|$)/i, '').replace(/\/+$/, '');
+    if (!stripped || stripped === '/app') return 'landing';
+
+    const parts = stripped.split('/').filter(Boolean);
+    if (parts.length === 0) return 'landing';
+    if (NON_CHAT_SEGMENT_RE.test(parts[0])) return null;
+
+    if (parts[0].toLowerCase() === 'app' && parts[1]) {
+      const id = parts[1].trim();
+      if (!id || DANGEROUS_OBJECT_KEYS.has(id.toLowerCase())) return null;
+      return `chat:${id.slice(0, 128)}`;
+    }
+    if (parts[0].toLowerCase() === 'gem' && parts[1]) {
+      const gemId = parts[1].trim();
+      if (!gemId || DANGEROUS_OBJECT_KEYS.has(gemId.toLowerCase())) return null;
+      if (parts[2]) {
+        const chatId = parts[2].trim();
+        if (!chatId || DANGEROUS_OBJECT_KEYS.has(chatId.toLowerCase())) return null;
+        return `gem:${gemId.slice(0, 64)}:${chatId.slice(0, 128)}`;
+      }
+      return `gem:${gemId.slice(0, 64)}`;
+    }
+    const fallbackKey = parts.join(':').slice(0, 128);
+    if (!fallbackKey || DANGEROUS_OBJECT_KEYS.has(fallbackKey.toLowerCase())) return null;
+    return `page:${fallbackKey}`;
+  }
+
+  function sanitizeChatOverride(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const out = {};
+    for (const key of CHAT_OVERRIDE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(raw, key) && typeof raw[key] === 'boolean') {
+        out[key] = raw[key];
+      }
+    }
+    if (raw.emergencyStopped === true) {
+      out.emergencyStopped = true;
+    }
+    if (typeof raw.updatedAt === 'number' && Number.isFinite(raw.updatedAt) && raw.updatedAt > 0) {
+      out.updatedAt = Math.round(raw.updatedAt);
+    }
+    return out;
+  }
+
+  function hasChatOverrideChanges(override) {
+    if (!override || typeof override !== 'object') return false;
+    if (override.emergencyStopped === true) return true;
+    for (const key of CHAT_OVERRIDE_KEYS) {
+      if (typeof override[key] === 'boolean') return true;
+    }
+    return false;
+  }
+
+  function sanitizeChatOverridesMap(raw, maxEntries) {
+    const cap = typeof maxEntries === 'number' && maxEntries > 0 ? Math.round(maxEntries) : MAX_CHAT_OVERRIDES;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const entries = [];
+    for (const key of Object.keys(raw)) {
+      if (!key || key.length > 160 || DANGEROUS_OBJECT_KEYS.has(key.toLowerCase())) continue;
+      const cleaned = sanitizeChatOverride(raw[key]);
+      if (!hasChatOverrideChanges(cleaned)) continue;
+      entries.push([key, cleaned]);
+    }
+    if (entries.length > cap) {
+      entries.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+      entries.length = cap;
+    }
+    const out = {};
+    for (const [key, val] of entries) {
+      out[key] = val;
+    }
+    return out;
+  }
+
+  function resolveEffectiveSettings(globalSettings, chatOverride) {
+    const base = mergeSettings(globalSettings);
+    if (!chatOverride || typeof chatOverride !== 'object') return base;
+    const effective = Object.assign({}, base);
+    for (const key of CHAT_OVERRIDE_KEYS) {
+      if (typeof chatOverride[key] === 'boolean') {
+        effective[key] = chatOverride[key];
+      }
+    }
+    return effective;
+  }
+
+  function formatConversationLabel(chatKey, lang) {
+    if (!chatKey || chatKey === 'landing') {
+      return t(lang, 'chatLabelNew');
+    }
+    if (chatKey.startsWith('chat:')) {
+      const id = chatKey.slice(5);
+      return t(lang, 'chatLabelId', { id: id.length > 8 ? id.slice(0, 8) : id });
+    }
+    if (chatKey.startsWith('gem:')) {
+      const rest = chatKey.slice(4);
+      const id = rest.length > 10 ? rest.slice(0, 10) : rest;
+      return t(lang, 'chatLabelGem', { id });
+    }
+    const shortKey = chatKey.length > 12 ? chatKey.slice(0, 12) : chatKey;
+    return t(lang, 'chatLabelId', { id: shortKey });
+  }
+
   const api = {
     STORAGE_KEY,
     STATS_KEY,
+    CHAT_OVERRIDES_KEY,
+    CHAT_OVERRIDE_KEYS,
+    MAX_CHAT_OVERRIDES,
     SETTINGS_VERSION,
     SUPPORTED_LANGUAGES,
     SUPPORTED_THEMES,
@@ -1553,7 +1860,13 @@
     containsKeyword,
     matchButtonLabel,
     createEmptyStats,
-    normalizeStats
+    normalizeStats,
+    extractConversationKey,
+    sanitizeChatOverride,
+    hasChatOverrideChanges,
+    sanitizeChatOverridesMap,
+    resolveEffectiveSettings,
+    formatConversationLabel
   };
 
   root.GMAH_DEFAULTS = api;

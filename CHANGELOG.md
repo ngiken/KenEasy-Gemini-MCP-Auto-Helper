@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-11-24
+
+### 🎨 Notion-Style UI Complete Refactor (`hud.css`, `popup.css`, `popup.html`, `hud.js`)
+- **Paper Light & Charcoal Dark Neutral Palette**:
+  - Rebuilt both Floating HUD and Popup stylesheets around Notion's signature flat aesthetic: warm paper light (`#FFFFFF / #F7F6F3`, `#37352F` ink) and calm charcoal dark (`#191919 / #1F1F1F / #262626`, `#E6E6E4` text), 1px hairline borders, subtle hover fills, restrained radii, and low-saturation semantic tones (`#0F7B6C` green, `#2383E2` blue, `#D9730D` amber, `#EB5757` red) with zero neon glows.
+- **Refined Component Layout & Zero-`innerHTML` Compliance**:
+  - Restructured Popup's per-chat header into a clean two-row layout preventing text wrapping at `382px` width; added active-state highlights (`.gmah-action-active`) for HUD Logs/Inspect drawers plus inline **Clear Logs** and **Refresh Inspect** toolbars while preserving strict Trusted Types CSP compatibility.
+- **Automated Visual Verification**:
+  - Added `assets/render_notion_preview.py` to capture real-DOM 2x headless Chrome previews (`assets/notion-ui-preview.png` and individual light/dark Popup & HUD captures).
+
+### 🎛️ Per-Chat Independent Controls & Isolated Emergency Stop (`defaults.js`, `content.js`, `hud.js`, `popup.html`, `popup.js`)
+- **Per-Conversation Override Persistence (`gmah_chat_overrides_v1`)**:
+  - Added URL-based conversation key extraction (`extractConversationKey`) supporting `/app/<id>`, `/u/<n>/app/<id>`, `/gem/<gemId>/<chatId>`, and `/app` landing (with automatic override migration to `/app/<newId>` upon creating a new chat).
+  - Each conversation can independently enable or disable 6 core controls (`enabled`, `autoAllow`, `autoContinue`, `backgroundMode`, `stallAlertEnabled`, `stallAutoRecoverEnabled`) without altering global defaults or other open tabs.
+- **Isolated Single-Chat Emergency Stop**:
+  - Triggering **Emergency Stop** in HUD or Popup now stops **only the current conversation** and persists its stopped state across SPA navigation (auto-restoring when returning to that chat while other conversations keep running normally).
+  - Popup now features a dedicated top **「当前对话独立控制 / This Conversation」** card (6 independent toggles, override indicator, **Stop/Resume this chat**, and **Reset to global**) alongside a separate **「停止全部对话 / Stop All Chats」** broadcast button.
+- **HUD Scope Switcher**:
+  - Added a Notion-style segmented **「本对话 / 全局默认」** switcher, conversation ID pill, per-row blue custom override indicators, and one-click **「恢复全局」** reset right inside the floating HUD.
+
+### ⚡ Background & Minimized Window Clicking Hardening (`background.js`, `content.js`)
+- **MAIN-World Click Escalation (`mainWorldClickByToken`, `GMAH_MAIN_WORLD_CLICK`)**:
+  - Added self-contained `MAIN`-world click execution piercing ShadowRoots and Angular Material chips (`<mat-chip>`, `<suggestion-chip>`, MWC) when isolated-world clicks are throttled or ignored in hidden/minimized tabs—now covering Allow retries, Continue retries, and Stall-Recovery Stop/Send buttons.
+- **Per-Chat Background Heartbeat & Discard Isolation**:
+  - `background.js` now loads and listens to `gmah_chat_overrides_v1` with precise per-tab evaluation (`isTabBackgroundActive`), keeping Service Worker heartbeats and `autoDiscardable: false` active for chats that individually enable background mode even if global background mode is off, without leaking to other tabs or emergency-stopped chats.
+- **Minimized Window Follow-Up Wakeup**:
+  - When Chrome loses focus or minimizes (`windowId === -1`), `handleWindowFocusChanged` schedules an extra `1200ms` follow-up wake tick (`window_minimized_followup`) for background-active tabs to prevent compositor-throttled misses.
+
+### 🛡️ Deep Boundary Stress, Concurrency & Defensive Hardening
+- **DOM / ShadowRoot Cycle Defense (`content.js`)**:
+  - Guarded `collectSearchRoots` with `depth < 32` and `visited = new Set()` to completely prevent `RangeError: Maximum call stack size exceeded` in adversarial or cyclic Shadow DOM structures.
+- **Throwing DOM API Isolation (`content.js` / `hud.js`)**:
+  - Wrapped `querySelectorAll` in `queryAllFromRoots`, and all `getBoundingClientRect()` / `getComputedStyle()` calls across content engine and HUD in `try ... catch` blocks with safe bounding fallbacks.
+- **Ancestor Traversal Depth Bounds (`content.js`)**:
+  - Hardened all 13 ancestor/parent traversal loops (`isIgnoredAncestor`, `hasAncestorRoleOrTag`, `isElementVisible`, `collectClickableElements`, `containsDeep`, `isInsideHudOrNonComposer`, `findClosestButtonAncestor`, `isInsideRichTextareaOrInputArea`, `hasClickedSiblingButton`, `hasSiblingApprovalContext`, `isNoisyMutationTarget`, `isFollowUpChipElement`, `hasNegativeSiblingInGroup`) with strict `depth < 64` guards, `visited = new Set()`, and exception handling.
+- **Timing & Backward NTP Clock-Skew Defense (`content.js`)**:
+  - Implemented `safeNow()` and `sanitizeTimestamps(now)` to clamp past event timestamps on backward clock jumps (NTP synchronization or DST rollbacks), ensuring cooldowns, settle delays, and stall monitors never freeze (clamped `retryInMs <= 30000ms`).
+- **ReDoS & Oversized Keyword Guards (`defaults.js`)**:
+  - Added 256-character length guards before dynamic regular expression creation in `containsKeyword` and skipped oversized keywords in `matchButtonLabel`, wrapping all regex compilation in `try ... catch` with `.includes()` fallback to eliminate `SyntaxError: Regular expression too large` and ReDoS lockups.
+- **Prototype Pollution Isolation (`defaults.js`)**:
+  - Explicitly filtered `__proto__`, `constructor`, and `prototype` keys in `sanitizeKeywordArray`.
+- **Multi-Tab Stall Notification Isolation (`content.js`)**:
+  - Removed `GMAH_CLEAR_ALL_STALL_NOTIFICATIONS` from `onStallResolved()` so resolving a stall in one tab sends only tab-specific `GMAH_STALL_CLEAR`, preserving active stall alerts and desktop notifications in other concurrent tabs.
+- **Tab Navigation Cleanup (`background.js`)**:
+  - In `handleTabUpdated`, detect when a monitored tab navigates away from Gemini to an external URL and cleanly unregister its port, badge, scheduled ticks, and stall alerts via `handleTabRemoved(tabId)`.
+- **Breaker Badge Persistence & Restoration (`background.js`)**:
+  - Persisted `breakerBadgeMap` in `chrome.storage.session` to restore active breaker badges across Service Worker restarts while preventing stall clear operations from clobbering active breaker badges.
+- **Port Rotation Race Hardening (`content.js`)**:
+  - Tagged rotating ports with `port.__gmahRotating = true` prior to disconnect, preventing asynchronous `onDisconnect` events from triggering redundant duplicate reconnects.
+- **Web Locks Atomic Stats Write (`content.js`)**:
+  - Wrapped statistics read-modify-write (`flushPendingStatsDelta`) in Web Locks API (`navigator.locks.request('gmah_stats_write_lock', ...)`) with graceful fallback, preventing undercounts from concurrent multi-tab writes.
+- **Memory Bounding & Early-Return Pruning (`content.js`)**:
+  - Enforced a strict 500-entry FIFO maximum capacity on `clickedElements` and `clickAttempts` (`boundTrackingSets`), and pruned unmounted/disconnected DOM nodes unconditionally at the start of `scanOnce()` before any disabled/early return.
+- **HUD Event Listener Deduplication & Mid-Drag State Commit (`hud.js`)**:
+  - Guarded window event listener attachment (`resize`, `blur`, `pagehide`, `beforeunload`) to attach exactly once per HUD lifecycle, eliminating listener leaks on rapid re-mounts (<= 12 listeners across 10 mounts), and safely committed position via `savePosition` if blur or pagehide interrupts a drag mid-flight.
+
+### 🛠️ Background, Occlusion & Minimized Window Deep Optimization
+- **Non-Fullscreen & Occluded Window Auto-Continue Fix (`content.js`)**:
+  - Relaxed hidden layout checks (`relaxHiddenLayout`) whenever `isBackgroundOrUnfocused(doc)` is active (`doc.hidden || !doc.hasFocus()`), solving the Chromium compositor bug where paused CSS fade-in animations left buttons at `opacity: 0` and blocked clicking.
+- **Windows Real Minimization Detection Fix (`content.js`)**:
+  - Removed flawed assumption that minimized windows in Windows Chrome have `innerWidth === 0`; now properly detects Windows taskbar minimization (`screenX <= -32000`, `windowState === 'minimized'`, etc.).
+- **Lingering Generation Spinner Deadlock Release (`content.js`)**:
+  - Extended the 2.2-second frozen spinner bypass in `detectGenerating` to all unfocused and background states while adding explicit safeguards (`hasActiveToolOrThinking` and `connectingText`) so active MCP tool calls and deep thinking phases are never cut short.
+- **Deep Button Piercing (`resolveClickTarget`)**:
+  - Enhanced click resolution to directly pierce `<mat-chip>`, `<mat-chip-option>`, `<suggestion-chip>` and nested Shadow DOM inner buttons on background attempts.
+- **Expanded Keyword Coverage (`defaults.js`)**:
+  - Added traditional Chinese, Cantonese, and English continue keywords (`接續`, `接着写`, `接着说`, `keep writing`, `continue answering`, etc.).
+- **Cold-Start Storage Safeguard (`content.js`)**:
+  - Added a 1.5s fallback timer ensuring `settingsReady` activates with defaults even if `chrome.storage.local.get` is delayed by background tab throttling on cold start.
+- **All 115 Automated Tests Passing**:
+  - Verified across 7 comprehensive test suites in `tests/run_all.js` (81 regression + 27 deep boundary stress/fuzz + 7 per-chat override, isolated emergency stop, MAIN-world click & Notion UI tests).
+
+---
+
 ## [1.0.0] - 2026-11-23
 
 ### 🎉 Official Stable Release (v1.0.0)

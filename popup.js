@@ -11,6 +11,17 @@
     let toastTimer = null;
     let autoSaveTimer = null;
     let currentSettings = D.mergeSettings(D.DEFAULT_SETTINGS);
+    let currentTabState = null;
+    let currentTabMeta = null;
+
+    const CHAT_TOGGLE_BINDINGS = [
+      { id: 'chatEnabled', key: 'enabled' },
+      { id: 'chatAutoAllow', key: 'autoAllow' },
+      { id: 'chatAutoContinue', key: 'autoContinue' },
+      { id: 'chatBackgroundMode', key: 'backgroundMode' },
+      { id: 'chatStallAlertEnabled', key: 'stallAlertEnabled' },
+      { id: 'chatStallAutoRecoverEnabled', key: 'stallAutoRecoverEnabled' }
+    ];
 
     function byId(id) {
       return d ? d.getElementById(id) : null;
@@ -66,7 +77,8 @@
       const el = byId('toast');
       if (!el) return;
       el.textContent = msg;
-      el.style.color = isError ? '#f28b82' : '#81c995';
+      const isLight = currentSettings && currentSettings.theme === 'light';
+      el.style.color = isError ? (isLight ? '#d44c47' : '#f08080') : (isLight ? '#0f7b6c' : '#6bc9a4');
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(() => {
         el.textContent = '';
@@ -129,6 +141,71 @@
       if (btnToggleTheme) {
         btnToggleTheme.textContent = s.theme === 'light' ? tr('popupThemeLight') : tr('popupThemeDark');
       }
+
+      if (currentTabState) {
+        renderChatControl(currentTabState);
+      }
+    }
+
+    function renderChatControl(tabState) {
+      const card = byId('chatControlCard');
+      if (!card) return;
+      if (!tabState || tabState.isNonChatPage || !tabState.settings) {
+        card.style.display = 'none';
+        return;
+      }
+
+      card.style.display = 'flex';
+      const lang = currentSettings.language;
+      const eff = tabState.settings;
+      const override = tabState.chatOverride && typeof tabState.chatOverride === 'object' ? tabState.chatOverride : {};
+      const hasOverride = Boolean(
+        tabState.hasChatOverride ||
+          (typeof D.hasChatOverrideChanges === 'function' && D.hasChatOverrideChanges(override))
+      );
+      const isTripped = Boolean(tabState.circuitBreaker && tabState.circuitBreaker.tripped);
+
+      const chatLabelEl = byId('chatLabel');
+      if (chatLabelEl) {
+        chatLabelEl.textContent =
+          typeof D.formatConversationLabel === 'function'
+            ? D.formatConversationLabel(tabState.conversationKey, lang)
+            : tr('chatLabelNew');
+      }
+
+      const badgeEl = byId('chatOverrideBadge');
+      if (badgeEl) {
+        badgeEl.textContent = hasOverride ? tr('scopeChatCustom') : tr('scopeFollowGlobal');
+        badgeEl.className = hasOverride ? 'chat-mode-tag custom' : 'chat-mode-tag';
+      }
+
+      const resetBtn = byId('btnResetChatOverride');
+      if (resetBtn) {
+        resetBtn.style.display = hasOverride ? 'inline-block' : 'none';
+        resetBtn.textContent = tr('scopeResetBtn');
+      }
+
+      for (const item of CHAT_TOGGLE_BINDINGS) {
+        const input = byId(item.id);
+        if (!input) continue;
+        input.checked = Boolean(eff[item.key]);
+        const wrap = input.parentNode;
+        if (wrap && wrap.nodeType === 1) {
+          const isCustom = typeof override[item.key] === 'boolean';
+          wrap.className = isCustom ? 'chat-toggle-item overridden' : 'chat-toggle-item';
+        }
+      }
+
+      const btnChatEmergency = byId('btnChatEmergency');
+      if (btnChatEmergency) {
+        if (isTripped) {
+          btnChatEmergency.textContent = tr('chatResumeBtn');
+          btnChatEmergency.className = 'btn primary btn-sm';
+        } else {
+          btnChatEmergency.textContent = tr('chatEmergencyBtn');
+          btnChatEmergency.className = 'btn danger btn-sm';
+        }
+      }
     }
 
     function renderStats(stats, settings) {
@@ -142,6 +219,10 @@
     }
 
     function renderLiveStatus(tabState, meta) {
+      currentTabState = tabState || null;
+      currentTabMeta = meta || null;
+      renderChatControl(tabState);
+
       const liveEl = byId('statLive');
       if (!liveEl) return;
       if (!tabState) {
@@ -152,6 +233,11 @@
           liveEl.textContent = tr('liveNoTab');
           liveEl.className = '';
         }
+        return;
+      }
+      if (tabState.isNonChatPage) {
+        liveEl.textContent = tr('liveStandby');
+        liveEl.className = '';
         return;
       }
       if (tabState.circuitBreaker && tabState.circuitBreaker.tripped) {
@@ -318,7 +404,8 @@
       cb(null);
     }
 
-    function sendToGeminiTabs(message, cb) {
+    function sendToGeminiTabs(message, cb, opts) {
+      const activeOnly = Boolean(opts && opts.activeOnly);
       if (!api || !api.tabs || typeof api.tabs.query !== 'function') {
         if (cb) cb(null, { reason: 'no_tab', tabCount: 0 });
         return;
@@ -337,19 +424,20 @@
             const bScore = bWin + (b && b.active ? 2 : 0) + (b && b.highlighted ? 1 : 0);
             return bScore - aScore;
           });
+          const targets = activeOnly ? ordered.slice(0, 1) : ordered;
 
-          queryTabsAndSend(ordered, message, (best) => {
+          queryTabsAndSend(targets, message, (best) => {
             if (best) {
               if (cb) cb(best, { reason: 'ok', tabCount: ordered.length });
               return;
             }
             // Gemini tab is open but content script isn't injected yet (e.g., tab was open before install/reload)
-            injectIntoTabs(ordered, (injected) => {
+            injectIntoTabs(targets, (injected) => {
               if (!injected) {
                 if (cb) cb(null, { reason: 'needs_reload', tabCount: ordered.length });
                 return;
               }
-              queryTabsAndSend(ordered, message, (retryBest) => {
+              queryTabsAndSend(targets, message, (retryBest) => {
                 if (retryBest) {
                   if (cb) cb(retryBest, { reason: 'ok', injected: true, tabCount: ordered.length });
                 } else if (cb) {
@@ -360,6 +448,10 @@
           });
         });
       });
+    }
+
+    function sendToActiveGeminiTab(message, cb) {
+      return sendToGeminiTabs(message, cb, { activeOnly: true });
     }
 
     function saveSettings(customSettings, msg, opts) {
@@ -385,7 +477,11 @@
           // Push settings directly to open Gemini tabs so breaker reconciliation & live status never race storage.onChanged
           sendToGeminiTabs({ type: 'GMAH_APPLY_SETTINGS', settings: next }, (state, meta) => {
             if (state) {
-              renderLiveStatus(Object.assign({}, state, { settings: next }), meta);
+              const effSettings =
+                typeof D.resolveEffectiveSettings === 'function'
+                  ? D.resolveEffectiveSettings(next, state.chatOverride)
+                  : next;
+              renderLiveStatus(Object.assign({}, state, { settings: effSettings, globalSettings: next }), meta);
             } else {
               renderLiveStatus(null, meta);
             }
@@ -554,13 +650,85 @@
         });
       }
 
+      for (const item of CHAT_TOGGLE_BINDINGS) {
+        const el = byId(item.id);
+        if (!el) continue;
+        el.addEventListener('change', () => {
+          sendToActiveGeminiTab(
+            { type: 'GMAH_UPDATE_CHAT_OVERRIDE', override: { [item.key]: Boolean(el.checked) } },
+            (state, meta) => {
+              renderLiveStatus(state, meta);
+              if (state) {
+                showToast(tr('toastChatUpdated'));
+              } else if (meta && meta.reason === 'needs_reload') {
+                showToast(tr('toastNeedsReload'), true);
+              } else {
+                showToast(tr('toastNoGeminiTab'), true);
+              }
+            }
+          );
+        });
+      }
+
+      const btnResetChatOverride = byId('btnResetChatOverride');
+      if (btnResetChatOverride) {
+        btnResetChatOverride.addEventListener('click', () => {
+          sendToActiveGeminiTab({ type: 'GMAH_RESET_CHAT_OVERRIDE' }, (state, meta) => {
+            renderLiveStatus(state, meta);
+            if (state) {
+              showToast(tr('toastChatReset'));
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast(tr('toastNeedsReload'), true);
+            } else {
+              showToast(tr('toastNoGeminiTab'), true);
+            }
+          });
+        });
+      }
+
+      const btnChatEmergency = byId('btnChatEmergency');
+      if (btnChatEmergency) {
+        btnChatEmergency.addEventListener('click', () => {
+          const isTripped = Boolean(
+            currentTabState && currentTabState.circuitBreaker && currentTabState.circuitBreaker.tripped
+          );
+          const msgType = isTripped ? 'GMAH_RESET_BREAKER' : 'GMAH_EMERGENCY_STOP';
+          sendToActiveGeminiTab({ type: msgType }, (state, meta) => {
+            renderLiveStatus(state, meta);
+            if (state) {
+              showToast(isTripped ? tr('toastBreakerReset') : tr('toastEmergencyChatSent'), !isTripped);
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast(tr('toastNeedsReload'), true);
+            } else {
+              showToast(tr('toastNoGeminiTab'), true);
+            }
+          });
+        });
+      }
+
       const btnEmergency = byId('btnEmergency');
       if (btnEmergency) {
         btnEmergency.addEventListener('click', () => {
+          sendToActiveGeminiTab({ type: 'GMAH_EMERGENCY_STOP' }, (state, meta) => {
+            renderLiveStatus(state, meta);
+            if (state) {
+              showToast(tr('toastEmergencyChatSent'), true);
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast(tr('toastNeedsReload'), true);
+            } else {
+              showToast(tr('toastNoGeminiTab'), true);
+            }
+          });
+        });
+      }
+
+      const btnEmergencyAll = byId('btnEmergencyAll');
+      if (btnEmergencyAll) {
+        btnEmergencyAll.addEventListener('click', () => {
           sendToGeminiTabs({ type: 'GMAH_EMERGENCY_STOP' }, (state, meta) => {
             renderLiveStatus(state, meta);
             if (state) {
-              showToast(tr('toastEmergencySent'), true);
+              showToast(tr('toastEmergencyAllSent'), true);
             } else if (meta && meta.reason === 'needs_reload') {
               showToast(tr('toastNeedsReload'), true);
             } else {
@@ -573,7 +741,7 @@
       const btnForceRecover = byId('btnForceRecover');
       if (btnForceRecover) {
         btnForceRecover.addEventListener('click', () => {
-          sendToGeminiTabs({ type: 'GMAH_FORCE_STALL_RECOVER' }, (state, meta) => {
+          sendToActiveGeminiTab({ type: 'GMAH_FORCE_STALL_RECOVER' }, (state, meta) => {
             renderLiveStatus(state, meta);
             if (state) {
               showToast(tr('toastForceRecoverSent'));
@@ -589,7 +757,7 @@
       const btnResetBreaker = byId('btnResetBreaker');
       if (btnResetBreaker) {
         btnResetBreaker.addEventListener('click', () => {
-          sendToGeminiTabs({ type: 'GMAH_RESET_BREAKER' }, (state, meta) => {
+          sendToActiveGeminiTab({ type: 'GMAH_RESET_BREAKER' }, (state, meta) => {
             renderLiveStatus(state, meta);
             if (state) {
               showToast(tr('toastBreakerReset'));
@@ -640,6 +808,7 @@
       init,
       loadInitial,
       renderSettings,
+      renderChatControl,
       renderStats,
       renderLiveStatus,
       readSettingsFromForm,

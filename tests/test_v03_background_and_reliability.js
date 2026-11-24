@@ -13,7 +13,10 @@ const {
   getElementLabel,
   isNoisyMutationTarget,
   isFreshChatLandingUrl,
-  resolveClickTarget
+  resolveClickTarget,
+  isElementVisible,
+  isBackgroundOrUnfocused,
+  hasActiveToolOrThinking
 } = require('../content.js');
 const { createBackgroundController, PORT_ROTATE_MS } = require('../background.js');
 const { createHud } = require('../hud.js');
@@ -1474,6 +1477,263 @@ function runTests(test) {
       fn({ type: 'GMAH_APPLY_SETTINGS', settings: { backgroundMode: false } }, {}, () => {});
     }
     assert.strictEqual(lockAcquired, 1);
+  });
+
+  // 12. Windows Chrome minimized window (doc.hidden = true, innerWidth = 1920, innerHeight = 1080)
+  test('Windows Chrome minimized window (doc.hidden = true, innerWidth = 1920, innerHeight = 1080) successfully auto-continues with 0x0 rect or opacity: 0', () => {
+    const { doc, win } = createEnv();
+    let now = 900000;
+    doc.hidden = true;
+    doc._focused = false;
+    win.innerWidth = 1920; // Real Windows minimized window retains innerWidth & innerHeight!
+    win.innerHeight = 1080;
+
+    // Continue button has 0x0 rect and opacity: 0 due to Chrome suspended transitions and deferred layout passes
+    const contBtn = doc.createElement('button', {
+      text: '继续',
+      rect: { width: 0, height: 0 },
+      style: { opacity: '0' }
+    });
+    addTurn(doc, '代码生成已暂停，点击继续继续生成。', [contBtn]);
+
+    const engine = new GmahEngine({ doc, win, now: () => now });
+    const r1 = engine.scanOnce();
+    assert.strictEqual(r1.action, 'clicked_continue', 'Auto-Continue must click 0x0 / opacity: 0 button in minimized window');
+    assert.strictEqual(contBtn.clickCount, 1);
+
+    // Verify negative cases: buttons with display: none, visibility: hidden, cdk-visually-hidden, or scale(0) are STILL rejected
+    const hiddenParent = doc.createElement('div', { style: { display: 'none' } });
+    const ghostBtn = doc.createElement('button', { text: '继续', rect: { width: 0, height: 0 } });
+    hiddenParent.appendChild(ghostBtn);
+    doc.body.appendChild(hiddenParent);
+
+    const cdkHiddenBtn = doc.createElement('button', {
+      text: '继续',
+      className: 'cdk-visually-hidden',
+      rect: { width: 0, height: 0 }
+    });
+    doc.body.appendChild(cdkHiddenBtn);
+
+    const scale0Btn = doc.createElement('button', {
+      text: '继续',
+      style: { transform: 'scale(0)' },
+      rect: { width: 0, height: 0 }
+    });
+    doc.body.appendChild(scale0Btn);
+
+    assert.strictEqual(isElementVisible(ghostBtn, win, doc, { relaxHiddenLayout: true }), false);
+    assert.strictEqual(isElementVisible(cdkHiddenBtn, win, doc, { relaxHiddenLayout: true }), false);
+    assert.strictEqual(isElementVisible(scale0Btn, win, doc, { relaxHiddenLayout: true }), false);
+
+    // Verify ancestor pointer-events: none is respected unless child explicitly sets pointer-events: auto
+    const peWrapper = doc.createElement('div', { style: { pointerEvents: 'none' } });
+    const peChildInherit = doc.createElement('button', { text: '继续', rect: { width: 0, height: 0 } });
+    const peChildAuto = doc.createElement('button', { text: '继续', rect: { width: 0, height: 0 }, style: { pointerEvents: 'auto' } });
+    peWrapper.appendChild(peChildInherit);
+    peWrapper.appendChild(peChildAuto);
+    doc.body.appendChild(peWrapper);
+
+    assert.strictEqual(isElementVisible(peChildInherit, win, doc, { relaxHiddenLayout: true }), false);
+    assert.strictEqual(isElementVisible(peChildAuto, win, doc, { relaxHiddenLayout: true }), true);
+  });
+
+  // 13. Unfocused / occluded window (doc.hidden = false, hasFocus = () => false)
+  test('unfocused/occluded window (doc.hidden = false, hasFocus = () => false) successfully auto-continues with opacity: 0', () => {
+    const { doc, win } = createEnv();
+    let now = 920000;
+    doc.hidden = false;
+    doc._focused = false; // doc.hasFocus() returns false
+    win.innerWidth = 1440;
+    win.innerHeight = 900;
+
+    // Window is visible on screen but not focused (e.g. user is working in VS Code / IDE beside it)
+    // Chrome suspends CSS animations and transitions for unfocused windows, leaving button at opacity: 0
+    const contBtn = doc.createElement('button', {
+      text: '继续',
+      rect: { width: 120, height: 36 },
+      style: { opacity: '0' }
+    });
+    addTurn(doc, '上一阶段已完成，点击继续处理下一批数据。', [contBtn]);
+
+    const engine = new GmahEngine({ doc, win, now: () => now });
+    const r1 = engine.scanOnce();
+    assert.strictEqual(r1.action, 'clicked_continue', 'Auto-Continue must click opacity: 0 button when window is unfocused/occluded');
+    assert.strictEqual(contBtn.clickCount, 1);
+
+    // When the tab IS focused (doc.hidden = false, hasFocus = true), strict opacity check applies:
+    // opacity: 0 button is treated as invisible because user can see the window!
+    doc._focused = true;
+    const ghostBtn = doc.createElement('button', {
+      text: '继续',
+      rect: { width: 120, height: 36 },
+      style: { opacity: '0' }
+    });
+    assert.strictEqual(isElementVisible(ghostBtn, win, doc, { relaxHiddenLayout: false }), false);
+    assert.strictEqual(isElementVisible(ghostBtn, win, doc, { relaxHiddenLayout: true }), false, 'Focused window must NOT relax opacity: 0');
+  });
+
+  // 14. Lingering spinner when unfocused (doc.hidden = false, hasFocus = () => false) safely bypasses after grace period
+  test('lingering spinner when unfocused (doc.hidden = false, hasFocus = () => false) safely bypasses after grace period', () => {
+    const { doc, win } = createEnv();
+    let now = 940000;
+    doc.hidden = false;
+    doc._focused = false; // doc.hasFocus() returns false
+    win.innerWidth = 1440;
+    win.innerHeight = 900;
+
+    // Gemini finished output, Stop button is gone, but frozen mat-progress-spinner remains in DOM
+    const frozenSpinner = doc.createElement('mat-progress-spinner', {
+      rect: { width: 24, height: 24 },
+      style: { opacity: '1' }
+    });
+    doc.body.appendChild(frozenSpinner);
+
+    const contBtn = doc.createElement('button', { text: '继续' });
+    addTurn(doc, '代码重构完成，请点击继续运行自动化测试。', [contBtn]);
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      settings: { idleSettleMs: 1800 }
+    });
+
+    // t = 0: initial grace period wait
+    const r0 = engine.scanOnce();
+    assert.strictEqual(r0.action, 'wait');
+    assert.strictEqual(r0.reason, 'generating');
+    assert.ok(r0.retryInMs >= 2000, `Expected retryInMs >= 2000, got ${r0.retryInMs}`);
+    assert.strictEqual(contBtn.clickCount, 0);
+
+    // t + 2300ms (still unfocused!): frozen spinner is bypassed after grace period expires
+    now += 2300;
+    const r1 = engine.scanOnce();
+    assert.strictEqual(r1.action, 'clicked_continue', 'Must bypass frozen spinner and click Continue when window is unfocused');
+    assert.strictEqual(contBtn.clickCount, 1);
+  });
+
+  // 15. detectGenerating protects MCP connectingText, tool execution, and thinking indicators from premature grace bypass
+  test('detectGenerating protects MCP connectingText, tool execution, and thinking indicators from premature grace bypass', () => {
+    const { doc, win } = createEnv();
+    let now = 960000;
+    doc.hidden = true; // Minimized / background tab
+    doc._focused = false;
+    win.innerWidth = 1920;
+    win.innerHeight = 1080;
+
+    // Turn has a Continue button and a progress spinner
+    const spinner = doc.createElement('mat-progress-spinner', { rect: { width: 24, height: 24 } });
+    doc.body.appendChild(spinner);
+    const contBtn = doc.createElement('button', { text: '继续' });
+    addTurn(doc, '任务正在处理中...', [contBtn]);
+
+    // Active MCP connecting status
+    const mcpStatus = doc.createElement('div', {
+      attrs: { role: 'status' },
+      text: '正在连接 Desktop Commander...'
+    });
+    doc.body.appendChild(mcpStatus);
+
+    const engine = new GmahEngine({
+      doc,
+      win,
+      now: () => now,
+      settings: { idleSettleMs: 1800 }
+    });
+
+    // Even after 5000ms (far exceeding 2.2s grace), connectingText MUST block continue
+    now += 5000;
+    const r1 = engine.scanOnce();
+    assert.strictEqual(r1.action, 'wait');
+    assert.ok(r1.reason === 'generating' || r1.reason === 'connecting');
+    assert.strictEqual(contBtn.clickCount, 0, 'Active MCP connection must never be bypassed by grace timer');
+
+    // Remove MCP status and add active tool-execution element
+    mcpStatus.remove();
+    const toolExec = doc.createElement('div', { className: 'tool-execution' });
+    doc.body.appendChild(toolExec);
+
+    now += 5000;
+    const r2 = engine.scanOnce();
+    assert.strictEqual(r2.action, 'wait');
+    assert.strictEqual(r2.reason, 'generating');
+    assert.strictEqual(contBtn.clickCount, 0, 'Active tool execution must never be bypassed by grace timer');
+
+    // Remove tool-execution and add thinking indicator
+    toolExec.remove();
+    const thinking = doc.createElement('div', { className: 'thinking-indicator' });
+    doc.body.appendChild(thinking);
+
+    now += 5000;
+    const r3 = engine.scanOnce();
+    assert.strictEqual(r3.action, 'wait');
+    assert.strictEqual(r3.reason, 'generating');
+    assert.strictEqual(contBtn.clickCount, 0, 'Active thinking indicator must never be bypassed by grace timer');
+
+    // Remove thinking indicator and add genuine Stop button with deferred 0x0 layout in background
+    thinking.remove();
+    const stopBtn = doc.createElement('button', {
+      className: 'send-button stop',
+      attrs: { 'aria-label': '停止' },
+      rect: { width: 0, height: 0 },
+      style: { opacity: '0' }
+    });
+    doc.body.appendChild(stopBtn);
+
+    now += 5000;
+    const r4 = engine.scanOnce();
+    assert.strictEqual(r4.action, 'wait');
+    assert.strictEqual(r4.reason, 'generating');
+    assert.strictEqual(contBtn.clickCount, 0, 'Stop button with 0x0 rect/opacity 0 in background must strictly block continue');
+
+    // Finally remove Stop button: now the spinner is genuinely a frozen leftover
+    stopBtn.remove();
+    const r5Init = engine.scanOnce();
+    assert.strictEqual(r5Init.action, 'wait');
+    assert.strictEqual(r5Init.reason, 'generating');
+
+    now += 2300;
+    const r5 = engine.scanOnce();
+    assert.strictEqual(r5.action, 'clicked_continue');
+    assert.strictEqual(contBtn.clickCount, 1);
+  });
+
+  // 16. resolveClickTarget pierces Angular Material chips and Shadow DOM inner buttons on retry
+  test('resolveClickTarget pierces <mat-chip>, <mat-chip-option>, <suggestion-chip> and nested Shadow DOM inner buttons', () => {
+    const { doc } = createEnv();
+
+    // 1. <mat-chip> with inner <button>
+    const matChip = doc.createElement('mat-chip');
+    const innerBtn1 = doc.createElement('button', { text: '继续' });
+    matChip.appendChild(innerBtn1);
+
+    assert.strictEqual(resolveClickTarget(matChip, 1), matChip, 'Attempt 1 returns the chip itself');
+    assert.strictEqual(resolveClickTarget(matChip, 2), innerBtn1, 'Attempt 2 pierces to inner native button');
+
+    // 2. <mat-chip-option> with inner disabled button
+    const optChip = doc.createElement('mat-chip-option');
+    const disabledBtn = doc.createElement('button', { disabled: true, text: '继续' });
+    optChip.appendChild(disabledBtn);
+    assert.strictEqual(resolveClickTarget(optChip, 2), optChip, 'Disabled inner button is not selected');
+
+    // 3. <suggestion-chip> with nested Shadow DOM button
+    const sugChip = doc.createElement('suggestion-chip');
+    const wrapper = doc.createElement('div', { attrs: { role: 'button' } });
+    const shadow = wrapper.attachShadow();
+    const deepBtn = doc.createElement('button', { text: '继续' });
+    shadow.appendChild(deepBtn);
+    sugChip.appendChild(wrapper);
+
+    assert.strictEqual(resolveClickTarget(sugChip, 2), deepBtn, 'Attempt 2 pierces deep Shadow DOM inner button');
+
+    // 4. Custom MWC component (<md-filled-button>) with shadowRoot
+    const mwcBtn = doc.createElement('md-filled-button');
+    const mwcShadow = mwcBtn.attachShadow();
+    const nativeBtn = doc.createElement('button', { text: '始终允许' });
+    mwcShadow.appendChild(nativeBtn);
+
+    assert.strictEqual(resolveClickTarget(mwcBtn, 1), mwcBtn);
+    assert.strictEqual(resolveClickTarget(mwcBtn, 2), nativeBtn, 'Attempt 2 pierces MWC Shadow DOM button');
   });
 }
 

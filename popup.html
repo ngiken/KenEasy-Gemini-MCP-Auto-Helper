@@ -11,7 +11,7 @@
     <header class="header">
       <div class="brand">
         <img src="icons/icon48.png" alt="icon" class="logo" />
-        <div>
+        <div class="brand-info">
           <div class="brand-title-row">
             <h1 data-i18n="popupTitle">Gemini MCP 助手</h1>
             <span class="badge-beta" id="popupBetaBadge" data-i18n="betaBadge">v1.0.0</span>
@@ -28,7 +28,7 @@
 
     <section class="appearance-bar">
       <div class="appearance-item">
-        <span class="appearance-icon">🌐</span>
+        <span class="appearance-icon" aria-hidden="true">🌐</span>
         <select id="language" class="select-lang" aria-label="Language">
           <option value="zh-CN">简体中文</option>
           <option value="zh-TW">繁體中文</option>
@@ -53,6 +53,54 @@
         <strong id="statLive" class="badge-ok" data-i18n="livePending">待检测</strong>
       </div>
     </section>
+
+    <section class="card chat-control-card" id="chatControlCard" style="display: none;">
+      <div class="card-header-row">
+        <div class="chat-header-left">
+          <h2 data-i18n="secCurrentChat">当前对话独立控制</h2>
+          <span class="chat-id-pill" id="chatLabel" data-i18n="chatLabelNew">新对话</span>
+        </div>
+        <div class="chat-header-right">
+          <span class="chat-mode-tag" id="chatOverrideBadge" data-i18n="scopeFollowGlobal">跟随全局</span>
+          <button type="button" id="btnResetChatOverride" class="btn ghost btn-xs" data-i18n="scopeResetBtn" data-i18n-title="scopeResetTip" style="display: none;">恢复全局</button>
+        </div>
+      </div>
+
+      <div class="chat-toggle-grid">
+        <label class="chat-toggle-item">
+          <span data-i18n="hudRowMaster">插件状态</span>
+          <input type="checkbox" id="chatEnabled" />
+        </label>
+        <label class="chat-toggle-item">
+          <span data-i18n="hudRowAllow">自动始终允许</span>
+          <input type="checkbox" id="chatAutoAllow" />
+        </label>
+        <label class="chat-toggle-item">
+          <span data-i18n="hudRowContinue">自动点击继续</span>
+          <input type="checkbox" id="chatAutoContinue" />
+        </label>
+        <label class="chat-toggle-item">
+          <span data-i18n="hudRowBackground">后台切屏运行</span>
+          <input type="checkbox" id="chatBackgroundMode" />
+        </label>
+        <label class="chat-toggle-item">
+          <span data-i18n="hudRowNotif">桌面通知</span>
+          <input type="checkbox" id="chatStallAlertEnabled" />
+        </label>
+        <label class="chat-toggle-item">
+          <span data-i18n="hudRowStallRecover">超时自动续接</span>
+          <input type="checkbox" id="chatStallAutoRecoverEnabled" />
+        </label>
+      </div>
+
+      <div class="chat-action-row">
+        <button type="button" id="btnChatEmergency" class="btn danger btn-sm" data-i18n="chatEmergencyBtn">仅停本对话</button>
+      </div>
+    </section>
+
+    <div class="section-divider">
+      <span data-i18n="secGlobalSettings">全局默认设置</span>
+    </div>
 
     <section class="card">
       <h2 data-i18n="secCore">核心自动化</h2>
@@ -175,9 +223,10 @@
 
     <section class="quick-actions-4">
       <button type="button" id="btnEmergency" class="btn danger" data-i18n="btnEmergency">紧急停止</button>
+      <button type="button" id="btnEmergencyAll" class="btn danger-outline" data-i18n="btnEmergencyAll">停止全部对话</button>
       <button type="button" id="btnResetBreaker" class="btn secondary" data-i18n="btnResetBreaker">解除熔断</button>
       <button type="button" id="btnResetStats" class="btn secondary" data-i18n="btnResetStats">清零计数</button>
-      <button type="button" id="btnResetHudPos" class="btn secondary" data-i18n="btnResetHudPos">复位悬浮窗</button>
+      <button type="button" id="btnResetHudPos" class="btn secondary btn-span-2" data-i18n="btnResetHudPos">复位悬浮窗</button>
     </section>
 
     <footer class="footer">

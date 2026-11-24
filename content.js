@@ -301,6 +301,30 @@
   const LOADING_COMBINED_SELECTOR = LOADING_SELECTORS.join(',');
   const ALERT_COMBINED_SELECTOR = ALERT_SELECTORS.join(',');
   const CONNECTING_STATUS_COMBINED_SELECTOR = CONNECTING_STATUS_SELECTORS.join(',');
+  const TOOL_OR_THINKING_SELECTORS = [
+    '.tool-call',
+    '.tool-execution',
+    '.mcp-status',
+    '.mcp-tool-call',
+    'tool-call',
+    'mcp-tool-call',
+    '.thinking-indicator',
+    '[data-test-id*="tool-call"]',
+    '[data-test-id*="tool_call"]',
+    '[data-test-id*="thinking"]'
+  ];
+  const TOOL_OR_THINKING_COMBINED_SELECTOR = TOOL_OR_THINKING_SELECTORS.join(',');
+
+  function hasActiveToolOrThinking(doc, win, searchRoots) {
+    if (!doc) return false;
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
+    const nodes = queryAllFromRoots(roots, TOOL_OR_THINKING_COMBINED_SELECTOR, []);
+    for (const n of nodes) {
+      if (!n || isIgnoredAncestor(n)) continue;
+      if (isElementVisible(n, win, doc, { relaxHiddenLayout: true })) return true;
+    }
+    return false;
+  }
 
   function formatTime(date) {
     const d = date instanceof Date ? date : new Date();
@@ -311,57 +335,81 @@
 
   function isIgnoredAncestor(el) {
     let cur = el;
+    let depth = 0;
+    const visited = new Set();
     if (cur && cur.nodeType !== 1) {
-      cur = cur.parentElement || cur.parentNode || null;
-      if (cur && cur.nodeType === 11 && cur.host) cur = cur.host;
-    }
-    while (cur && cur.nodeType === 1) {
-      if (cur.id === 'gmah-hud') return true;
-      if (cur.getAttribute && cur.getAttribute('data-gmah-ignore') === 'true') return true;
-      const tag = (cur.tagName || '').toUpperCase();
-      if (
-        tag === 'NAV' ||
-        tag === 'ASIDE' ||
-        tag === 'HEADER' ||
-        tag === 'PRE' ||
-        tag === 'CODE' ||
-        tag === 'TEXTAREA' ||
-        tag === 'INPUT' ||
-        tag === 'SCRIPT' ||
-        tag === 'STYLE'
-      ) {
-        return true;
+      try {
+        cur = cur.parentElement || cur.parentNode || null;
+        if (cur && cur.nodeType === 11 && cur.host) cur = cur.host;
+      } catch (_) {
+        cur = null;
       }
-      if (cur.getAttribute) {
-        const role = (cur.getAttribute('role') || '').toLowerCase();
-        if (role === 'navigation' || role === 'menubar') return true;
-        if (cur.getAttribute('contenteditable') === 'true') return true;
-        const testId = (cur.getAttribute('data-test-id') || '').toLowerCase();
+    }
+    while (cur && cur.nodeType === 1 && depth++ < 64) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        if (cur.id === 'gmah-hud') return true;
+        if (cur.getAttribute && cur.getAttribute('data-gmah-ignore') === 'true') return true;
+        const tag = (cur.tagName || '').toUpperCase();
         if (
-          testId.includes('conversation-list') ||
-          testId.includes('sidebar') ||
-          testId.includes('sidenav') ||
-          testId.includes('feedback') ||
-          testId.includes('survey')
+          tag === 'NAV' ||
+          tag === 'ASIDE' ||
+          tag === 'HEADER' ||
+          tag === 'PRE' ||
+          tag === 'CODE' ||
+          tag === 'TEXTAREA' ||
+          tag === 'INPUT' ||
+          tag === 'SCRIPT' ||
+          tag === 'STYLE'
         ) {
           return true;
         }
+        if (cur.getAttribute) {
+          const role = (cur.getAttribute('role') || '').toLowerCase();
+          if (role === 'navigation' || role === 'menubar') return true;
+          if (cur.getAttribute('contenteditable') === 'true') return true;
+          const testId = (cur.getAttribute('data-test-id') || '').toLowerCase();
+          if (
+            testId.includes('conversation-list') ||
+            testId.includes('sidebar') ||
+            testId.includes('sidenav') ||
+            testId.includes('feedback') ||
+            testId.includes('survey')
+          ) {
+            return true;
+          }
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
       }
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
     }
     return false;
   }
 
   function hasAncestorRoleOrTag(el, roles, tags) {
     let cur = el;
-    while (cur && cur.nodeType === 1) {
-      const tag = (cur.tagName || '').toUpperCase();
-      if (tags && tags.indexOf(tag) >= 0) return true;
-      if (cur.getAttribute) {
-        const role = (cur.getAttribute('role') || '').toLowerCase();
-        if (roles && roles.indexOf(role) >= 0) return true;
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 64) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        const tag = (cur.tagName || '').toUpperCase();
+        if (tags && tags.indexOf(tag) >= 0) return true;
+        if (cur.getAttribute) {
+          const role = (cur.getAttribute('role') || '').toLowerCase();
+          if (roles && roles.indexOf(role) >= 0) return true;
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
       }
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
     }
     return false;
   }
@@ -376,30 +424,51 @@
 
   function isElementVisible(el, win, doc, opts) {
     if (!el || el.nodeType !== 1) return false;
-    if (el.disabled === true || el.hidden === true) return false;
-    if (el.getAttribute) {
-      if (el.getAttribute('aria-disabled') === 'true') return false;
-      if (el.getAttribute('aria-hidden') === 'true') return false;
-    }
+    try {
+      if (el.disabled === true || el.hidden === true) return false;
+      if (el.getAttribute) {
+        if (el.getAttribute('aria-disabled') === 'true') return false;
+        if (el.getAttribute('aria-hidden') === 'true') return false;
+      }
+    } catch (_) {}
 
     const w = win || (typeof window !== 'undefined' ? window : null);
     const d = doc || (el.ownerDocument || (typeof document !== 'undefined' ? document : null));
 
-    // In background tabs or minimized windows (document.hidden === true), Chrome suspends CSS
-    // fade-in transitions (leaving newly mounted buttons at opacity:0) and defers layout (0x0 rect)
-    // until the tab regains focus. Only relax these for interactive clickables (relaxHiddenLayout:true);
-    // keep strict opacity/rect checks for generating/loading indicators unless window is minimized,
-    // so faded-out spinners in background tabs never falsely block Auto-Continue.
     const isPageHidden = Boolean(d && d.hidden === true);
-    const isWindowMinimized = Boolean(isPageHidden && w && w.innerWidth === 0 && w.innerHeight === 0);
-    const relaxHiddenLayout = Boolean(opts && opts.relaxHiddenLayout && isPageHidden);
+    const isBgOrUnfocused = Boolean(d && isBackgroundOrUnfocused(d));
+    let isWindowMinimized = false;
+    try {
+      isWindowMinimized = Boolean(
+        isPageHidden &&
+        (
+          !w ||
+          (w.innerWidth === 0 && w.innerHeight === 0) ||
+          (w.outerWidth === 0 && w.outerHeight === 0) ||
+          (typeof w.screenX === 'number' && w.screenX <= -32000) ||
+          (typeof w.screenY === 'number' && w.screenY <= -32000) ||
+          (typeof w.screenLeft === 'number' && w.screenLeft <= -32000) ||
+          (typeof w.screenTop === 'number' && w.screenTop <= -32000) ||
+          w.minimized === true ||
+          w.isMinimized === true ||
+          w.windowState === 'minimized' ||
+          (d && (d.minimized === true || d.isMinimized === true || d.windowState === 'minimized'))
+        )
+      );
+    } catch (_) {}
+    const relaxHiddenLayout = Boolean(opts && opts.relaxHiddenLayout && isBgOrUnfocused);
 
     let selfDisplay = '';
+    let explicitPointerEvents = null;
     let cur = el;
-    while (cur && cur.nodeType === 1) {
-      if (cur.hidden === true) return false;
-      if (cur.getAttribute && cur.getAttribute('aria-hidden') === 'true') return false;
-      if (!relaxHiddenLayout) {
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 64) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        if (cur.hidden === true) return false;
+        if (cur.getAttribute && cur.getAttribute('aria-hidden') === 'true') return false;
         const curCls =
           typeof cur.className === 'string'
             ? cur.className
@@ -407,29 +476,35 @@
         if (/\b(ng-hide|cdk-visually-hidden|visually-hidden|display-none|d-none|invisible)\b/i.test(curCls)) {
           return false;
         }
-      }
-      if (w && typeof w.getComputedStyle === 'function') {
-        try {
+        if (w && typeof w.getComputedStyle === 'function') {
           const style = w.getComputedStyle(cur);
           if (style) {
-            if (cur === el) selfDisplay = style.display || '';
+            if (cur === el) {
+              selfDisplay = style.display || '';
+              if (style.pointerEvents) explicitPointerEvents = style.pointerEvents;
+            }
             if (style.display === 'none' || style.visibility === 'hidden') return false;
-            if (!relaxHiddenLayout && style.opacity !== '' && parseFloat(style.opacity) === 0) return false;
-            if (!relaxHiddenLayout && cur === el) {
+            const op = parseFloat(style.opacity);
+            if (!relaxHiddenLayout && style.opacity !== '' && Number.isFinite(op) && op === 0) return false;
+            if (cur === el) {
               if (
-                (style.width === '0px' && style.height === '0px') ||
+                (!relaxHiddenLayout && style.width === '0px' && style.height === '0px') ||
                 (typeof style.transform === 'string' && /scale\(\s*0(?:\s*,\s*0)?\s*\)/i.test(style.transform))
               ) {
                 return false;
               }
             }
-            if (cur === el && style.pointerEvents === 'none') return false;
+            if (style.pointerEvents === 'none' && explicitPointerEvents !== 'auto') return false;
           }
-        } catch (_) {
-          // Ignore computed style errors in exotic nodes
         }
+      } catch (_) {
+        // Ignore computed style errors in exotic nodes
       }
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
+      }
     }
 
     if (!relaxHiddenLayout && !isWindowMinimized && selfDisplay !== 'contents' && typeof el.getBoundingClientRect === 'function') {
@@ -488,100 +563,119 @@
     return acc + cleanPart;
   }
 
-  function extractVisibleLabelText(node, isRoot) {
+  function extractVisibleLabelText(node, isRoot, depth, seen) {
     if (!node) return '';
-    if (!isRoot && isIconOrDecorativeNode(node)) return '';
+    const d = typeof depth === 'number' ? depth : 0;
+    if (d > 32) return '';
+    const visited = seen || new Set();
+    if (visited.has(node)) return '';
+    visited.add(node);
 
-    // Support Material Web Components (<md-filled-button> etc.) that project labels via <slot>
-    if (
-      node.nodeType === 1 &&
-      (node.tagName || '').toUpperCase() === 'SLOT' &&
-      typeof node.assignedNodes === 'function'
-    ) {
-      let assigned = [];
-      try {
-        assigned = node.assignedNodes({ flatten: true }) || [];
-      } catch (_) {
-        assigned = [];
+    try {
+      if (!isRoot && isIconOrDecorativeNode(node)) return '';
+
+      // Support Material Web Components (<md-filled-button> etc.) that project labels via <slot>
+      if (
+        node.nodeType === 1 &&
+        (node.tagName || '').toUpperCase() === 'SLOT' &&
+        typeof node.assignedNodes === 'function'
+      ) {
+        let assigned = [];
+        try {
+          assigned = node.assignedNodes({ flatten: true }) || [];
+        } catch (_) {
+          assigned = [];
+        }
+        if (assigned.length > 0) {
+          let slotOut = '';
+          for (let i = 0; i < assigned.length; i++) {
+            const item = assigned[i];
+            if (!item) continue;
+            if (item.nodeType === 3) {
+              slotOut = appendLabelChunk(slotOut, item.nodeValue || item.textContent || '');
+            } else if (item.nodeType === 1 && !isIconOrDecorativeNode(item)) {
+              slotOut = appendLabelChunk(slotOut, extractVisibleLabelText(item, false, d + 1, visited));
+            }
+          }
+          return slotOut.replace(/\s+/g, ' ').trim();
+        }
       }
-      if (assigned.length > 0) {
-        let slotOut = '';
-        for (let i = 0; i < assigned.length; i++) {
-          const item = assigned[i];
-          if (!item) continue;
-          if (item.nodeType === 3) {
-            slotOut = appendLabelChunk(slotOut, item.nodeValue || item.textContent || '');
-          } else if (item.nodeType === 1 && !isIconOrDecorativeNode(item)) {
-            slotOut = appendLabelChunk(slotOut, extractVisibleLabelText(item, false));
+
+      if (node.childNodes && typeof node.childNodes.length === 'number' && node.childNodes.length > 0) {
+        let out = '';
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          if (!child) continue;
+          if (child.nodeType === 3) {
+            out = appendLabelChunk(out, child.nodeValue || child.textContent || '');
+          } else if (child.nodeType === 1) {
+            if (isIconOrDecorativeNode(child)) continue;
+            out = appendLabelChunk(out, extractVisibleLabelText(child, false, d + 1, visited));
           }
         }
-        return slotOut.replace(/\s+/g, ' ').trim();
+        const cleaned = out.replace(/\s+/g, ' ').trim();
+        if (cleaned) return cleaned;
+        return node.shadowRoot ? extractVisibleLabelText(node.shadowRoot, false, d + 1, visited) : '';
       }
-    }
 
-    if (node.childNodes && typeof node.childNodes.length === 'number' && node.childNodes.length > 0) {
-      let out = '';
-      for (let i = 0; i < node.childNodes.length; i++) {
-        const child = node.childNodes[i];
-        if (!child) continue;
-        if (child.nodeType === 3) {
-          out = appendLabelChunk(out, child.nodeValue || child.textContent || '');
-        } else if (child.nodeType === 1) {
-          if (isIconOrDecorativeNode(child)) continue;
-          out = appendLabelChunk(out, extractVisibleLabelText(child, false));
+      if (node.children && node.children.length > 0) {
+        let out = typeof node._ownText === 'string' ? node._ownText : '';
+        for (let i = 0; i < node.children.length; i++) {
+          const child = node.children[i];
+          if (!child || isIconOrDecorativeNode(child)) continue;
+          out = appendLabelChunk(out, extractVisibleLabelText(child, false, d + 1, visited));
         }
+        const cleaned = out.replace(/\s+/g, ' ').trim();
+        if (cleaned) return cleaned;
+        return node.shadowRoot ? extractVisibleLabelText(node.shadowRoot, false, d + 1, visited) : '';
       }
-      const cleaned = out.replace(/\s+/g, ' ').trim();
-      if (cleaned) return cleaned;
-      return node.shadowRoot ? extractVisibleLabelText(node.shadowRoot, false) : '';
-    }
 
-    if (node.children && node.children.length > 0) {
-      let out = typeof node._ownText === 'string' ? node._ownText : '';
-      for (let i = 0; i < node.children.length; i++) {
-        const child = node.children[i];
-        if (!child || isIconOrDecorativeNode(child)) continue;
-        out = appendLabelChunk(out, extractVisibleLabelText(child, false));
+      const direct = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
+      if (direct) return direct;
+
+      if (node.shadowRoot) {
+        return extractVisibleLabelText(node.shadowRoot, false, d + 1, visited);
       }
-      const cleaned = out.replace(/\s+/g, ' ').trim();
-      if (cleaned) return cleaned;
-      return node.shadowRoot ? extractVisibleLabelText(node.shadowRoot, false) : '';
-    }
-
-    const direct = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
-    if (direct) return direct;
-
-    if (node.shadowRoot) {
-      return extractVisibleLabelText(node.shadowRoot, false);
-    }
+    } catch (_) {}
     return '';
   }
 
   function getElementLabel(el) {
     if (!el) return '';
-    const text = extractVisibleLabelText(el, true);
-    if (text) return text;
-    if (el.getAttribute) {
-      return (el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
-    }
+    try {
+      const text = extractVisibleLabelText(el, true);
+      if (text) return text;
+      if (el.getAttribute) {
+        return (el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
+      }
+    } catch (_) {}
     return '';
   }
 
   /**
    * Collects the root node plus all nested open ShadowRoots once per scan pass.
    */
-  function collectSearchRoots(rootNode, out) {
+  function collectSearchRoots(rootNode, out, depth, seen) {
     const roots = out || [];
     if (!rootNode) return roots;
+    const visited = seen || new Set();
+    if (visited.has(rootNode)) return roots;
+    visited.add(rootNode);
     roots.push(rootNode);
+
+    const d = typeof depth === 'number' ? depth : 0;
+    if (d >= 32 || roots.length >= 256) return roots;
+
     if (typeof rootNode.querySelectorAll === 'function') {
-      const allNodes = rootNode.querySelectorAll('*');
-      for (let i = 0; i < allNodes.length; i++) {
-        const node = allNodes[i];
-        if (node && node.shadowRoot) {
-          collectSearchRoots(node.shadowRoot, roots);
+      try {
+        const allNodes = rootNode.querySelectorAll('*');
+        for (let i = 0; i < allNodes.length; i++) {
+          const node = allNodes[i];
+          if (node && node.shadowRoot && !visited.has(node.shadowRoot)) {
+            collectSearchRoots(node.shadowRoot, roots, d + 1, visited);
+          }
         }
-      }
+      } catch (_) {}
     }
     return roots;
   }
@@ -592,10 +686,12 @@
     for (let r = 0; r < roots.length; r++) {
       const rootNode = roots[r];
       if (!rootNode || typeof rootNode.querySelectorAll !== 'function') continue;
-      const matched = rootNode.querySelectorAll(selector);
-      for (let i = 0; i < matched.length; i++) {
-        results.push(matched[i]);
-      }
+      try {
+        const matched = rootNode.querySelectorAll(selector);
+        for (let i = 0; i < matched.length; i++) {
+          results.push(matched[i]);
+        }
+      } catch (_) {}
     }
     return results;
   }
@@ -636,8 +732,15 @@
     const dropSet = new Set();
     for (const item of valid) {
       const normLabel = D.normalizeText(item.label);
-      let p = item.el.parentElement || (item.el.getRootNode && item.el.getRootNode().host) || null;
-      while (p) {
+      let p = null;
+      try {
+        p = item.el.parentElement || (item.el.getRootNode && item.el.getRootNode().host) || null;
+      } catch (_) {}
+      let depth = 0;
+      const visited = new Set();
+      while (p && depth++ < 64) {
+        if (visited.has(p)) break;
+        visited.add(p);
         const parentItem = byEl.get(p);
         if (parentItem && D.normalizeText(parentItem.label) === normLabel) {
           if (isNativeButton(item.el) && !isNativeButton(parentItem.el)) {
@@ -647,7 +750,11 @@
           }
           break;
         }
-        p = p.parentElement || (p.getRootNode && p.getRootNode().host) || null;
+        try {
+          p = p.parentElement || (p.getRootNode && p.getRootNode().host) || null;
+        } catch (_) {
+          p = null;
+        }
       }
     }
 
@@ -662,35 +769,47 @@
       (clickedElements && clickedElements.size > 0) ||
       (clickAttempts && clickAttempts.size > 0);
     if (!hasTracked) return false;
-    let container =
-      el.parentElement ||
-      el.parentNode ||
-      (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
-    for (let depth = 0; depth < 5 && container; depth++) {
-      const tag = (container.tagName || '').toUpperCase();
-      if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
-      if (typeof container.querySelectorAll === 'function') {
-        const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
-        if (siblings.length > 8) break;
-        let otherCount = 0;
-        for (let i = 0; i < siblings.length; i++) {
-          const sib = siblings[i];
-          if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
-          otherCount += 1;
-          if (
-            (clickedElements && clickedElements.has(sib)) ||
-            (clickAttempts && clickAttempts.has(sib))
-          ) {
-            return true;
-          }
-        }
-        // Stop at the innermost multi-button group so separate stacked cards stay independent
-        if (otherCount > 0) break;
-      }
+    let container = null;
+    try {
       container =
-        container.parentElement ||
-        (container.nodeType === 11 ? container.host : container.parentNode) ||
-        null;
+        el.parentElement ||
+        el.parentNode ||
+        (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
+    } catch (_) {}
+    const visited = new Set();
+    for (let depth = 0; depth < 5 && container; depth++) {
+      if (visited.has(container)) break;
+      visited.add(container);
+      try {
+        const tag = (container.tagName || '').toUpperCase();
+        if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
+        if (typeof container.querySelectorAll === 'function') {
+          const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
+          if (siblings.length > 8) break;
+          let otherCount = 0;
+          for (let i = 0; i < siblings.length; i++) {
+            const sib = siblings[i];
+            if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
+            otherCount += 1;
+            if (
+              (clickedElements && clickedElements.has(sib)) ||
+              (clickAttempts && clickAttempts.has(sib))
+            ) {
+              return true;
+            }
+          }
+          // Stop at the innermost multi-button group so separate stacked cards stay independent
+          if (otherCount > 0) break;
+        }
+      } catch (_) {}
+      try {
+        container =
+          container.parentElement ||
+          (container.nodeType === 11 ? container.host : container.parentNode) ||
+          null;
+      } catch (_) {
+        container = null;
+      }
     }
     return false;
   }
@@ -702,29 +821,41 @@
       .concat(settings.alwaysAllowKeywords || [])
       .concat(settings.customAlwaysAllowKeywords || []);
 
-    let container =
-      el.parentElement ||
-      el.parentNode ||
-      (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
+    let container = null;
+    try {
+      container =
+        el.parentElement ||
+        el.parentNode ||
+        (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
+    } catch (_) {}
+    const visited = new Set();
     for (let depth = 0; depth < 5 && container; depth++) {
-      const tag = (container.tagName || '').toUpperCase();
-      if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
-      if (typeof container.querySelectorAll === 'function') {
-        const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
-        if (siblings.length > 8) break;
-        for (let i = 0; i < siblings.length; i++) {
-          const sib = siblings[i];
-          if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
-          const sibLabel = getElementLabel(sib);
-          if (sibLabel && sibLabel.length <= 64 && D.containsKeyword(sibLabel, denyAndAlways)) {
-            return true;
+      if (visited.has(container)) break;
+      visited.add(container);
+      try {
+        const tag = (container.tagName || '').toUpperCase();
+        if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN') break;
+        if (typeof container.querySelectorAll === 'function') {
+          const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
+          if (siblings.length > 8) break;
+          for (let i = 0; i < siblings.length; i++) {
+            const sib = siblings[i];
+            if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
+            const sibLabel = getElementLabel(sib);
+            if (sibLabel && sibLabel.length <= 64 && D.containsKeyword(sibLabel, denyAndAlways)) {
+              return true;
+            }
           }
         }
+      } catch (_) {}
+      try {
+        container =
+          container.parentElement ||
+          (container.nodeType === 11 ? container.host : container.parentNode) ||
+          null;
+      } catch (_) {
+        container = null;
       }
-      container =
-        container.parentElement ||
-        (container.nodeType === 11 ? container.host : container.parentNode) ||
-        null;
     }
     return false;
   }
@@ -734,62 +865,82 @@
       return true;
     }
     let cur = el;
-    for (let depth = 0; depth < 3 && cur && cur.nodeType === 1; depth++) {
-      const tag = (cur.tagName || '').toUpperCase();
-      if (tag === 'MAT-CHIP' || tag === 'MAT-ACTION-CHIP' || tag === 'MAT-CHIP-OPTION') {
-        return true;
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 4) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        const tag = (cur.tagName || '').toUpperCase();
+        if (tag === 'MAT-CHIP' || tag === 'MAT-ACTION-CHIP' || tag === 'MAT-CHIP-OPTION') {
+          return true;
+        }
+        const cls =
+          typeof cur.className === 'string'
+            ? cur.className
+            : (cur.getAttribute && cur.getAttribute('class')) || '';
+        if (/\b(follow-up-chip|suggestion-chip|mat-mdc-chip|mdc-evolution-chip)\b/i.test(cls)) {
+          return true;
+        }
+        const testId = (cur.getAttribute && cur.getAttribute('data-test-id') || '').toLowerCase();
+        if (testId.includes('chip') || testId.includes('follow-up') || testId.includes('suggestion')) {
+          return true;
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
       }
-      const cls =
-        typeof cur.className === 'string'
-          ? cur.className
-          : (cur.getAttribute && cur.getAttribute('class')) || '';
-      if (/\b(follow-up-chip|suggestion-chip|mat-mdc-chip|mdc-evolution-chip)\b/i.test(cls)) {
-        return true;
-      }
-      const testId = (cur.getAttribute && cur.getAttribute('data-test-id') || '').toLowerCase();
-      if (testId.includes('chip') || testId.includes('follow-up') || testId.includes('suggestion')) {
-        return true;
-      }
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
     }
     return false;
   }
 
   function hasNegativeSiblingInGroup(el) {
-    let container =
-      el.parentElement ||
-      el.parentNode ||
-      (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
-    // Check only immediate button group (depth < 2) so a solo "Yes" follow-up chip never climbs
-    // into <model-response> and hits unrelated message action bar buttons.
-    for (let depth = 0; depth < 2 && container; depth++) {
-      const tag = (container.tagName || '').toUpperCase();
-      if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN' || tag === 'MODEL-RESPONSE') break;
-      if (typeof container.querySelectorAll === 'function') {
-        const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
-        if (siblings.length > 6) break;
-        let otherCount = 0;
-        for (let i = 0; i < siblings.length; i++) {
-          const sib = siblings[i];
-          if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
-          otherCount += 1;
-          const sibLabel = getElementLabel(sib);
-          if (
-            sibLabel &&
-            D.matchButtonLabel(sibLabel, DIALOG_OR_SURVEY_NEGATIVE_SIBLINGS, {
-              maxLen: 20,
-              mode: 'exact'
-            })
-          ) {
-            return true;
-          }
-        }
-        if (otherCount > 0) break;
-      }
+    let container = null;
+    try {
       container =
-        container.parentElement ||
-        (container.nodeType === 11 ? container.host : container.parentNode) ||
-        null;
+        el.parentElement ||
+        el.parentNode ||
+        (el.getRootNode && el.getRootNode() !== el ? el.getRootNode() : null);
+    } catch (_) {}
+    const visited = new Set();
+    for (let depth = 0; depth < 2 && container; depth++) {
+      if (visited.has(container)) break;
+      visited.add(container);
+      try {
+        const tag = (container.tagName || '').toUpperCase();
+        if (tag === 'BODY' || tag === 'HTML' || tag === 'MAIN' || tag === 'MODEL-RESPONSE') break;
+        if (typeof container.querySelectorAll === 'function') {
+          const siblings = container.querySelectorAll(SIBLING_BUTTON_SELECTOR);
+          if (siblings.length > 6) break;
+          let otherCount = 0;
+          for (let i = 0; i < siblings.length; i++) {
+            const sib = siblings[i];
+            if (sib === el || containsDeep(sib, el) || containsDeep(el, sib)) continue;
+            otherCount += 1;
+            const sibLabel = getElementLabel(sib);
+            if (
+              sibLabel &&
+              D.matchButtonLabel(sibLabel, DIALOG_OR_SURVEY_NEGATIVE_SIBLINGS, {
+                maxLen: 20,
+                mode: 'exact'
+              })
+            ) {
+              return true;
+            }
+          }
+          if (otherCount > 0) break;
+        }
+      } catch (_) {}
+      try {
+        container =
+          container.parentElement ||
+          (container.nodeType === 11 ? container.host : container.parentNode) ||
+          null;
+      } catch (_) {
+        container = null;
+      }
     }
     return false;
   }
@@ -824,13 +975,23 @@
 
   function containsDeep(ancestor, node) {
     if (!ancestor || !node) return false;
-    if (typeof ancestor.contains === 'function' && ancestor.contains(node)) {
-      return true;
-    }
+    try {
+      if (typeof ancestor.contains === 'function' && ancestor.contains(node)) {
+        return true;
+      }
+    } catch (_) {}
     let cur = node;
-    while (cur) {
+    let depth = 0;
+    const visited = new Set();
+    while (cur && depth++ < 64) {
       if (cur === ancestor) return true;
-      cur = cur.parentNode || (cur.nodeType === 11 ? cur.host : null) || null;
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        cur = cur.parentNode || (cur.nodeType === 11 ? cur.host : null) || null;
+      } catch (_) {
+        break;
+      }
     }
     return false;
   }
@@ -882,7 +1043,7 @@
 
   function isBackgroundOrUnfocused(doc) {
     if (!doc) return false;
-    if (doc.hidden === true) return true;
+    if (doc.hidden === true || doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender') return true;
     if (typeof doc.hasFocus === 'function') {
       try {
         return !doc.hasFocus();
@@ -893,39 +1054,80 @@
 
   function isNoisyMutationTarget(node) {
     let cur = node;
+    let depth = 0;
+    const visited = new Set();
     if (cur && cur.nodeType !== 1) {
-      cur = cur.parentElement || cur.parentNode || null;
-      if (cur && cur.nodeType === 11 && cur.host) cur = cur.host;
-    }
-    for (let depth = 0; depth < 3 && cur && cur.nodeType === 1; depth++) {
-      if (isIconOrDecorativeNode(cur)) return true;
-      const tag = (cur.tagName || '').toUpperCase();
-      if (tag === 'MAT-PROGRESS-SPINNER' || tag === 'MAT-PROGRESS-BAR') return true;
-      const role = cur.getAttribute ? (cur.getAttribute('role') || '').toLowerCase() : '';
-      if (role === 'tooltip' || role === 'progressbar' || role === 'status') return true;
-      const cls =
-        typeof cur.className === 'string'
-          ? cur.className
-          : (cur.getAttribute && cur.getAttribute('class')) || '';
-      if (
-        /\b(mat-ripple|mat-mdc-ripple-element|mat-ripple-element|cdk-overlay-backdrop|mdc-tooltip|mat-mdc-tooltip|streaming-indicator|loading-text)\b/i.test(
-          cls
-        )
-      ) {
-        return true;
+      try {
+        cur = cur.parentElement || cur.parentNode || null;
+        if (cur && cur.nodeType === 11 && cur.host) cur = cur.host;
+      } catch (_) {
+        cur = null;
       }
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    }
+    while (cur && cur.nodeType === 1 && depth++ < 4) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        if (isIconOrDecorativeNode(cur)) return true;
+        const tag = (cur.tagName || '').toUpperCase();
+        if (tag === 'MAT-PROGRESS-SPINNER' || tag === 'MAT-PROGRESS-BAR') return true;
+        const role = cur.getAttribute ? (cur.getAttribute('role') || '').toLowerCase() : '';
+        if (role === 'tooltip' || role === 'progressbar' || role === 'status') return true;
+        const cls =
+          typeof cur.className === 'string'
+            ? cur.className
+            : (cur.getAttribute && cur.getAttribute('class')) || '';
+        if (
+          /\b(mat-ripple|mat-mdc-ripple-element|mat-ripple-element|cdk-overlay-backdrop|mdc-tooltip|mat-mdc-tooltip|streaming-indicator|loading-text)\b/i.test(
+            cls
+          )
+        ) {
+          return true;
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
+      }
     }
     return false;
   }
 
   function resolveClickTarget(el, attempt) {
-    if (!el || attempt < 2) return el;
-    // On retry, pierce custom Material Web Components (<md-filled-button>, etc.) to click the inner native <button>
-    if (el.shadowRoot && typeof el.shadowRoot.querySelector === 'function') {
-      const inner = el.shadowRoot.querySelector('button, [role="button"]');
-      if (inner && !inner.disabled) return inner;
-    }
+    const tryNum = typeof attempt === 'number' ? attempt : 2;
+    if (!el || tryNum < 2) return el;
+    try {
+      // On retry, pierce custom Material Web Components (<md-filled-button>, etc.) or Shadow DOM
+      if (el.shadowRoot && typeof el.shadowRoot.querySelector === 'function') {
+        const inner = el.shadowRoot.querySelector('button, [role="button"]');
+        if (inner && !inner.disabled) return inner;
+      }
+      // Also pierce Angular Material chips (<mat-chip>, <mat-chip-option>, <suggestion-chip>, etc.)
+      // whose inner native <button> handles the actual click event
+      const tag = (el.tagName || '').toUpperCase();
+      const cls =
+        typeof el.className === 'string'
+          ? el.className
+          : (el.getAttribute && el.getAttribute('class')) || '';
+      const isChip =
+        tag === 'MAT-CHIP' ||
+        tag === 'MAT-CHIP-OPTION' ||
+        tag === 'MAT-ACTION-CHIP' ||
+        tag === 'SUGGESTION-CHIP' ||
+        /\b(suggestion-chip|follow-up-chip|mat-mdc-chip|mdc-evolution-chip)\b/i.test(cls);
+
+      if (isChip && typeof el.querySelector === 'function') {
+        const inner = el.querySelector('button, [role="button"]');
+        if (inner && !inner.disabled) {
+          if (inner.shadowRoot && typeof inner.shadowRoot.querySelector === 'function') {
+            const deep = inner.shadowRoot.querySelector('button, [role="button"]');
+            if (deep && !deep.disabled) return deep;
+          }
+          return inner;
+        }
+      }
+    } catch (_) {}
     return el;
   }
 
@@ -937,7 +1139,7 @@
     if (typeof target.getBoundingClientRect === 'function') {
       try {
         const rect = target.getBoundingClientRect();
-        if (rect && rect.width > 0 && rect.height > 0) {
+        if (rect && Number.isFinite(rect.width) && Number.isFinite(rect.height) && rect.width > 0 && rect.height > 0) {
           // On initial click with human pacing randomFn, add slight natural variation within inner safe box (±22%);
           // on retry attempts (attempt >= 2), aim dead-center for maximum hit reliability.
           let offsetX = 0;
@@ -948,9 +1150,11 @@
             offsetX = (r1 - 0.5) * 0.44;
             offsetY = (r2 - 0.5) * 0.44;
           }
+          const left = Number.isFinite(rect.left) ? rect.left : 0;
+          const top = Number.isFinite(rect.top) ? rect.top : 0;
           coords = {
-            clientX: Math.round((rect.left || 0) + rect.width * (0.5 + offsetX)),
-            clientY: Math.round((rect.top || 0) + rect.height * (0.5 + offsetY))
+            clientX: Math.round(left + rect.width * (0.5 + offsetX)),
+            clientY: Math.round(top + rect.height * (0.5 + offsetY))
           };
         }
       } catch (_) {}
@@ -958,6 +1162,11 @@
 
     const baseOpts = Object.assign(
       { bubbles: true, cancelable: true, composed: true, button: 0 },
+      w && typeof w.addEventListener === 'function' ? { view: w } : {},
+      coords
+    );
+    const enterOpts = Object.assign(
+      { bubbles: false, cancelable: false, composed: true, buttons: 0, detail: 0 },
       w && typeof w.addEventListener === 'function' ? { view: w } : {},
       coords
     );
@@ -978,10 +1187,12 @@
 
     try {
       if (w && typeof w.PointerEvent === 'function') {
+        target.dispatchEvent(new w.PointerEvent('pointerenter', Object.assign({ pointerId: 1, isPrimary: true }, enterOpts)));
         target.dispatchEvent(new w.PointerEvent('pointerover', Object.assign({ pointerId: 1, isPrimary: true }, hoverOpts)));
         target.dispatchEvent(new w.PointerEvent('pointermove', Object.assign({ pointerId: 1, isPrimary: true }, hoverOpts)));
       }
       if (w && typeof w.MouseEvent === 'function') {
+        target.dispatchEvent(new w.MouseEvent('mouseenter', enterOpts));
         target.dispatchEvent(new w.MouseEvent('mouseover', hoverOpts));
       }
       if (w && typeof w.PointerEvent === 'function') {
@@ -1018,41 +1229,51 @@
 
   function isInsideHudOrNonComposer(el) {
     let cur = el;
-    while (cur && cur.nodeType === 1) {
-      if (cur.id === 'gmah-hud') return true;
-      if (cur.getAttribute && cur.getAttribute('data-gmah-ignore') === 'true') return true;
-      const tag = (cur.tagName || '').toUpperCase();
-      if (
-        tag === 'NAV' ||
-        tag === 'ASIDE' ||
-        tag === 'HEADER' ||
-        tag === 'PRE' ||
-        tag === 'CODE' ||
-        tag === 'SCRIPT' ||
-        tag === 'STYLE' ||
-        tag === 'DIALOG' ||
-        tag === 'MAT-DIALOG-CONTAINER'
-      ) {
-        return true;
-      }
-      if (cur.getAttribute) {
-        const role = (cur.getAttribute('role') || '').toLowerCase();
-        if (role === 'navigation' || role === 'menubar' || role === 'dialog' || role === 'alertdialog') {
-          return true;
-        }
-        const testId = (cur.getAttribute('data-test-id') || '').toLowerCase();
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 64) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        if (cur.id === 'gmah-hud') return true;
+        if (cur.getAttribute && cur.getAttribute('data-gmah-ignore') === 'true') return true;
+        const tag = (cur.tagName || '').toUpperCase();
         if (
-          testId.includes('conversation-list') ||
-          testId.includes('sidebar') ||
-          testId.includes('sidenav') ||
-          testId.includes('feedback') ||
-          testId.includes('survey') ||
-          testId.includes('search')
+          tag === 'NAV' ||
+          tag === 'ASIDE' ||
+          tag === 'HEADER' ||
+          tag === 'PRE' ||
+          tag === 'CODE' ||
+          tag === 'SCRIPT' ||
+          tag === 'STYLE' ||
+          tag === 'DIALOG' ||
+          tag === 'MAT-DIALOG-CONTAINER'
         ) {
           return true;
         }
+        if (cur.getAttribute) {
+          const role = (cur.getAttribute('role') || '').toLowerCase();
+          if (role === 'navigation' || role === 'menubar' || role === 'dialog' || role === 'alertdialog') {
+            return true;
+          }
+          const testId = (cur.getAttribute('data-test-id') || '').toLowerCase();
+          if (
+            testId.includes('conversation-list') ||
+            testId.includes('sidebar') ||
+            testId.includes('sidenav') ||
+            testId.includes('feedback') ||
+            testId.includes('survey') ||
+            testId.includes('search')
+          ) {
+            return true;
+          }
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
       }
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
     }
     return false;
   }
@@ -1062,38 +1283,52 @@
 
   function isStopButtonElement(el) {
     if (!el || el.nodeType !== 1) return false;
-    const cls =
-      typeof el.className === 'string'
-        ? el.className
-        : (el.getAttribute && el.getAttribute('class')) || '';
-    if (/\bstop(?:-button)?\b/i.test(cls)) return true;
-    const testId = (el.getAttribute && el.getAttribute('data-test-id') || '').toLowerCase();
-    if (testId.includes('stop')) return true;
-    if (typeof el.querySelector === 'function') {
-      try {
-        if (el.querySelector(STOP_ICON_SELECTOR)) return true;
-      } catch (_) {}
+    try {
+      const cls =
+        typeof el.className === 'string'
+          ? el.className
+          : (el.getAttribute && el.getAttribute('class')) || '';
+      if (/\bstop(?:-button)?\b/i.test(cls)) return true;
+      const testId = (el.getAttribute && el.getAttribute('data-test-id') || '').toLowerCase();
+      if (testId.includes('stop')) return true;
+      if (typeof el.querySelector === 'function') {
+        try {
+          if (el.querySelector(STOP_ICON_SELECTOR)) return true;
+        } catch (_) {}
+      }
+      const aria = D.normalizeText((el.getAttribute && el.getAttribute('aria-label')) || '');
+      const lbl = D.normalizeText(getElementLabel(el));
+      const combined = `${aria} ${lbl}`;
+      return (
+        /\bstop\b/i.test(combined) ||
+        combined.includes('停止') ||
+        combined.includes('取消生成') ||
+        combined.includes('终止') ||
+        combined.includes('終止') ||
+        combined.includes('中止')
+      );
+    } catch (_) {
+      return false;
     }
-    const aria = D.normalizeText((el.getAttribute && el.getAttribute('aria-label')) || '');
-    const lbl = D.normalizeText(getElementLabel(el));
-    const combined = `${aria} ${lbl}`;
-    return (
-      /\bstop\b/i.test(combined) ||
-      combined.includes('停止') ||
-      combined.includes('取消生成') ||
-      combined.includes('终止') ||
-      combined.includes('終止') ||
-      combined.includes('中止')
-    );
   }
 
   function findClosestButtonAncestor(node) {
     let cur = node;
-    for (let depth = 0; depth < 5 && cur && cur.nodeType === 1; depth++) {
-      const tag = (cur.tagName || '').toUpperCase();
-      const role = cur.getAttribute ? (cur.getAttribute('role') || '').toLowerCase() : '';
-      if (tag === 'BUTTON' || role === 'button') return cur;
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 64) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        const tag = (cur.tagName || '').toUpperCase();
+        const role = cur.getAttribute ? (cur.getAttribute('role') || '').toLowerCase() : '';
+        if (tag === 'BUTTON' || role === 'button') return cur;
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
+      }
     }
     return null;
   }
@@ -1112,7 +1347,7 @@
       const btn = findClosestButtonAncestor(icon);
       if (btn && !isIgnoredAncestor(btn) && isElementVisible(btn, win, doc)) return btn;
     }
-    if (!strictOnly && doc.hidden === true) {
+    if (!strictOnly && isBackgroundOrUnfocused(doc)) {
       for (const n of nodes) {
         if (!n || isIgnoredAncestor(n)) continue;
         if (isElementVisible(n, win, doc, { relaxHiddenLayout: true })) return n;
@@ -1130,15 +1365,25 @@
 
   function isInsideRichTextareaOrInputArea(el) {
     let cur = el;
-    for (let depth = 0; depth < 6 && cur && cur.nodeType === 1; depth++) {
-      const tag = (cur.tagName || '').toUpperCase();
-      if (tag === 'RICH-TEXTAREA') return true;
-      const cls =
-        typeof cur.className === 'string'
-          ? cur.className
-          : (cur.getAttribute && cur.getAttribute('class')) || '';
-      if (/\b(input-area|text-input-field|prompt-input|composer)\b/i.test(cls)) return true;
-      cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 16) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        const tag = (cur.tagName || '').toUpperCase();
+        if (tag === 'RICH-TEXTAREA') return true;
+        const cls =
+          typeof cur.className === 'string'
+            ? cur.className
+            : (cur.getAttribute && cur.getAttribute('class')) || '';
+        if (/\b(input-area|text-input-field|prompt-input|composer)\b/i.test(cls)) return true;
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
+      }
     }
     return false;
   }
@@ -1344,13 +1589,27 @@
       this.onStateChange = typeof opts.onStateChange === 'function' ? opts.onStateChange : null;
       this.onStatsSave = typeof opts.onStatsSave === 'function' ? opts.onStatsSave : null;
       this.onSettingsSave = typeof opts.onSettingsSave === 'function' ? opts.onSettingsSave : null;
+      this.onChatOverridesSave = typeof opts.onChatOverridesSave === 'function' ? opts.onChatOverridesSave : null;
+      this.onMainWorldClick = typeof opts.onMainWorldClick === 'function' ? opts.onMainWorldClick : null;
       this.onStallAlert = typeof opts.onStallAlert === 'function' ? opts.onStallAlert : null;
       this.onStallResolved = typeof opts.onStallResolved === 'function' ? opts.onStallResolved : null;
       this.onBreakerTrip = typeof opts.onBreakerTrip === 'function' ? opts.onBreakerTrip : null;
       this.onBreakerClear = typeof opts.onBreakerClear === 'function' ? opts.onBreakerClear : null;
 
-      this.settings = D.mergeSettings(opts.settings);
-      this.stats = D.normalizeStats(opts.stats, D.getTodayKey(new Date(this.now())));
+      this.lastUrl = this.win && this.win.location ? this.win.location.href : '';
+      this.conversationKey =
+        typeof D.extractConversationKey === 'function' ? D.extractConversationKey(this.lastUrl) : null;
+      this.globalSettings = D.mergeSettings(opts.settings);
+      this.chatOverrides =
+        typeof D.sanitizeChatOverridesMap === 'function'
+          ? D.sanitizeChatOverridesMap(opts.chatOverrides)
+          : {};
+      this.settings =
+        typeof D.resolveEffectiveSettings === 'function'
+          ? D.resolveEffectiveSettings(this.globalSettings, this.getCurrentChatOverride())
+          : D.mergeSettings(opts.settings);
+      this.stats = D.normalizeStats(opts.stats, D.getTodayKey(new Date(this.safeNow())));
+      this.mainWorldClickSeq = 0;
 
       this.clickedElements = new Set();
       this.clickAttempts = new Map(); // el -> { kind, count, lastAttemptAt, label, tier }
@@ -1366,16 +1625,13 @@
       this.nextContinueCooldownMs = 0;
       this.recentActionTimestamps = [];
       this.lastMutationAt = 0;
-      this.lastUrl = this.win && this.win.location ? this.win.location.href : '';
       this.statusKey = 'hudStatusMonitoring';
       this.statusVars = null;
       this.lastStatusText = this.tr('hudStatusMonitoring');
       this.isGenerating = false;
-      this.bgNoStopSinceAt = 0;
-      this.bgNoStopTurnFp = null;
       this.isNonChatPage = isNonChatGeminiUrl(this.lastUrl);
       this.ignoreStaleInitialContinue = Boolean(opts.ignoreStaleInitialContinue);
-      this.suppressInitialContinueUntil = this.ignoreStaleInitialContinue ? this.now() + 2000 : 0;
+      this.suppressInitialContinueUntil = this.ignoreStaleInitialContinue ? this.safeNow() + 2000 : 0;
 
       // Connection / waiting stall timer & auto-recovery state
       this.stallStartAt = 0;
@@ -1398,6 +1654,122 @@
 
       this.logs = [];
       this.maxLogs = 40;
+
+      const initOverride = this.getCurrentChatOverride();
+      if (initOverride && initOverride.emergencyStopped === true) {
+        const reason = this.tr('breakerReasonEmergency');
+        this.circuitBreaker = {
+          tripped: true,
+          reasonCode: 'emergency_stop',
+          reasonKey: 'breakerReasonEmergency',
+          reasonVars: null,
+          reason
+        };
+        this.statusKey = null;
+        this.statusVars = null;
+        this.lastStatusText = this.tr('hudStatusBreaker', { reason });
+      }
+    }
+
+    safeNow() {
+      try {
+        const val = typeof this.now === 'function' ? Number(this.now()) : Date.now();
+        if (Number.isFinite(val)) return val;
+      } catch (_) {}
+      return Date.now();
+    }
+
+    sanitizeTimestamps(now) {
+      if (!Number.isFinite(now)) return;
+      if (!Number.isFinite(this.lastMutationAt) || this.lastMutationAt > now) {
+        this.lastMutationAt = now;
+      }
+      if (!Number.isFinite(this.lastAllowClickAt) || this.lastAllowClickAt > now) {
+        this.lastAllowClickAt = 0;
+      }
+      if (!Number.isFinite(this.lastContinueClickAt) || this.lastContinueClickAt > now) {
+        this.lastContinueClickAt = 0;
+      }
+      if (!Number.isFinite(this.bgNoStopSinceAt) || this.bgNoStopSinceAt > now) {
+        this.bgNoStopSinceAt = now;
+      }
+      if (!Number.isFinite(this.stallStartAt) || this.stallStartAt > now) {
+        this.stallStartAt = now;
+      }
+      if (!Number.isFinite(this.suppressInitialContinueUntil) || this.suppressInitialContinueUntil > now + 30000) {
+        this.suppressInitialContinueUntil = 0;
+      }
+      if (Array.isArray(this.recentActionTimestamps)) {
+        this.recentActionTimestamps = this.recentActionTimestamps.filter(
+          (ts) => Number.isFinite(ts) && ts <= now && ts >= now - 60000
+        );
+      } else {
+        this.recentActionTimestamps = [];
+      }
+      if (this.stallRecovery) {
+        if (!Number.isFinite(this.stallRecovery.startedAt) || this.stallRecovery.startedAt > now) {
+          this.stallRecovery.startedAt = now;
+        }
+        if (!Number.isFinite(this.stallRecovery.phaseAt) || this.stallRecovery.phaseAt > now) {
+          this.stallRecovery.phaseAt = now;
+        }
+      }
+      if (this.clickAttempts && this.clickAttempts.size > 0) {
+        for (const entry of this.clickAttempts.values()) {
+          if (entry && (!Number.isFinite(entry.lastAttemptAt) || entry.lastAttemptAt > now)) {
+            entry.lastAttemptAt = now;
+          }
+        }
+      }
+    }
+
+    boundTrackingSets(maxCapacity) {
+      const cap = typeof maxCapacity === 'number' && maxCapacity > 0 ? maxCapacity : 500;
+      if (this.clickedElements && this.clickedElements.size > cap) {
+        const excess = this.clickedElements.size - cap;
+        let count = 0;
+        for (const item of this.clickedElements) {
+          this.clickedElements.delete(item);
+          if (++count >= excess) break;
+        }
+      }
+      if (this.clickAttempts && this.clickAttempts.size > cap) {
+        const excess = this.clickAttempts.size - cap;
+        let count = 0;
+        for (const key of this.clickAttempts.keys()) {
+          this.clickAttempts.delete(key);
+          if (++count >= excess) break;
+        }
+      }
+    }
+
+    pruneDisconnectedTrackedNodes() {
+      if (this.clickedElements && this.clickedElements.size > 0) {
+        for (const el of Array.from(this.clickedElements)) {
+          if (!el || el.nodeType !== 1 || el.isConnected === false) {
+            this.clickedElements.delete(el);
+          }
+        }
+      }
+      if (this.clickAttempts && this.clickAttempts.size > 0) {
+        for (const el of Array.from(this.clickAttempts.keys())) {
+          if (!el || el.nodeType !== 1 || el.isConnected === false) {
+            this.clickAttempts.delete(el);
+          }
+        }
+      }
+    }
+
+    trackClicked(el) {
+      if (!el) return;
+      this.clickedElements.add(el);
+      this.boundTrackingSets(500);
+    }
+
+    trackClickAttempt(el, data) {
+      if (!el) return;
+      this.clickAttempts.set(el, data);
+      this.boundTrackingSets(500);
     }
 
     tr(key, vars) {
@@ -1435,9 +1807,55 @@
       return entry;
     }
 
+    clearLogs() {
+      this.logs = [];
+      this.emitState();
+    }
+
+    getCurrentChatOverride() {
+      if (!this.conversationKey || !this.chatOverrides) return {};
+      const entry = this.chatOverrides[this.conversationKey];
+      return entry && typeof entry === 'object' ? entry : {};
+    }
+
+    hasChatOverride() {
+      const entry = this.getCurrentChatOverride();
+      return typeof D.hasChatOverrideChanges === 'function' ? D.hasChatOverrideChanges(entry) : false;
+    }
+
+    recomputeEffectiveSettings() {
+      this.settings =
+        typeof D.resolveEffectiveSettings === 'function'
+          ? D.resolveEffectiveSettings(this.globalSettings, this.getCurrentChatOverride())
+          : D.mergeSettings(this.globalSettings);
+    }
+
+    persistChatOverrides(removedKey) {
+      if (!this.onChatOverridesSave) return;
+      const sanitized =
+        typeof D.sanitizeChatOverridesMap === 'function'
+          ? D.sanitizeChatOverridesMap(this.chatOverrides)
+          : Object.assign({}, this.chatOverrides);
+      this.chatOverrides = sanitized;
+      this.onChatOverridesSave(sanitized, {
+        conversationKey: this.conversationKey,
+        override: this.conversationKey ? this.chatOverrides[this.conversationKey] || null : null,
+        removedKey: removedKey || null
+      });
+    }
+
     getState() {
+      const chatOverride = Object.assign({}, this.getCurrentChatOverride());
       return {
         settings: this.settings,
+        globalSettings: this.globalSettings,
+        conversationKey: this.conversationKey,
+        chatOverride,
+        hasChatOverride: this.hasChatOverride(),
+        chatEmergencyStopped: Boolean(
+          chatOverride.emergencyStopped === true ||
+            (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop')
+        ),
         stats: this.stats,
         taskContinueCount: this.taskContinueCount,
         isGenerating: this.isGenerating,
@@ -1501,9 +1919,7 @@
       return false;
     }
 
-    updateSettings(partial, persist) {
-      const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
-      this.settings = D.mergeSettings(Object.assign({}, this.settings, partial));
+    applyEffectiveSettingsSideEffects(prevStallAlert) {
       this.refreshLocalizedTexts();
       if (!this.settings.enabled) {
         if (!this.stallRecovery || !this.stallRecovery.manual) {
@@ -1529,11 +1945,159 @@
           this.onStallResolved();
         }
       }
+    }
+
+    updateSettings(partial, persist) {
+      const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
+      this.globalSettings = D.mergeSettings(Object.assign({}, this.globalSettings, partial));
+      this.recomputeEffectiveSettings();
+      this.applyEffectiveSettingsSideEffects(prevStallAlert);
       if (persist && this.onSettingsSave) {
-        this.onSettingsSave(this.settings);
+        this.onSettingsSave(this.globalSettings);
       }
       if (!this.reconcileBreakerWithSettings()) {
         this.emitState();
+      }
+    }
+
+    updateChatOverride(partial, persist) {
+      if (!this.conversationKey || !partial || typeof partial !== 'object') {
+        return this.updateSettings(partial, persist);
+      }
+      const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
+      const current = Object.assign({}, this.getCurrentChatOverride());
+      const allowedKeys = Array.isArray(D.CHAT_OVERRIDE_KEYS) ? D.CHAT_OVERRIDE_KEYS : [];
+      let changed = false;
+
+      for (const key of allowedKeys) {
+        if (!Object.prototype.hasOwnProperty.call(partial, key)) continue;
+        const val = partial[key];
+        if (val === null || val === undefined) {
+          if (Object.prototype.hasOwnProperty.call(current, key)) {
+            delete current[key];
+            changed = true;
+          }
+        } else if (typeof val === 'boolean') {
+          if (val === this.globalSettings[key]) {
+            if (Object.prototype.hasOwnProperty.call(current, key)) {
+              delete current[key];
+              changed = true;
+            }
+          } else if (current[key] !== val) {
+            current[key] = val;
+            changed = true;
+          }
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(partial, 'emergencyStopped')) {
+        if (partial.emergencyStopped === true) {
+          if (current.emergencyStopped !== true) {
+            current.emergencyStopped = true;
+            changed = true;
+          }
+        } else if (current.emergencyStopped) {
+          delete current.emergencyStopped;
+          changed = true;
+        }
+      }
+
+      if (typeof D.hasChatOverrideChanges === 'function' && D.hasChatOverrideChanges(current)) {
+        current.updatedAt = this.safeNow();
+        this.chatOverrides[this.conversationKey] = D.sanitizeChatOverride(current);
+      } else {
+        delete this.chatOverrides[this.conversationKey];
+      }
+
+      this.recomputeEffectiveSettings();
+      this.applyEffectiveSettingsSideEffects(prevStallAlert);
+
+      if (current.emergencyStopped === true) {
+        this.tripBreaker('emergency_stop', null, 'breakerReasonEmergency');
+      } else if (
+        Object.prototype.hasOwnProperty.call(partial, 'emergencyStopped') &&
+        !partial.emergencyStopped &&
+        this.circuitBreaker.tripped &&
+        this.circuitBreaker.reasonCode === 'emergency_stop'
+      ) {
+        this.clearBreaker();
+      }
+
+      if (persist && changed) {
+        this.persistChatOverrides();
+      }
+      if (!this.reconcileBreakerWithSettings()) {
+        this.emitState();
+      }
+      return this.getCurrentChatOverride();
+    }
+
+    clearChatOverride(persist) {
+      if (!this.conversationKey) return false;
+      const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
+      const hadOverride = this.hasChatOverride();
+      const wasEmergency = this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop';
+      delete this.chatOverrides[this.conversationKey];
+      this.recomputeEffectiveSettings();
+      this.applyEffectiveSettingsSideEffects(prevStallAlert);
+      if (persist && hadOverride) {
+        this.persistChatOverrides();
+      }
+      if (wasEmergency) {
+        this.clearBreaker(this.tr('logChatOverrideCleared'));
+      } else {
+        if (hadOverride) this.addLog(this.tr('logChatOverrideCleared'));
+        if (!this.reconcileBreakerWithSettings()) {
+          this.emitState();
+        }
+      }
+      return hadOverride;
+    }
+
+    setChatOverridesMap(rawMap) {
+      const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
+      this.chatOverrides =
+        typeof D.sanitizeChatOverridesMap === 'function'
+          ? D.sanitizeChatOverridesMap(rawMap)
+          : {};
+      this.recomputeEffectiveSettings();
+      this.applyEffectiveSettingsSideEffects(prevStallAlert);
+
+      const curOverride = this.getCurrentChatOverride();
+      if (curOverride.emergencyStopped === true) {
+        if (!this.circuitBreaker.tripped || this.circuitBreaker.reasonCode !== 'emergency_stop') {
+          this.tripBreaker('emergency_stop', null, 'breakerReasonEmergency');
+          return;
+        }
+      } else if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
+        this.clearBreaker();
+        return;
+      }
+
+      if (!this.reconcileBreakerWithSettings()) {
+        this.emitState();
+      }
+    }
+
+    triggerMainWorldClick(el, attempt, kind, label) {
+      if (!el || !this.onMainWorldClick) return false;
+      const target = resolveClickTarget(el, attempt);
+      if (!target || typeof target.setAttribute !== 'function') return false;
+      this.mainWorldClickSeq += 1;
+      const token = `gmah_${this.safeNow()}_${this.mainWorldClickSeq}`;
+      try {
+        target.setAttribute('data-gmah-click-target', token);
+      } catch (_) {
+        return false;
+      }
+      try {
+        this.onMainWorldClick({ token, attempt: Number(attempt) || 2, kind: kind || 'click', label: label || '' });
+        return true;
+      } catch (_) {
+        try {
+          if (typeof target.removeAttribute === 'function') target.removeAttribute('data-gmah-click-target');
+        } catch (_) {}
+        return false;
       }
     }
 
@@ -1650,12 +2214,44 @@
       this.emitState();
     }
 
-    emergencyStop() {
+    emergencyStop(opts) {
+      const persist = !opts || opts.persist !== false;
+      if (this.conversationKey && !this.isNonChatPage) {
+        const cur = Object.assign({}, this.getCurrentChatOverride(), {
+          emergencyStopped: true,
+          updatedAt: this.safeNow()
+        });
+        this.chatOverrides[this.conversationKey] =
+          typeof D.sanitizeChatOverride === 'function' ? D.sanitizeChatOverride(cur) : cur;
+        if (persist) {
+          this.persistChatOverrides();
+        }
+      }
       this.tripBreaker('emergency_stop', null, 'breakerReasonEmergency');
     }
 
-    clearBreaker(logMsg) {
+    clearBreaker(logMsg, opts) {
       const prevCode = this.circuitBreaker.reasonCode;
+      const persist = !opts || opts.persist !== false;
+      if (
+        prevCode === 'emergency_stop' &&
+        this.conversationKey &&
+        this.chatOverrides &&
+        this.chatOverrides[this.conversationKey] &&
+        this.chatOverrides[this.conversationKey].emergencyStopped
+      ) {
+        const nextEntry = Object.assign({}, this.chatOverrides[this.conversationKey]);
+        delete nextEntry.emergencyStopped;
+        if (typeof D.hasChatOverrideChanges === 'function' && D.hasChatOverrideChanges(nextEntry)) {
+          nextEntry.updatedAt = this.safeNow();
+          this.chatOverrides[this.conversationKey] = D.sanitizeChatOverride(nextEntry);
+        } else {
+          delete this.chatOverrides[this.conversationKey];
+        }
+        if (persist) {
+          this.persistChatOverrides();
+        }
+      }
       this.resetStallMonitor(true);
       this.circuitBreaker = {
         tripped: false,
@@ -1708,13 +2304,38 @@
 
     onConversationChange(newUrl) {
       const prevUrl = this.lastUrl;
+      const prevKey = this.conversationKey;
+      const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
       this.resetStallMonitor(true);
       this.stallRecoveryCount = 0;
       this.stallRecoveryBaselineFp = null;
       this.lastUrl = newUrl;
       this.isNonChatPage = isNonChatGeminiUrl(newUrl);
+      const nextKey =
+        typeof D.extractConversationKey === 'function' ? D.extractConversationKey(newUrl) : null;
       // Do NOT suppress continue when transitioning from fresh /app landing page into a brand-new /app/<id> chat
       const isFreshChatCreation = isFreshChatLandingUrl(prevUrl) && !this.isNonChatPage && !isFreshChatLandingUrl(newUrl);
+      if (
+        isFreshChatCreation &&
+        prevKey === 'landing' &&
+        nextKey &&
+        nextKey !== 'landing' &&
+        this.chatOverrides &&
+        this.chatOverrides.landing
+      ) {
+        const inherited = Object.assign({}, this.chatOverrides.landing, { updatedAt: this.safeNow() });
+        this.chatOverrides[nextKey] =
+          typeof D.sanitizeChatOverride === 'function' ? D.sanitizeChatOverride(inherited) : inherited;
+        delete this.chatOverrides.landing;
+        this.conversationKey = nextKey;
+        this.persistChatOverrides('landing');
+      } else {
+        this.conversationKey = nextKey;
+      }
+
+      this.recomputeEffectiveSettings();
+      this.applyEffectiveSettingsSideEffects(prevStallAlert);
+
       this.suppressInitialContinueUntil =
         this.ignoreStaleInitialContinue && !isFreshChatCreation ? this.now() + 2000 : 0;
       this.taskContinueCount = 0;
@@ -1724,12 +2345,24 @@
       this.lastContinueFingerprint = null;
       this.lastContinueContentFingerprint = null;
       this.clickAttempts.clear();
+
+      const nextOverride = this.getCurrentChatOverride();
+      if (nextOverride && nextOverride.emergencyStopped === true) {
+        if (!this.circuitBreaker.tripped || this.circuitBreaker.reasonCode !== 'emergency_stop') {
+          this.tripBreaker('emergency_stop', null, 'breakerReasonEmergency');
+          this.addLog(this.tr('logChatEmergencyRestored'));
+          this.emitState();
+        } else {
+          this.emitState();
+        }
+        return;
+      }
+
       if (
         this.circuitBreaker.tripped &&
-        this.circuitBreaker.reasonCode !== 'emergency_stop' &&
         this.circuitBreaker.reasonCode !== 'daily_limit'
       ) {
-        this.clearBreaker('已切换对话，自动重置熔断状态');
+        this.clearBreaker(this.tr('logChatChangedClearBreaker'), { persist: false });
       } else {
         this.emitState();
       }
@@ -1754,7 +2387,7 @@
       const roots = Array.isArray(searchRoots)
         ? searchRoots
         : collectSearchRoots(this.doc.body || this.doc, []);
-      if (findStopButton(this.doc, this.win, roots, true)) {
+      if (findStopButton(this.doc, this.win, roots, false)) {
         this.bgNoStopSinceAt = 0;
         this.bgNoStopTurnFp = null;
         return true;
@@ -1764,11 +2397,19 @@
         this.bgNoStopTurnFp = null;
         return false;
       }
-      // In background tabs (document.hidden === true), Chrome pauses CSS/Angular leave animations,
+      // In background tabs or unfocused/occluded windows, Chrome pauses CSS/Angular leave animations,
       // which can leave a finished response's spinner/streaming-indicator stuck in DOM with opacity:1
       // after the Stop button is already gone. Once no Stop button and no new text arrive for >= 2.2s,
       // treat the lingering spinner as frozen UI rather than active generation so Auto-Continue runs in BG!
-      if (this.doc.hidden === true && typeof now === 'number') {
+      // Ensure the grace timer NEVER expires if MCP connectingText, tool calls, or thinking indicators are active!
+      if (isBackgroundOrUnfocused(this.doc) && typeof now === 'number') {
+        const hasConnecting = Boolean(this.detectConnectingStatus(roots, turns));
+        const hasToolOrThinking = hasActiveToolOrThinking(this.doc, this.win, roots);
+        if (hasConnecting || hasToolOrThinking) {
+          this.bgNoStopSinceAt = now;
+          return true;
+        }
+
         const turnFp = computeResponseFingerprint(turns) || '';
         if (this.bgNoStopSinceAt === 0 || turnFp !== this.bgNoStopTurnFp) {
           this.bgNoStopSinceAt = now;
@@ -2034,6 +2675,9 @@
               sr.stopAttempts += 1;
               sr.phaseAt = now;
               this.clickFn(stopBtn, this.win, sr.stopAttempts, this.randomFn);
+              if (isBackgroundOrUnfocused(this.doc)) {
+                this.triggerMainWorldClick(stopBtn, sr.stopAttempts, 'stop', 'Stop');
+              }
               this.emitState();
               return {
                 action: 'stall_recover_stop_retry',
@@ -2131,6 +2775,9 @@
 
           if (sendBtn) {
             this.clickFn(sendBtn, this.win, 1, this.randomFn);
+            if (isBackgroundOrUnfocused(this.doc) && (!inputEl || readPromptInputText(inputEl).length > 0)) {
+              this.triggerMainWorldClick(sendBtn, 2, 'send', 'Send');
+            }
             method = 'button';
             targetEl = sendBtn;
           } else if (sinceFill < fallbackDeadlineMs) {
@@ -2625,16 +3272,17 @@
     markExistingContinueCandidatesSeen() {
       if (!this.doc) return 0;
       const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
-      if (this.detectGenerating(searchRoots)) return 0;
-      const clickables = collectClickableElements(this.doc, this.win, searchRoots);
       const turns = getAssistantTurns(this.doc, searchRoots);
+      const now = typeof this.now === 'function' ? this.now() : Date.now();
+      if (this.detectGenerating(searchRoots, turns, now)) return 0;
+      const clickables = collectClickableElements(this.doc, this.win, searchRoots);
       let count = 0;
       let guard = 0;
       while (guard < 20) {
         guard += 1;
         const hit = this.findContinueCandidate(clickables, turns);
         if (!hit) break;
-        this.clickedElements.add(hit.item.el);
+        this.trackClicked(hit.item.el);
         count += 1;
       }
       return count;
@@ -2645,6 +3293,11 @@
      */
     scanOnce() {
       if (!this.doc) return { action: 'noop', reason: 'no_doc' };
+
+      const now = this.safeNow();
+      this.sanitizeTimestamps(now);
+      this.pruneDisconnectedTrackedNodes();
+      this.boundTrackingSets(500);
 
       // SPA URL change check
       const currentHref = this.win && this.win.location ? this.win.location.href : this.lastUrl;
@@ -2661,7 +3314,6 @@
       }
 
       this.ensureTodayStats();
-      const now = this.now();
       const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
       const turns = getAssistantTurns(this.doc, searchRoots);
       this.isGenerating = this.detectGenerating(searchRoots, turns, now);
@@ -2725,8 +3377,8 @@
         if (allowElapsed >= effectiveAllowCooldown) {
           const allowHit = this.findAllowCandidate(clickables);
           if (allowHit) {
-            this.clickedElements.add(allowHit.item.el);
-            this.clickAttempts.set(allowHit.item.el, {
+            this.trackClicked(allowHit.item.el);
+            this.trackClickAttempt(allowHit.item.el, {
               kind: 'allow',
               count: 1,
               lastAttemptAt: now,
@@ -2764,6 +3416,12 @@
             this.nextAllowCooldownMs = this.computeEffectiveAllowCooldownMs(now);
             this.resetStallMonitor(true);
             this.clickFn(allowRetry.el, this.win, allowRetry.entry.count, this.randomFn);
+            const mainWorldEscalated = this.triggerMainWorldClick(
+              allowRetry.el,
+              allowRetry.entry.count,
+              'allow',
+              allowRetry.entry.label
+            );
             const maxRetry = allowRetry.maxAttempts || MAX_BG_CLICK_ATTEMPTS;
             this.setStatus('hudStatusRetryClick', {
               label: allowRetry.entry.label,
@@ -2771,7 +3429,13 @@
               max: maxRetry
             });
             this.addLog(
-              `🔁 后台重试点击允许：「${allowRetry.entry.label}」 (${allowRetry.entry.count}/${maxRetry})`
+              mainWorldEscalated
+                ? this.tr('logMainWorldRetry', {
+                    label: allowRetry.entry.label,
+                    attempt: allowRetry.entry.count,
+                    max: maxRetry
+                  })
+                : `🔁 后台重试点击允许：「${allowRetry.entry.label}」 (${allowRetry.entry.count}/${maxRetry})`
             );
             this.emitState();
             return {
@@ -2779,6 +3443,7 @@
               tier: allowRetry.entry.tier,
               label: allowRetry.entry.label,
               attempt: allowRetry.entry.count,
+              mainWorldEscalated,
               element: allowRetry.el,
               pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
             };
@@ -2787,10 +3452,12 @@
           const pendingAllow = this.findAllowCandidate(clickables);
           if (pendingAllow) {
             this.emitState();
+            const rawWait = effectiveAllowCooldown - allowElapsed;
+            const safeRetry = Number.isFinite(rawWait) ? Math.max(100, Math.min(60000, Math.round(rawWait))) : 500;
             return {
               action: 'wait',
               reason: 'allow_cooldown',
-              retryInMs: Math.max(100, effectiveAllowCooldown - allowElapsed)
+              retryInMs: safeRetry
             };
           }
         }
@@ -2827,26 +3494,30 @@
       }
 
       // Layer B: Wait for streaming to finish + DOM settle
-      if (this.isGenerating) {
+      if (this.isGenerating || connectingText) {
         let retryInMs = 0;
-        if (this.doc && this.doc.hidden === true && this.bgNoStopSinceAt > 0) {
+        if (this.doc && isBackgroundOrUnfocused(this.doc) && this.bgNoStopSinceAt > 0) {
           const graceMs = Math.max(2200, this.settings.idleSettleMs);
-          retryInMs = Math.max(250, graceMs - (now - this.bgNoStopSinceAt));
+          const rawGrace = graceMs - (now - this.bgNoStopSinceAt);
+          retryInMs = Number.isFinite(rawGrace) ? Math.max(250, Math.min(30000, Math.round(rawGrace))) : 500;
         }
         this.emitState();
         return {
           action: 'wait',
-          reason: 'generating',
+          reason: this.isGenerating ? 'generating' : 'connecting',
+          connectingText: connectingText || undefined,
           retryInMs,
           pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
         };
       }
       if (this.lastMutationAt > 0 && now - this.lastMutationAt < this.settings.idleSettleMs) {
         this.emitState();
+        const rawSettle = this.settings.idleSettleMs - (now - this.lastMutationAt);
+        const safeRetry = Number.isFinite(rawSettle) ? Math.max(150, Math.min(30000, Math.round(rawSettle))) : 300;
         return {
           action: 'wait',
           reason: 'settling',
-          retryInMs: Math.max(150, this.settings.idleSettleMs - (now - this.lastMutationAt))
+          retryInMs: safeRetry
         };
       }
 
@@ -2866,6 +3537,12 @@
         this.lastContinueClickAt = now;
         this.resetStallMonitor(true);
         this.clickFn(contRetry.el, this.win, contRetry.entry.count, this.randomFn);
+        const mainWorldEscalated = this.triggerMainWorldClick(
+          contRetry.el,
+          contRetry.entry.count,
+          'continue',
+          contRetry.entry.label
+        );
         const maxRetry = contRetry.maxAttempts || MAX_BG_CLICK_ATTEMPTS;
         this.setStatus('hudStatusRetryClick', {
           label: contRetry.entry.label,
@@ -2873,13 +3550,20 @@
           max: maxRetry
         });
         this.addLog(
-          `🔁 后台重试点击继续：「${contRetry.entry.label}」 (${contRetry.entry.count}/${maxRetry})`
+          mainWorldEscalated
+            ? this.tr('logMainWorldRetry', {
+                label: contRetry.entry.label,
+                attempt: contRetry.entry.count,
+                max: maxRetry
+              })
+            : `🔁 后台重试点击继续：「${contRetry.entry.label}」 (${contRetry.entry.count}/${maxRetry})`
         );
         this.emitState();
         return {
           action: 'retried_continue',
           label: contRetry.entry.label,
           attempt: contRetry.entry.count,
+          mainWorldEscalated,
           element: contRetry.el,
           pendingRetryInMs: this.getNextBgRetryDelayMs(visibleSet, now)
         };
@@ -2897,7 +3581,7 @@
       }
 
       if (this.suppressInitialContinueUntil > 0 && now < this.suppressInitialContinueUntil) {
-        this.clickedElements.add(contHit.item.el);
+        this.trackClicked(contHit.item.el);
         this.emitState();
         return { action: 'noop', reason: 'initial_stale_continue_ignored' };
       }
@@ -2927,10 +3611,12 @@
           : 0;
       if (this.lastContinueClickAt > 0 && now - this.lastContinueClickAt < effectiveContinueCooldown) {
         this.emitState();
+        const rawCooldown = effectiveContinueCooldown - (now - this.lastContinueClickAt);
+        const safeRetry = Number.isFinite(rawCooldown) ? Math.max(150, Math.min(60000, Math.round(rawCooldown))) : 1000;
         return {
           action: 'wait',
           reason: 'cooldown',
-          retryInMs: Math.max(150, effectiveContinueCooldown - (now - this.lastContinueClickAt))
+          retryInMs: safeRetry
         };
       }
 
@@ -2951,7 +3637,7 @@
               (isFollowUpChip && D.containsKeyword(tail, FOLLOWUP_PROMPT_OVERRIDE_CUES))
           );
           if (doneCue && !truncCue && !hasFollowupOverride) {
-            this.clickedElements.add(contHit.item.el);
+            this.trackClicked(contHit.item.el);
             this.setStatus('hudStatusSkippedCompletion', { cue: doneCue });
             this.addLog(`🛡️ 检测到完工信号「${doneCue}」，跳过点击「${contHit.item.label}」`);
             this.emitState();
@@ -2974,8 +3660,8 @@
       }
 
       // Safe to click continue!
-      this.clickedElements.add(contHit.item.el);
-      this.clickAttempts.set(contHit.item.el, {
+      this.trackClicked(contHit.item.el);
+      this.trackClickAttempt(contHit.item.el, {
         kind: 'continue',
         count: 1,
         lastAttemptAt: now,
@@ -3031,6 +3717,7 @@
     computeContentFingerprint,
     resolveClickTarget,
     defaultClickElement,
+    hasActiveToolOrThinking,
     findStopButton,
     findPromptInput,
     findSendButton,
@@ -3099,21 +3786,11 @@
     let statsFlushInFlight = false;
     let pendingStatsDelta = { allow: 0, continue: 0, date: null };
 
-    function flushPendingStatsDelta() {
-      if (statsFlushInFlight || !isContextAlive() || !hasChromeStorage) return;
-      if (pendingStatsDelta.allow === 0 && pendingStatsDelta.continue === 0) return;
-      const batch = {
-        allow: pendingStatsDelta.allow,
-        continue: pendingStatsDelta.continue,
-        date: pendingStatsDelta.date || D.getTodayKey()
-      };
-      pendingStatsDelta.allow = 0;
-      pendingStatsDelta.continue = 0;
-      statsFlushInFlight = true;
+    function performStatsDeltaRMW(batch, done) {
       try {
         chrome.storage.local.get([D.STATS_KEY], (res) => {
           if (!isContextAlive()) {
-            statsFlushInFlight = false;
+            done();
             return;
           }
           const stored = D.normalizeStats(res && res[D.STATS_KEY], batch.date);
@@ -3126,19 +3803,55 @@
           engine.emitState();
           try {
             chrome.storage.local.set({ [D.STATS_KEY]: Object.assign({}, merged) }, () => {
-              statsFlushInFlight = false;
-              if (pendingStatsDelta.allow > 0 || pendingStatsDelta.continue > 0) {
-                flushPendingStatsDelta();
-              }
+              done();
             });
           } catch (_) {
-            statsFlushInFlight = false;
+            done();
             teardownStaleContext();
           }
         });
       } catch (_) {
-        statsFlushInFlight = false;
+        done();
         teardownStaleContext();
+      }
+    }
+
+    function flushPendingStatsDelta() {
+      if (statsFlushInFlight || !isContextAlive() || !hasChromeStorage) return;
+      if (pendingStatsDelta.allow === 0 && pendingStatsDelta.continue === 0) return;
+      const batch = {
+        allow: pendingStatsDelta.allow,
+        continue: pendingStatsDelta.continue,
+        date: pendingStatsDelta.date || D.getTodayKey()
+      };
+      pendingStatsDelta.allow = 0;
+      pendingStatsDelta.continue = 0;
+      statsFlushInFlight = true;
+
+      const finish = () => {
+        statsFlushInFlight = false;
+        if (pendingStatsDelta.allow > 0 || pendingStatsDelta.continue > 0) {
+          flushPendingStatsDelta();
+        }
+      };
+
+      if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
+        try {
+          navigator.locks.request('gmah_stats_write_lock', () => {
+            return new Promise((resolve) => {
+              performStatsDeltaRMW(batch, () => {
+                resolve();
+                finish();
+              });
+            });
+          }).catch(() => {
+            performStatsDeltaRMW(batch, finish);
+          });
+        } catch (_) {
+          performStatsDeltaRMW(batch, finish);
+        }
+      } else {
+        performStatsDeltaRMW(batch, finish);
       }
     }
 
@@ -3180,18 +3893,63 @@
       }
     }
 
+    const saveChatOverrides = (overridesMap, meta) => {
+      if (!isContextAlive() || !hasChromeStorage) return;
+      const keyName = D.CHAT_OVERRIDES_KEY || 'gmah_chat_overrides_v1';
+      try {
+        if (meta && meta.conversationKey && typeof chrome.storage.local.get === 'function') {
+          chrome.storage.local.get([keyName], (res) => {
+            if (!isContextAlive()) return;
+            const currentMap =
+              typeof D.sanitizeChatOverridesMap === 'function'
+                ? D.sanitizeChatOverridesMap(res && res[keyName])
+                : {};
+            if (meta.removedKey && meta.removedKey !== meta.conversationKey) {
+              delete currentMap[meta.removedKey];
+            }
+            if (meta.override && typeof D.hasChatOverrideChanges === 'function' && D.hasChatOverrideChanges(meta.override)) {
+              currentMap[meta.conversationKey] = D.sanitizeChatOverride(meta.override);
+            } else {
+              delete currentMap[meta.conversationKey];
+            }
+            const finalMap =
+              typeof D.sanitizeChatOverridesMap === 'function'
+                ? D.sanitizeChatOverridesMap(currentMap)
+                : currentMap;
+            engine.chatOverrides = finalMap;
+            try {
+              chrome.storage.local.set({ [keyName]: finalMap });
+            } catch (_) {
+              teardownStaleContext();
+            }
+          });
+          return;
+        }
+        const cleaned =
+          typeof D.sanitizeChatOverridesMap === 'function'
+            ? D.sanitizeChatOverridesMap(overridesMap)
+            : Object.assign({}, overridesMap || {});
+        chrome.storage.local.set({ [keyName]: cleaned });
+      } catch (_) {
+        teardownStaleContext();
+      }
+    };
+
     const engine = new GmahEngine({
       doc: document,
       win: window,
       ignoreStaleInitialContinue: true,
       onSettingsSave: saveSettings,
+      onChatOverridesSave: saveChatOverrides,
       onStatsSave: saveStats,
+      onMainWorldClick: (payload) => {
+        sendToBackground(Object.assign({ type: 'GMAH_MAIN_WORLD_CLICK' }, payload || {}));
+      },
       onStallAlert: (payload) => {
         sendToBackground(Object.assign({ type: 'GMAH_STALL_ALERT' }, payload || {}));
       },
       onStallResolved: () => {
         sendToBackground({ type: 'GMAH_STALL_CLEAR' });
-        sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
       },
       onBreakerTrip: (payload) => {
         sendToBackground(Object.assign({ type: 'GMAH_BREAKER_ALERT' }, payload || {}));
@@ -3212,15 +3970,57 @@
       return true;
     }
 
+    function toggleScopedSetting(key, scope, labelKey) {
+      if (!isContextAlive()) return;
+      const useChatScope = scope !== 'global' && Boolean(engine.conversationKey) && !engine.isNonChatPage;
+      if (useChatScope) {
+        const nextVal = !engine.settings[key];
+        engine.updateChatOverride({ [key]: nextVal }, true);
+        if (key === 'enabled' || key === 'backgroundMode') {
+          syncBackgroundKeepaliveLock();
+        }
+        if (key === 'stallAlertEnabled' && !nextVal) {
+          sendToBackground({ type: 'GMAH_STALL_CLEAR' });
+        }
+        engine.addLog(
+          engine.tr('logChatOverrideSet', {
+            key: engine.tr(labelKey),
+            val: engine.tr(nextVal ? 'stateOn' : 'stateOff')
+          })
+        );
+        engine.emitState();
+        return;
+      }
+      const nextVal = !engine.globalSettings[key];
+      engine.updateSettings({ [key]: nextVal }, true);
+      if (key === 'enabled' || key === 'backgroundMode') {
+        syncBackgroundKeepaliveLock();
+      }
+      if (key === 'stallAlertEnabled' && !nextVal) {
+        sendToBackground({ type: 'GMAH_STALL_CLEAR' });
+        sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
+      }
+      if (key === 'enabled') {
+        engine.addLog(nextVal ? '▶️ 插件已开启' : '⏸️ 插件已暂停');
+      } else if (key === 'backgroundMode') {
+        engine.addLog(nextVal ? '🌙 后台静默运行已开启' : '🌙 后台静默运行已关闭');
+      } else if (key === 'stallAlertEnabled') {
+        engine.addLog(nextVal ? '🔔 桌面通知提醒已开启' : '🔕 桌面通知提醒已关闭');
+      } else if (key === 'stallAutoRecoverEnabled') {
+        engine.addLog(engine.tr(nextVal ? 'logStallRecoverOn' : 'logStallRecoverOff'));
+      }
+      engine.emitState();
+    }
+
     if (hudApi && typeof hudApi.createHud === 'function') {
       hud = hudApi.createHud({
         onToggleMinimize: () => {
           if (!isContextAlive()) return;
-          engine.updateSettings({ hudMinimized: !engine.settings.hudMinimized }, true);
+          engine.updateSettings({ hudMinimized: !engine.globalSettings.hudMinimized }, true);
         },
         onToggleTheme: () => {
           if (!isContextAlive()) return;
-          const nextTheme = engine.settings.theme === 'light' ? 'dark' : 'light';
+          const nextTheme = engine.globalSettings.theme === 'light' ? 'dark' : 'light';
           engine.updateSettings({ theme: nextTheme }, true);
           engine.addLog(
             nextTheme === 'light'
@@ -3232,53 +4032,22 @@
         onCycleLanguage: () => {
           if (!isContextAlive()) return;
           const order = D.SUPPORTED_LANGUAGES || ['zh-CN', 'zh-TW', 'en', 'ja'];
-          const cur = D.resolveLanguage(engine.settings.language);
+          const cur = D.resolveLanguage(engine.globalSettings.language);
           const nextLang = order[(order.indexOf(cur) + 1) % order.length];
           engine.updateSettings({ language: nextLang }, true);
           engine.addLog(`🌐 ${D.t(nextLang, 'toastLangChanged')} (${D.t(nextLang, 'langLabel')})`);
           engine.emitState();
         },
-        onToggleEnabled: () => {
+        onToggleEnabled: (scope) => toggleScopedSetting('enabled', scope, 'hudRowMaster'),
+        onToggleAllow: (scope) => toggleScopedSetting('autoAllow', scope, 'hudRowAllow'),
+        onToggleContinue: (scope) => toggleScopedSetting('autoContinue', scope, 'hudRowContinue'),
+        onToggleBackground: (scope) => toggleScopedSetting('backgroundMode', scope, 'hudRowBackground'),
+        onToggleNotification: (scope) => toggleScopedSetting('stallAlertEnabled', scope, 'hudRowNotif'),
+        onToggleStallRecover: (scope) => toggleScopedSetting('stallAutoRecoverEnabled', scope, 'hudRowStallRecover'),
+        onResetChatOverride: () => {
           if (!isContextAlive()) return;
-          engine.updateSettings({ enabled: !engine.settings.enabled }, true);
+          engine.clearChatOverride(true);
           syncBackgroundKeepaliveLock();
-          engine.addLog(engine.settings.enabled ? '▶️ 插件已开启' : '⏸️ 插件已暂停');
-          engine.emitState();
-        },
-        onToggleAllow: () => {
-          if (!isContextAlive()) return;
-          engine.updateSettings({ autoAllow: !engine.settings.autoAllow }, true);
-        },
-        onToggleContinue: () => {
-          if (!isContextAlive()) return;
-          engine.updateSettings({ autoContinue: !engine.settings.autoContinue }, true);
-        },
-        onToggleBackground: () => {
-          if (!isContextAlive()) return;
-          engine.updateSettings({ backgroundMode: !engine.settings.backgroundMode }, true);
-          syncBackgroundKeepaliveLock();
-          engine.addLog(
-            engine.settings.backgroundMode ? '🌙 后台静默运行已开启' : '🌙 后台静默运行已关闭'
-          );
-          engine.emitState();
-        },
-        onToggleNotification: () => {
-          if (!isContextAlive()) return;
-          const nextVal = !engine.settings.stallAlertEnabled;
-          engine.updateSettings({ stallAlertEnabled: nextVal }, true);
-          if (!nextVal) {
-            sendToBackground({ type: 'GMAH_STALL_CLEAR' });
-            sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
-          }
-          engine.addLog(nextVal ? '🔔 桌面通知提醒已开启' : '🔕 桌面通知提醒已关闭');
-          engine.emitState();
-        },
-        onToggleStallRecover: () => {
-          if (!isContextAlive()) return;
-          const nextVal = !engine.settings.stallAutoRecoverEnabled;
-          engine.updateSettings({ stallAutoRecoverEnabled: nextVal }, true);
-          engine.addLog(engine.tr(nextVal ? 'logStallRecoverOn' : 'logStallRecoverOff'));
-          engine.emitState();
         },
         onForceStallRecover: () => {
           if (!isContextAlive()) return;
@@ -3305,24 +4074,52 @@
         onAddKeyword: (kind, text) => {
           if (!isContextAlive()) return;
           engine.addCustomKeyword(kind, text);
+        },
+        onClearLogs: () => {
+          if (!isContextAlive()) return;
+          engine.clearLogs();
         }
       });
       hud.mount();
     }
 
-    // Load initial persisted settings & stats
+    // Load initial persisted settings, per-chat overrides & stats
     if (hasChromeStorage) {
+      let settingsInitTimer = setTimeout(() => {
+        if (!settingsReady && isContextAlive()) {
+          settingsReady = true;
+          syncBackgroundKeepaliveLock();
+          if (canRunScanInCurrentVisibility()) {
+            runScanAndSchedule();
+          }
+        }
+      }, 1500);
       try {
-        chrome.storage.local.get([D.STORAGE_KEY, D.STATS_KEY], (res) => {
+        const chatOverridesKey = D.CHAT_OVERRIDES_KEY || 'gmah_chat_overrides_v1';
+        chrome.storage.local.get([D.STORAGE_KEY, D.STATS_KEY, chatOverridesKey], (res) => {
+          if (settingsInitTimer) {
+            clearTimeout(settingsInitTimer);
+            settingsInitTimer = null;
+          }
           if (!isContextAlive()) return;
           const migratedRes = D.migrateStoredSettings(res && res[D.STORAGE_KEY]);
-          engine.settings = migratedRes.settings;
+          engine.globalSettings = migratedRes.settings;
+          engine.chatOverrides =
+            typeof D.sanitizeChatOverridesMap === 'function'
+              ? D.sanitizeChatOverridesMap(res && res[chatOverridesKey])
+              : {};
+          engine.recomputeEffectiveSettings();
           engine.refreshLocalizedTexts();
           if (migratedRes.migrated) {
-            saveSettings(engine.settings);
+            saveSettings(engine.globalSettings);
           }
           if (res && res[D.STATS_KEY]) {
             engine.stats = D.normalizeStats(res[D.STATS_KEY]);
+          }
+          const curChatOverride = engine.getCurrentChatOverride();
+          if (curChatOverride && curChatOverride.emergencyStopped === true) {
+            engine.tripBreaker('emergency_stop', null, 'breakerReasonEmergency');
+            engine.addLog(engine.tr('logChatEmergencyRestored'));
           }
           settingsReady = true;
           syncBackgroundKeepaliveLock();
@@ -3335,24 +4132,16 @@
           if (!isContextAlive() || area !== 'local') return;
           if (changes[D.STORAGE_KEY] && changes[D.STORAGE_KEY].newValue) {
             const oldAlert = engine.settings ? engine.settings.stallAlertEnabled : true;
-            engine.settings = D.mergeSettings(changes[D.STORAGE_KEY].newValue);
-            engine.refreshLocalizedTexts();
-            if (!engine.settings.enabled) {
-              if (!engine.stallRecovery || !engine.stallRecovery.manual) {
-                engine.resetStallMonitor(true);
-              }
-            } else {
-              if (!engine.settings.stallAutoRecoverEnabled && engine.stallRecovery && !engine.stallRecovery.manual) {
-                engine.stallRecovery = null;
-                engine.stallRecoveryBlockedFp = null;
-              }
-              if (!engine.settings.stallAlertEnabled && engine.stallAlertActive) {
-                engine.stallAlertActive = false;
-              }
-            }
+            engine.globalSettings = D.mergeSettings(changes[D.STORAGE_KEY].newValue);
+            engine.recomputeEffectiveSettings();
+            engine.applyEffectiveSettingsSideEffects(oldAlert);
             if (!engine.settings.enabled || (oldAlert && !engine.settings.stallAlertEnabled)) {
               sendToBackground({ type: 'GMAH_CLEAR_ALL_STALL_NOTIFICATIONS' });
             }
+            syncBackgroundKeepaliveLock();
+          }
+          if (changes[chatOverridesKey]) {
+            engine.setChatOverridesMap(changes[chatOverridesKey].newValue || {});
             syncBackgroundKeepaliveLock();
           }
           if (changes.gmah_hud_position && hud) {
@@ -3783,10 +4572,11 @@
           if (!msg || typeof msg !== 'object') return;
           if (msg.type === 'GMAH_ROTATE_PORT') {
             // Proactively replace the long-lived port before Chrome's 5-min MV3 forced disconnect
-            rotatingPort = true;
-            bgPort = null;
+            port.__gmahRotating = true;
+            if (bgPort === port) {
+              bgPort = null;
+            }
             try { port.disconnect(); } catch (_) {}
-            rotatingPort = false;
             connectBackgroundPort();
             return;
           }
@@ -3805,7 +4595,7 @@
           if (bgPort === port) {
             bgPort = null;
           }
-          if (rotatingPort || !isContextAlive()) return;
+          if (port.__gmahRotating || !isContextAlive()) return;
           if (!chrome.runtime || !chrome.runtime.id) {
             teardownStaleContext();
             return;
@@ -3900,6 +4690,17 @@
           if (engine.settings.enabled && engine.settings.backgroundMode && !bgPort) {
             connectBackgroundPort();
           }
+          sendResponse({ ok: true, state: engine.getState() });
+        } else if (msg.type === 'GMAH_UPDATE_CHAT_OVERRIDE' && msg.override) {
+          engine.updateChatOverride(msg.override, true);
+          syncBackgroundKeepaliveLock();
+          if (engine.settings.enabled && engine.settings.backgroundMode && !bgPort) {
+            connectBackgroundPort();
+          }
+          sendResponse({ ok: true, state: engine.getState() });
+        } else if (msg.type === 'GMAH_RESET_CHAT_OVERRIDE') {
+          engine.clearChatOverride(true);
+          syncBackgroundKeepaliveLock();
           sendResponse({ ok: true, state: engine.getState() });
         } else if (msg.type === 'GMAH_GET_STATE') {
           if (engine.settings.enabled && engine.settings.backgroundMode && !bgPort) {

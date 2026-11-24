@@ -1,39 +1,47 @@
+/* KenEasy Gemini MCP Auto Helper — Notion-inspired Floating HUD */
+
 #gmah-hud {
   position: fixed;
   right: 18px;
   bottom: 84px;
   z-index: 2147483640;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 12px;
-  color: #e8eaed;
+  line-height: 1.4;
+  color: #e6e6e4;
   user-select: none;
   touch-action: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#gmah-hud * {
+  box-sizing: border-box;
 }
 
 #gmah-hud.gmah-dragging {
-  opacity: 0.94;
+  opacity: 0.96;
   user-select: none;
 }
 
 #gmah-hud.gmah-dragging .gmah-card {
   transition: none !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 #gmah-hud .gmah-card {
-  background: rgba(24, 26, 31, 0.92);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
-  padding: 10px 12px;
-  width: 262px;
-  transition: all 0.18s ease;
+  background: #1f1f1f;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36), 0 0 0 1px rgba(0, 0, 0, 0.2);
+  padding: 10px 11px;
+  width: 274px;
+  transition: box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
 #gmah-hud .gmah-card.minimized {
   width: auto;
   padding: 6px 10px;
+  border-radius: 8px;
 }
 
 #gmah-hud .gmah-header {
@@ -42,6 +50,11 @@
   justify-content: space-between;
   gap: 6px;
   cursor: grab;
+  padding-bottom: 2px;
+}
+
+#gmah-hud .gmah-card.minimized .gmah-header {
+  padding-bottom: 0;
 }
 
 #gmah-hud .gmah-header:active,
@@ -58,70 +71,218 @@
 
 #gmah-hud .gmah-title {
   font-weight: 600;
-  font-size: 12px;
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+  color: #e6e6e4;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   cursor: pointer;
   min-width: 0;
 }
 
 #gmah-hud .gmah-badge-beta {
   font-size: 10px;
-  font-weight: 600;
-  color: #8ab4f8;
-  background: rgba(138, 180, 248, 0.15);
-  border: 1px solid rgba(138, 180, 248, 0.35);
-  border-radius: 999px;
+  font-weight: 500;
+  color: #9b9a97;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
   padding: 1px 5px;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
 #gmah-hud .gmah-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #5f6368;
+  background: #6b6b68;
   flex-shrink: 0;
 }
 
-#gmah-hud .gmah-dot.active { background: #34a853; box-shadow: 0 0 6px #34a853; }
-#gmah-hud .gmah-dot.warn { background: #fbbc04; box-shadow: 0 0 6px #fbbc04; animation: gmah-pulse 1.5s ease-in-out infinite; }
-#gmah-hud .gmah-dot.stopped { background: #ea4335; box-shadow: 0 0 6px #ea4335; }
+#gmah-hud .gmah-dot.active {
+  background: #2daa7e;
+}
+
+#gmah-hud .gmah-dot.warn {
+  background: #d9730d;
+  animation: gmah-pulse 1.8s ease-in-out infinite;
+}
+
+#gmah-hud .gmah-dot.stopped {
+  background: #eb5757;
+}
 
 @keyframes gmah-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.45; transform: scale(0.85); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 #gmah-hud .gmah-icon-btn {
   background: transparent;
-  border: none;
-  color: #bdc1c6;
+  border: 1px solid transparent;
+  color: #9b9a97;
   cursor: pointer;
   padding: 2px 5px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 5px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 #gmah-hud .gmah-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6e6e4;
+}
+
+#gmah-hud .gmah-lang-btn {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 5px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+#gmah-hud .gmah-theme-btn {
+  font-size: 11.5px;
+  line-height: 1;
 }
 
 #gmah-hud .gmah-body {
   margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
 }
 
+/* Notion-style Scope Bar (This Chat / Global + Chat Tag + Reset) */
+#gmah-hud .gmah-scope-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 7px;
+  border-radius: 7px;
+  background: #262626;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  margin-bottom: 2px;
+}
+
+#gmah-hud .gmah-scope-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px;
+  border-radius: 6px;
+}
+
+#gmah-hud .gmah-scope-tab {
+  border: none;
+  background: transparent;
+  color: #9b9a97;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+#gmah-hud .gmah-scope-tab:hover:not(.active) {
+  color: #d3d3d0;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#gmah-hud .gmah-scope-tab.active {
+  background: #333333;
+  color: #f1f1ef;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+#gmah-hud .gmah-scope-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+#gmah-hud .gmah-chat-chip {
+  font-size: 10.5px;
+  color: #9b9a97;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#gmah-hud .gmah-chat-chip.custom {
+  color: #6eaef5;
+  background: rgba(35, 131, 226, 0.14);
+}
+
+#gmah-hud .gmah-scope-reset {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #9b9a97;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+#gmah-hud .gmah-scope-reset:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6e6e4;
+}
+
+/* Notion Property Rows */
 #gmah-hud .gmah-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 3px 5px;
+  margin: 0 -5px;
+  border-radius: 6px;
+  transition: background 0.12s ease;
+}
+
+#gmah-hud .gmah-row:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+#gmah-hud .gmah-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #d4d4d1;
+  font-size: 11.5px;
+  min-width: 0;
+}
+
+#gmah-hud .gmah-row.gmah-row-custom .gmah-row-label {
+  color: #f1f1ef;
+  font-weight: 500;
+}
+
+#gmah-hud .gmah-override-dot {
+  display: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #5fa8f5;
+  flex-shrink: 0;
 }
 
 #gmah-hud .gmah-row-controls {
@@ -131,269 +292,473 @@
   flex-shrink: 0;
 }
 
+/* Notion Subtle Select / Status Pills */
 #gmah-hud .gmah-pill {
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.06);
-  color: #dadce0;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.045);
+  color: #9b9a97;
   cursor: pointer;
+  font-family: inherit;
   font-size: 11px;
   font-weight: 500;
-}
-
-#gmah-hud .gmah-pill.gmah-pill-action {
-  padding: 3px 7px;
-  background: rgba(138, 180, 248, 0.16);
-  border-color: rgba(138, 180, 248, 0.45);
-  color: #aecbfa;
-}
-
-#gmah-hud .gmah-pill.gmah-pill-action:hover:not(:disabled) {
-  background: rgba(138, 180, 248, 0.3);
-  color: #ffffff;
-}
-
-#gmah-hud .gmah-pill.gmah-pill-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-#gmah-hud .gmah-wait-bar {
-  font-size: 11px;
-  font-weight: 500;
-  color: #aecbfa;
-  background: rgba(138, 180, 248, 0.12);
-  border: 1px solid rgba(138, 180, 248, 0.28);
-  border-radius: 8px;
-  padding: 5px 8px;
   line-height: 1.35;
-  word-break: break-word;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
-#gmah-hud .gmah-wait-bar.warn {
-  color: #fdd663;
-  background: rgba(251, 188, 4, 0.14);
-  border-color: rgba(251, 188, 4, 0.42);
+#gmah-hud .gmah-pill:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #e6e6e4;
 }
 
 #gmah-hud .gmah-pill.on {
-  background: rgba(52, 168, 83, 0.22);
-  border-color: rgba(52, 168, 83, 0.6);
-  color: #81c995;
+  background: rgba(45, 170, 126, 0.15);
+  border-color: rgba(45, 170, 126, 0.3);
+  color: #6bc9a4;
+}
+
+#gmah-hud .gmah-pill.on:hover {
+  background: rgba(45, 170, 126, 0.22);
 }
 
 #gmah-hud .gmah-pill.danger {
-  background: rgba(234, 67, 53, 0.2);
-  border-color: rgba(234, 67, 53, 0.55);
-  color: #f28b82;
+  background: rgba(235, 87, 87, 0.15);
+  border-color: rgba(235, 87, 87, 0.34);
+  color: #f08080;
+}
+
+#gmah-hud .gmah-pill.danger:hover {
+  background: rgba(235, 87, 87, 0.24);
+}
+
+#gmah-hud .gmah-pill.gmah-pill-action {
+  padding: 2px 7px;
+  background: rgba(35, 131, 226, 0.14);
+  border-color: rgba(35, 131, 226, 0.28);
+  color: #6eaef5;
+}
+
+#gmah-hud .gmah-pill.gmah-pill-action:hover:not(:disabled) {
+  background: rgba(35, 131, 226, 0.24);
+  color: #a9d0fb;
+}
+
+#gmah-hud .gmah-pill.gmah-pill-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Notion Callout Bars */
+#gmah-hud .gmah-wait-bar {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6eaef5;
+  background: rgba(35, 131, 226, 0.11);
+  border: 1px solid rgba(35, 131, 226, 0.22);
+  border-radius: 6px;
+  padding: 5px 8px;
+  line-height: 1.35;
+  word-break: break-word;
+  margin-top: 2px;
+}
+
+#gmah-hud .gmah-wait-bar.warn {
+  color: #e8a85a;
+  background: rgba(217, 115, 13, 0.13);
+  border-color: rgba(217, 115, 13, 0.28);
 }
 
 #gmah-hud .gmah-status {
   font-size: 11px;
-  color: #9aa0a6;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
+  color: #9b9a97;
+  background: #262626;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
   padding: 6px 8px;
-  line-height: 1.4;
+  line-height: 1.45;
   word-break: break-word;
+  margin-top: 2px;
 }
 
 #gmah-hud .gmah-status.alert {
-  color: #fdd663;
-  background: rgba(251, 188, 4, 0.12);
+  color: #e8a85a;
+  background: rgba(217, 115, 13, 0.12);
+  border-color: rgba(217, 115, 13, 0.26);
 }
 
+/* Bottom Action Row */
 #gmah-hud .gmah-actions {
   display: flex;
-  gap: 6px;
+  gap: 5px;
+  margin-top: 2px;
 }
 
 #gmah-hud .gmah-actions button {
   flex: 1;
   padding: 4px 6px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: #e8eaed;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.04);
+  color: #d4d4d1;
+  font-family: inherit;
   font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 #gmah-hud .gmah-actions button:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.09);
+  color: #f1f1ef;
 }
 
+#gmah-hud .gmah-actions button.gmah-action-active {
+  background: rgba(35, 131, 226, 0.16);
+  border-color: rgba(35, 131, 226, 0.34);
+  color: #6eaef5;
+}
+
+#gmah-hud .gmah-actions button.gmah-action-stop {
+  color: #f08080;
+  background: rgba(235, 87, 87, 0.09);
+  border-color: rgba(235, 87, 87, 0.22);
+}
+
+#gmah-hud .gmah-actions button.gmah-action-stop:hover {
+  background: rgba(235, 87, 87, 0.18);
+  border-color: rgba(235, 87, 87, 0.36);
+}
+
+/* Collapsible Logs / Inspect Panel */
 #gmah-hud .gmah-panel {
-  margin-top: 6px;
-  max-height: 160px;
+  margin-top: 4px;
+  max-height: 168px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.35);
-  border-radius: 8px;
-  padding: 6px;
+  background: #191919;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px 7px;
   font-size: 11px;
   line-height: 1.45;
   display: none;
 }
 
-#gmah-hud .gmah-panel.open { display: block; }
+#gmah-hud .gmah-panel.open {
+  display: block;
+}
+
+#gmah-hud .gmah-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 5px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+#gmah-hud .gmah-panel-meta {
+  font-size: 10.5px;
+  color: #9b9a97;
+}
+
+#gmah-hud .gmah-panel-mini-btn {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #9b9a97;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#gmah-hud .gmah-panel-mini-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6e6e4;
+}
 
 #gmah-hud .gmah-log-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   padding: 3px 0;
-  color: #cbd5e1;
+  color: #c7c7c4;
+}
+
+#gmah-hud .gmah-log-item:last-child {
+  border-bottom: none;
 }
 
 #gmah-hud .gmah-inspect-btn {
   display: inline-block;
-  margin: 2px;
+  margin: 2px 3px 2px 0;
   padding: 2px 6px;
-  border-radius: 6px;
-  background: rgba(138, 180, 248, 0.16);
-  border: 1px solid rgba(138, 180, 248, 0.45);
-  color: #aecbfa;
+  border-radius: 4px;
+  background: rgba(35, 131, 226, 0.14);
+  border: 1px solid rgba(35, 131, 226, 0.28);
+  color: #6eaef5;
   cursor: pointer;
-  font-size: 11px;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
 }
 
 #gmah-hud .gmah-inspect-btn:hover {
-  background: rgba(138, 180, 248, 0.3);
+  background: rgba(35, 131, 226, 0.24);
 }
 
 #gmah-hud .gmah-inspect-btn:disabled {
-  background: rgba(52, 168, 83, 0.2);
-  border-color: rgba(52, 168, 83, 0.55);
-  color: #81c995;
+  background: rgba(45, 170, 126, 0.15);
+  border-color: rgba(45, 170, 126, 0.3);
+  color: #6bc9a4;
   cursor: default;
 }
 
-#gmah-hud .gmah-lang-btn {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 5px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-#gmah-hud .gmah-theme-btn {
-  font-size: 12px;
-  line-height: 1;
-}
-
-/* Light (Daylight) Theme Mode */
+/* =========================================================
+   Notion Light (Paper) Theme Mode
+   ========================================================= */
 #gmah-hud.gmah-theme-light {
-  color: #1f2937;
+  color: #37352f;
 }
 
 #gmah-hud.gmah-theme-light .gmah-card {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(15, 23, 42, 0.14);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
+  background: #ffffff;
+  border-color: rgba(55, 53, 47, 0.12);
+  box-shadow: 0 6px 24px rgba(15, 15, 15, 0.09), 0 0 0 1px rgba(15, 15, 15, 0.04);
 }
 
 #gmah-hud.gmah-theme-light.gmah-dragging .gmah-card {
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 14px 36px rgba(15, 15, 15, 0.14), 0 0 0 1px rgba(15, 15, 15, 0.06);
+}
+
+#gmah-hud.gmah-theme-light .gmah-title {
+  color: #37352f;
 }
 
 #gmah-hud.gmah-theme-light .gmah-badge-beta {
-  color: #1d4ed8;
-  background: rgba(37, 99, 235, 0.1);
-  border-color: rgba(37, 99, 235, 0.3);
+  color: #787774;
+  background: #f7f6f3;
+  border-color: rgba(55, 53, 47, 0.1);
+}
+
+#gmah-hud.gmah-theme-light .gmah-dot {
+  background: #a5a4a0;
+}
+
+#gmah-hud.gmah-theme-light .gmah-dot.active {
+  background: #0f7b6c;
+}
+
+#gmah-hud.gmah-theme-light .gmah-dot.warn {
+  background: #d9730d;
+}
+
+#gmah-hud.gmah-theme-light .gmah-dot.stopped {
+  background: #eb5757;
 }
 
 #gmah-hud.gmah-theme-light .gmah-icon-btn {
-  color: #4b5563;
+  color: #787774;
 }
 
 #gmah-hud.gmah-theme-light .gmah-icon-btn:hover {
-  background: rgba(15, 23, 42, 0.08);
-  color: #111827;
+  background: rgba(55, 53, 47, 0.07);
+  color: #37352f;
 }
 
 #gmah-hud.gmah-theme-light .gmah-lang-btn {
-  border-color: rgba(15, 23, 42, 0.16);
-  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(55, 53, 47, 0.12);
+  background: #f7f6f3;
+}
+
+#gmah-hud.gmah-theme-light .gmah-body {
+  border-top-color: rgba(55, 53, 47, 0.09);
+}
+
+#gmah-hud.gmah-theme-light .gmah-scope-bar {
+  background: #f7f6f3;
+  border-color: rgba(55, 53, 47, 0.09);
+}
+
+#gmah-hud.gmah-theme-light .gmah-scope-tabs {
+  background: rgba(55, 53, 47, 0.07);
+}
+
+#gmah-hud.gmah-theme-light .gmah-scope-tab {
+  color: #787774;
+}
+
+#gmah-hud.gmah-theme-light .gmah-scope-tab:hover:not(.active) {
+  color: #37352f;
+  background: rgba(55, 53, 47, 0.04);
+}
+
+#gmah-hud.gmah-theme-light .gmah-scope-tab.active {
+  background: #ffffff;
+  color: #37352f;
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.08);
+}
+
+#gmah-hud.gmah-theme-light .gmah-chat-chip {
+  color: #787774;
+  background: rgba(55, 53, 47, 0.05);
+}
+
+#gmah-hud.gmah-theme-light .gmah-chat-chip.custom {
+  color: #2383e2;
+  background: #ebf3fb;
+}
+
+#gmah-hud.gmah-theme-light .gmah-scope-reset {
+  border-color: rgba(55, 53, 47, 0.14);
+  color: #787774;
+}
+
+#gmah-hud.gmah-theme-light .gmah-scope-reset:hover {
+  background: rgba(55, 53, 47, 0.07);
+  color: #37352f;
+}
+
+#gmah-hud.gmah-theme-light .gmah-row:hover {
+  background: rgba(55, 53, 47, 0.045);
+}
+
+#gmah-hud.gmah-theme-light .gmah-row-label {
+  color: #37352f;
+}
+
+#gmah-hud.gmah-theme-light .gmah-override-dot {
+  background: #2383e2;
 }
 
 #gmah-hud.gmah-theme-light .gmah-pill {
-  border-color: rgba(15, 23, 42, 0.15);
-  background: rgba(15, 23, 42, 0.05);
-  color: #374151;
+  border-color: rgba(55, 53, 47, 0.12);
+  background: #f7f6f3;
+  color: #787774;
+}
+
+#gmah-hud.gmah-theme-light .gmah-pill:hover {
+  background: #efeee9;
+  color: #37352f;
 }
 
 #gmah-hud.gmah-theme-light .gmah-pill.on {
-  background: rgba(22, 163, 74, 0.14);
-  border-color: rgba(22, 163, 74, 0.45);
-  color: #15803d;
+  background: #edf6f3;
+  border-color: rgba(15, 123, 108, 0.24);
+  color: #0f7b6c;
+}
+
+#gmah-hud.gmah-theme-light .gmah-pill.on:hover {
+  background: #e1f1eb;
 }
 
 #gmah-hud.gmah-theme-light .gmah-pill.danger {
-  background: rgba(220, 38, 38, 0.12);
-  border-color: rgba(220, 38, 38, 0.45);
-  color: #b91c1c;
+  background: #fdebeb;
+  border-color: rgba(235, 87, 87, 0.28);
+  color: #d44c47;
+}
+
+#gmah-hud.gmah-theme-light .gmah-pill.danger:hover {
+  background: #fbdcdc;
 }
 
 #gmah-hud.gmah-theme-light .gmah-pill.gmah-pill-action {
-  background: rgba(37, 99, 235, 0.1);
-  border-color: rgba(37, 99, 235, 0.35);
-  color: #1d4ed8;
+  background: #ebf3fb;
+  border-color: rgba(35, 131, 226, 0.24);
+  color: #2383e2;
 }
 
 #gmah-hud.gmah-theme-light .gmah-pill.gmah-pill-action:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.2);
-  color: #1e3a8a;
+  background: #dcebfa;
+  color: #1a6ec4;
 }
 
 #gmah-hud.gmah-theme-light .gmah-wait-bar {
-  color: #1d4ed8;
-  background: rgba(37, 99, 235, 0.08);
-  border-color: rgba(37, 99, 235, 0.24);
+  color: #2383e2;
+  background: #ebf3fb;
+  border-color: rgba(35, 131, 226, 0.2);
 }
 
 #gmah-hud.gmah-theme-light .gmah-wait-bar.warn {
-  color: #b45309;
-  background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.38);
+  color: #b35c07;
+  background: #faebdd;
+  border-color: rgba(217, 115, 13, 0.25);
 }
 
 #gmah-hud.gmah-theme-light .gmah-status {
-  color: #4b5563;
-  background: rgba(15, 23, 42, 0.045);
+  color: #6b6a66;
+  background: #f7f6f3;
+  border-color: rgba(55, 53, 47, 0.08);
 }
 
 #gmah-hud.gmah-theme-light .gmah-status.alert {
-  color: #b45309;
-  background: rgba(245, 158, 11, 0.14);
+  color: #b35c07;
+  background: #faebdd;
+  border-color: rgba(217, 115, 13, 0.24);
 }
 
 #gmah-hud.gmah-theme-light .gmah-actions button {
-  border-color: rgba(15, 23, 42, 0.14);
-  background: rgba(15, 23, 42, 0.05);
-  color: #1f2937;
+  border-color: rgba(55, 53, 47, 0.12);
+  background: #ffffff;
+  color: #37352f;
 }
 
 #gmah-hud.gmah-theme-light .gmah-actions button:hover {
-  background: rgba(15, 23, 42, 0.11);
+  background: #f7f6f3;
+}
+
+#gmah-hud.gmah-theme-light .gmah-actions button.gmah-action-active {
+  background: #ebf3fb;
+  border-color: rgba(35, 131, 226, 0.28);
+  color: #2383e2;
+}
+
+#gmah-hud.gmah-theme-light .gmah-actions button.gmah-action-stop {
+  color: #d44c47;
+  background: #fdf2f2;
+  border-color: rgba(235, 87, 87, 0.24);
+}
+
+#gmah-hud.gmah-theme-light .gmah-actions button.gmah-action-stop:hover {
+  background: #fbe4e4;
 }
 
 #gmah-hud.gmah-theme-light .gmah-panel {
-  background: rgba(241, 245, 249, 0.96);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f7f6f3;
+  border-color: rgba(55, 53, 47, 0.1);
+}
+
+#gmah-hud.gmah-theme-light .gmah-panel-toolbar {
+  border-bottom-color: rgba(55, 53, 47, 0.09);
+}
+
+#gmah-hud.gmah-theme-light .gmah-panel-meta {
+  color: #787774;
+}
+
+#gmah-hud.gmah-theme-light .gmah-panel-mini-btn {
+  border-color: rgba(55, 53, 47, 0.14);
+  color: #787774;
+}
+
+#gmah-hud.gmah-theme-light .gmah-panel-mini-btn:hover {
+  background: rgba(55, 53, 47, 0.07);
+  color: #37352f;
 }
 
 #gmah-hud.gmah-theme-light .gmah-log-item {
-  border-bottom-color: rgba(15, 23, 42, 0.08);
-  color: #334155;
+  border-bottom-color: rgba(55, 53, 47, 0.07);
+  color: #37352f;
 }
 
 #gmah-hud.gmah-theme-light .gmah-inspect-btn {
-  background: rgba(37, 99, 235, 0.1);
-  border-color: rgba(37, 99, 235, 0.35);
-  color: #1d4ed8;
+  background: #ebf3fb;
+  border-color: rgba(35, 131, 226, 0.24);
+  color: #2383e2;
 }
 
 #gmah-hud.gmah-theme-light .gmah-inspect-btn:disabled {
-  background: rgba(22, 163, 74, 0.14);
-  border-color: rgba(22, 163, 74, 0.45);
-  color: #15803d;
+  background: #edf6f3;
+  border-color: rgba(15, 123, 108, 0.24);
+  color: #0f7b6c;
 }
