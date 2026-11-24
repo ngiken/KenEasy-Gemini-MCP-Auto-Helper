@@ -8,61 +8,64 @@ KenEasy Gemini MCP Auto Helper
 ============================================================
 2. Summary / Short Description (max 132 chars)
 ============================================================
-Auto-click Gemini MCP Always Allow & Continue chips with stall auto-recovery, 4-language HUD, Dark/Light themes & 6-layer breaker.
+Notion-style HUD & popup, per-chat toggles & isolated E-stop, MAIN-world background clicks, stall auto-resume & 6-layer breaker.
 
 ============================================================
 3. Detailed Description (Paste everything below into description box)
 ============================================================
-KenEasy Gemini MCP Auto Helper is an open-source productivity extension engineered exclusively for Google Gemini (gemini.google.com). 
+KenEasy Gemini MCP Auto Helper is an open-source productivity extension engineered exclusively for Google Gemini (gemini.google.com).
 
-It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with an industrial-grade 6-layer circuit breaker and multi-window safety guards.
+It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with per-chat controls, isolated emergency stops, background click hardening, and an industrial-grade 6-layer circuit breaker.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✨ KEY FEATURES (V1.0.0 OFFICIAL RELEASE)
+✨ KEY FEATURES (V1.0.1)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚡ 1. STALL AUTO-RECOVERY, LIVE WAIT TIMER & HUMAN PACING 🆕
+🎛️ 1. PER-CHAT INDEPENDENT CONTROLS & ISOLATED EMERGENCY STOP 🆕
+• Toggle 6 core switches independently per Gemini conversation via the HUD ("This chat / Global" switcher) or Popup ("This Conversation" card), with automatic visual markers on customized settings.
+• Emergency Stop now halts only the current conversation and persists across SPA navigation while other Gemini conversations and tabs keep running; a separate "Stop All Chats" button is available in the Popup for global halts.
+• Automatically migrates `/app` landing-page overrides to newly created `/app/<id>` chats and supports one-click Reset back to global defaults.
+
+⚡ 2. BACKGROUND & MINIMIZED MAIN-WORLD CLICK ESCALATION 🆕
+• Escalates clicks into the page `MAIN` world when isolated-world clicks are throttled in background or minimized windows, piercing ShadowRoots and Angular Material chips across Allow retries, Continue chips, and Stall-Recovery Stop/Send buttons.
+• Isolates background heartbeats and tab discard protection (`autoDiscardable`) per chat, and schedules a `1200ms` follow-up wakeup tick when Chrome loses focus or minimizes.
+
+⏱️ 3. STALL AUTO-RECOVERY, LIVE WAIT TIMER & HUMAN PACING
 • Live connection/wait elapsed timer right inside the floating HUD and Popup.
 • Automatically stops stuck MCP/Gemini turns after your timeout (default 5 min) and sends your customizable reconnect prompt (default: "继续，刚才mcp连接断开了") with draft protection and a one-click "Resume Now" button.
 • Built-in human-like anti-throttling pacing (natural delays, chunked typing, safe off-center hover clicks, and a 60s anti-burst governor).
 
-⚡ 2. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)
+⚡ 4. SMART MCP TOOL APPROVAL (ALWAYS ALLOW FIRST)
 • Automatically detects and clicks "Always allow / 始终允许 / 常に許可" permission confirmation dialogs.
-• Pierces through Material Web Components Shadow DOM, <slot> projections, and role="menu" dropdown items.
+• Pierces through Material Web Components Shadow DOM, `<slot>` projections, and role="menu" dropdown items.
 • Safe fallback: Optionally falls back to clicking single "Allow once" with strict sibling approval context checks.
 • Strict context guard: Never clicks destructive buttons like Deny, Cancel, Delete, or Block, and skips non-chat routes (/gems, /extensions, /settings) and secondary browser restored-tab stale chips.
 
-🖱️ 3. HOLD-TO-DRAG FLOATING HUD
+🎨 5. NOTION-STYLE UI & HOLD-TO-DRAG FLOATING HUD
+• Rebuilt both HUD and Popup with Notion-inspired neutral styling (Paper Light & Charcoal Dark), 1px hairline borders, subtle hover fills, active drawer highlights, Clear Logs / Refresh Inspect toolbars, and strict zero-`innerHTML` CSP compliance.
 • Left-click and hold the HUD header to position it anywhere across the browser viewport — hovering never traps or sticks the HUD!
 • Deferred pointer capture beyond the 4px movement deadzone keeps collapse, theme, and language header buttons immediately clickable.
-• Viewport boundary clamping + one-click Reset HUD Position in the popup.
 
-🌗 4. 4-LANGUAGE UI + DARK & LIGHT DUAL MODES
+🌗 6. 4-LANGUAGE UI + DARK & LIGHT DUAL MODES
 • Instant switching across Simplified Chinese, Traditional Chinese, English, and Japanese (UI, notifications, and keywords).
-• Synchronized Dark Night and Light Daylight themes across both the floating HUD and popup control panel.
+• Synchronized Paper Light and Charcoal Dark themes across both the floating HUD and popup control panel.
 
-🔔 5. ANTI-STALL & CIRCUIT BREAKER DESKTOP NOTIFICATIONS
-• Get instant Windows/macOS native desktop alerts when tool execution or AI response generation stalls longer than your threshold (default 5 minutes), or when a safety circuit breaker trips.
-• Browser action icon badge updates to a red "!" (stall / emergency) or amber "!!" (breaker) warning badge.
-• 1-Click mute toggle available directly on the HUD and inside the popup settings panel.
-• Disabling notifications immediately revokes and clears all pending desktop alerts.
-• Clicking the notification brings your Gemini tab into focus instantly.
+🔔 7. ANTI-STALL & CIRCUIT BREAKER DESKTOP NOTIFICATIONS
+• Get instant native desktop alerts when tool execution or AI response generation stalls longer than your threshold (default 5 minutes), or when a safety circuit breaker trips.
+• Browser action icon badge updates with clear warning states, with 1-click mute on the HUD and popup and instant click-to-focus tab navigation.
 
-🤖 6. AUTOMATIC CONTINUE & YES CHIP CLICKING
+🤖 8. AUTOMATIC CONTINUE & YES CHIP CLICKING
 • Automatically clicks confirmation follow-up chips (such as "↪ Yes") and bottom "Continue" generation buttons.
 • Intelligently ignores satisfaction surveys, questionnaires, long prompt chips, and sidebar history.
 
-🛡️ 7. INDUSTRIAL 6-LAYER CIRCUIT BREAKER PROTECTION
-Prevents runaway infinite loops, token waste, and accidental quota burnout:
+🛡️ 9. INDUSTRIAL 6-LAYER CIRCUIT BREAKER & BOUNDARY HARDENING
+Prevents runaway infinite loops, token waste, and accidental quota burnout across 115 passing automated & fuzz tests:
 • Layer 1 (Immediate Error Trip): Instantly halts on quota exhaustion, rate limit, or server error cues.
 • Layer 2 (Per-Task Limit): Caps consecutive continue clicks per conversation task (default 10).
-• Layer 3 (Output Settle Guard): Waits for streaming tokens to settle (1.8s) followed by a debounce cooldown (4s).
-• Layer 4 (Daily Continue Limit): Configurable daily continue cap, automatically resets at midnight.
+• Layer 3 (Output Settle Guard): Waits for streaming tokens to settle (1.8s) followed by pacing and cooldown guards.
+• Layer 4 (Daily Continue Limit): Configurable daily continue cap with Web Locks atomic stats flushing, resetting at midnight.
 • Layer 5 (Completion Semantics): Pauses on cues like "Task completed" unless explicit truncation occurred.
-• Layer 6 (Stagnant & Duplicate Breaker): Computes turn content hashes and trips if output stagnates or loops.
-
-💻 8. NEVER-SLEEP MV3 BACKGROUND OPERATION
-• Keeps Gemini active when minimized or running in background tabs through MV3 keepalive heartbeats, 4-minute seamless port rotation, Web Lock anti-freeze shield, and tab discard prevention.
+• Layer 6 (Stagnant & Duplicate Breaker): Compares turn content hashes and trips if output stagnates or loops, backed by Shadow DOM cycle and clock-skew guards.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔒 PRIVACY & SECURITY COMMITMENT
@@ -76,5 +79,5 @@ Prevents runaway infinite loops, token waste, and accidental quota burnout:
 📖 HOW TO USE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. Install the extension and navigate to Google Gemini (https://gemini.google.com/).
-2. The HUD overlay appears on the page, ready to be dragged anywhere you prefer.
-3. Click the extension toolbar icon to customize cooldown intervals, safety caps, or custom approval keywords.
+2. The Notion-style HUD overlay appears on the page, ready to be dragged or switched between "This chat" and "Global".
+3. Click the extension toolbar icon to manage per-chat overrides, isolated E-Stop / Stop All Chats, cooldowns, caps, and custom keywords.
