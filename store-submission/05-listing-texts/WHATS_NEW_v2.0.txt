@@ -1,0 +1,25 @@
+【Chrome Web Store 更新說明 · v2.0 Release】
+
+============================================================
+English (Release Notes / Update Summary)
+============================================================
+v2.0 Update:
+• Background, Minimized & Sleep/Screen-Off Continuation: Strengthened background, minimized, and unfocused detection (`isBackgroundOrUnfocused`) and added immediate `MAIN`-world click escalation (`triggerMainWorldClick`) on initial clicks for both `Always allow` and `Continue` chips alongside retry and stall-recovery send flows.
+• Post-Sleep & Visibility Wakeup Recovery: Re-acquires the shared background keepalive Web Lock (`syncBackgroundKeepaliveLock`), rotates/reconnects the Service Worker port (`forceReconnectBackgroundPort`), and triggers an immediate scan upon returning from hidden, screen-off, or sleep states.
+• Version 2.0 Alignment & Test Verification: Bumped `manifest.json` version to `"2.0"` and aligned HUD/Popup version badges and localized strings, passing all 116/116 automated tests.
+
+============================================================
+繁體中文（更新說明）
+============================================================
+v2.0 更新內容：
+• 背景 / 最小化 / 熄屏休眠穩定繼續：強化背景、視窗最小化與失焦判定（`isBackgroundOrUnfocused`），並在背景/最小化狀態下於觸發「始終允許」與「繼續」晶片首擊時即同步升級 `MAIN` 世界點擊（`triggerMainWorldClick`），覆蓋首擊、重試與逾時續接停止/發送。
+• 休眠 / 熄屏後喚醒恢復：從隱藏、熄屏或休眠狀態恢復時，自動重新同步防休眠鎖（`syncBackgroundKeepaliveLock`）、重建長連線埠（`forceReconnectBackgroundPort`）並立即執行掃描。
+• 版本 2.0 同步與測試驗證：`manifest.json` 版本升至 `"2.0"`，懸浮窗與彈窗徽章及多語系文案同步更新，116/116 項自動化測試全數通過。
+
+============================================================
+简体中文（更新说明）
+============================================================
+v2.0 更新内容：
+• 后台 / 最小化 / 熄屏休眠稳定继续：强化后台、窗口最小化与失焦判定（`isBackgroundOrUnfocused`），并在后台/最小化状态下于触发「始终允许」与「继续」芯片首击时即同步升级 `MAIN` 世界点击（`triggerMainWorldClick`），覆盖首击、重试与超时续接停止/发送。
+• 休眠 / 熄屏后唤醒恢复：从隐藏、熄屏或休眠状态恢复时，自动重新同步防休眠锁（`syncBackgroundKeepaliveLock`）、重建长连接端口（`forceReconnectBackgroundPort`）并立即执行扫描。
+• 版本 2.0 同步与测试验证：`manifest.json` 版本升至 `"2.0"`，悬浮窗与弹窗徽章及多语系文案同步更新，116/116 项自动化测试全部通过。

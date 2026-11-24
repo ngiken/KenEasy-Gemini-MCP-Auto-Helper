@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v1.0.1-16a34a?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v2.0-16a34a?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,9 +24,9 @@
 </div>
 
 > [!NOTE]
-> ### ✅ v1.0.1 正式发布版
-> **KenEasy Gemini MCP Auto Helper v1.0.1** 现已正式发布！
-> 全新重构 Notion 极简双主题 UI（浅色纸感 / 深色炭灰）、单对话独立开关与隔离紧急停止、后台 / 最小化 MAIN 世界点击升级、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、拟人防降速节流、MV3 后台保活及 6 层防刷熔断器均已通过全部 **115/115** 项自动化与压力测试验证。
+> ### ✅ v2.0 正式发布版
+> **KenEasy Gemini MCP Auto Helper v2.0** 现已正式发布！
+> 全新重构 Notion 极简双主题 UI（浅色纸感 / 深色炭灰）、单对话独立开关与隔离紧急停止、后台 / 最小化 MAIN 世界点击升级、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、拟人防降速节流、MV3 后台保活及 6 层防刷熔断器均已通过全部 **116/116** 项自动化与压力测试验证。
 > - 如遇到 Gemini 页面新弹窗或想补充自定义续接话术，可直接在设置面板中自定义，或前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 反馈。
 > - 欢迎各位开发者 Star 🌟 与提交 PR，共同完善 Gemini 网页端自动化生态！
 
@@ -44,8 +44,8 @@
 
 直接点击下方任意一个下载链接即可**一键自动下载 `.zip` 安装包**：
 
-- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
-- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip)**（解压即根目录 `manifest.json`）
+- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
+- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip)**（解压即根目录 `manifest.json`）
 
 安装步骤：
 1. 点击上方链接下载 `.zip` 压缩包并解压到本地目录（例如 `E:\code\KenEasy-Gemini-MCP-Auto-Helper`）。
@@ -247,10 +247,10 @@ popup.js, popup.html, popup.css
 
 ## 📝 更新记录
 
-### v1.0.1 - 2026-11-24
+### v2.0 - 2026-11-24
 - **全新 Notion 风格 UI 全面重构**：重写 HUD 与 Popup 视觉样式（浅色纸感 `#FFFFFF / #F7F6F3` + 深色炭灰 `#191919 / #202020`、1px 极细边框、微灰悬停与低饱和语义色），新增日志清空 / 探测刷新工具栏与抽屉高亮态，并提供 2x 无头 Chrome 真实 DOM 预览图。
 - **单对话独立控制与隔离紧急停止**：新增 `gmah_chat_overrides_v1` 会话级覆写存储、HUD **`本对话 / 全局默认`** 分段切换栏、Popup **`当前对话独立控制`** 卡片与 **`停止全部对话`** 分离按钮；单对话紧急停止跨路由持久化且互不干扰，支持 `/app` → `/app/<id>` 新建对话自动迁移与一键「恢复全局」。
-- **后台 / 最小化点击与深层边界加固**：新增 `MAIN` 世界点击升级（穿透 ShadowRoot 与 `<mat-chip>`，覆盖允许、继续与超时续接停止/发送）、按对话隔离的后台心跳与防休眠策略、最小化 `1200ms` 跟进唤醒，以及 27 项深度压力/模糊防线；全量测试扩展至 **115/115 全通过**。
+- **后台 / 最小化点击与深层边界加固**：新增 `MAIN` 世界点击升级（穿透 ShadowRoot 与 `<mat-chip>`，覆盖允许、继续与超时续接停止/发送）、按对话隔离的后台心跳与防休眠策略、最小化 `1200ms` 跟进唤醒，以及 27 项深度压力/模糊防线；全量测试扩展至 **116/116 全通过**。
 
 ### v1.0.0 正式版 - 2026-11-23
 - **连接卡死自动终止与自定义续接**：超过设定阈值（默认 5 分钟）自动终止卡死的 MCP/Gemini 回合，保护用户草稿并发送可自定义续接话术（默认「继续，刚才mcp连接断开了」），支持单任务最大恢复次数上限。

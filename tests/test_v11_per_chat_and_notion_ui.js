@@ -7,7 +7,7 @@ const assert = require('assert');
 const ROOT = path.resolve(__dirname, '..');
 const GEMINI_ORIGIN = 'https://' + 'gemini.google.com';
 const D = require('../defaults.js');
-const { GmahEngine } = require('../content.js');
+const { GmahEngine, isBackgroundOrUnfocused } = require('../content.js');
 const { createBackgroundController, mainWorldClickByToken } = require('../background.js');
 const { createHud } = require('../hud.js');
 const { createPopupController } = require('../popup.js');
@@ -573,15 +573,16 @@ function runTests(test) {
     doc.body.appendChild(allowBtn);
     const r1 = engine.scanOnce();
     assert.strictEqual(r1.action, 'clicked_allow');
-    assert.strictEqual(mwPayloads.length, 0);
+    assert.strictEqual(mwPayloads.length, 1);
+    assert.strictEqual(mwPayloads[0].kind, 'allow');
 
-    // Advance past BG_ALLOW_RETRY_DELAY_MS (2500ms) -> attempt 2 must escalate to MAIN world
+    // Advance past BG_ALLOW_RETRY_DELAY_MS (2500ms) -> attempt 2 must escalate to MAIN world again
     now += 2600;
     const r2 = engine.scanOnce();
     assert.strictEqual(r2.action, 'retried_allow');
     assert.strictEqual(r2.mainWorldEscalated, true);
-    assert.strictEqual(mwPayloads.length, 1);
-    assert.strictEqual(mwPayloads[0].kind, 'allow');
+    assert.strictEqual(mwPayloads.length, 2);
+    assert.strictEqual(mwPayloads[1].kind, 'allow');
     assert.ok(allowBtn.getAttribute('data-gmah-click-target'));
 
     // Now test Stall Recovery Send MAIN-world fallback while hidden
@@ -596,8 +597,8 @@ function runTests(test) {
     now += 600;
     const f2 = engine.scanOnce();
     assert.strictEqual(f2.action, 'stall_recover_sent');
-    assert.strictEqual(mwPayloads.length, 2);
-    assert.strictEqual(mwPayloads[1].kind, 'send');
+    assert.strictEqual(mwPayloads.length, 3);
+    assert.strictEqual(mwPayloads[2].kind, 'send');
     assert.strictEqual(mwPayloads[1].attempt, 2);
   });
 
@@ -846,6 +847,93 @@ function runTests(test) {
     assert.strictEqual(sentLog[0].msg.type, 'GMAH_RESET_CHAT_OVERRIDE');
     assert.strictEqual(doc.getElementById('chatOverrideBadge').textContent, '跟随全局');
     assert.strictEqual(doc.getElementById('btnResetChatOverride').style.display, 'none');
+  });
+
+  test('v2.0 background, minimized & screen-off/sleep wakeup escalates MAIN-world clicks and continues reliably', () => {
+    const mainWorldCalls = [];
+    const bg = createBackgroundController(
+      {
+        runtime: { lastError: null },
+        scripting: {
+          executeScript(opts, cb) {
+            mainWorldCalls.push(opts);
+            if (typeof cb === 'function') cb([{ result: { clicked: true } }]);
+          }
+        },
+        tabs: {
+          query(_q, cb) {
+            cb([{ id: 77, url: `${GEMINI_ORIGIN}/app/sleep_test_1`, discarded: false }]);
+          },
+          update(_tabId, _props, cb) {
+            if (typeof cb === 'function') cb();
+          },
+          sendMessage(_tabId, _msg, cb) {
+            if (typeof cb === 'function') cb({ ok: true });
+          }
+        }
+      },
+      null,
+      () => 10000
+    );
+
+    const lockedWin = {
+      innerWidth: 0,
+      innerHeight: 0,
+      outerWidth: 0,
+      outerHeight: 0,
+      screenX: -32000,
+      screenY: -32000,
+      hasFocus: () => false
+    };
+    const { doc: hiddenDoc } = createEnv(`${GEMINI_ORIGIN}/app/sleep_test_1`);
+    hiddenDoc.hidden = true;
+    hiddenDoc.visibilityState = 'hidden';
+    hiddenDoc.hasFocus = () => false;
+
+    const turnDiv = hiddenDoc.createElement('div');
+    turnDiv.className = 'model-response';
+    turnDiv.textContent = 'First part of response.';
+    hiddenDoc.body.appendChild(turnDiv);
+
+    const contBtn = hiddenDoc.createElement('button', { text: 'Continue' });
+    hiddenDoc.body.appendChild(contBtn);
+
+    let mainWorldPayload = null;
+    const engine = new GmahEngine({
+      doc: hiddenDoc,
+      win: lockedWin,
+      now: () => 50000,
+      onMainWorldClick: (payload) => {
+        mainWorldPayload = payload;
+        const tok = payload.token;
+        const target = contBtn.getAttribute('data-gmah-click-target') === tok ? contBtn : null;
+        if (target) {
+          target.removeAttribute('data-gmah-click-target');
+          const res = mainWorldClickByToken(tok, payload.attempt, payload.kind);
+          assert.strictEqual(res.clicked, false);
+          assert.strictEqual(res.reason, 'not_found');
+        }
+      }
+    });
+
+    assert.strictEqual(isBackgroundOrUnfocused(hiddenDoc, lockedWin), true);
+    const res = engine.scanOnce();
+    assert.strictEqual(res.action, 'clicked_continue');
+    assert.strictEqual(contBtn.clickCount, 1);
+    assert.ok(mainWorldPayload && mainWorldPayload.kind === 'continue');
+    assert.ok(typeof mainWorldPayload.token === 'string' && mainWorldPayload.token.startsWith('gmah_'));
+    assert.ok(mainWorldCalls.length === 0);
+
+    const connectedPort = {
+      name: 'gmah-tab',
+      sender: { tab: { id: 77, url: `${GEMINI_ORIGIN}/app/sleep_test_1` } },
+      onMessage: { addListener() {} },
+      onDisconnect: { addListener() {} },
+      postMessage() {}
+    };
+    bg.handleConnect(connectedPort);
+    bg.handleWindowFocusChanged(-1);
+    assert.ok(bg.getScheduledTickTabIds().includes(77));
   });
 }
 

@@ -1041,9 +1041,34 @@
   const MAX_BG_CLICK_ATTEMPTS = 2;
   const MAX_BG_HIDDEN_ATTEMPTS = 4;
 
-  function isBackgroundOrUnfocused(doc) {
+  function isBackgroundOrUnfocused(doc, win) {
     if (!doc) return false;
-    if (doc.hidden === true || doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender') return true;
+    try {
+      if (doc.hidden === true || doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender') {
+        return true;
+      }
+      if (doc.minimized === true || doc.isMinimized === true || doc.windowState === 'minimized') {
+        return true;
+      }
+    } catch (_) {}
+    const w = win || (doc.defaultView) || (typeof window !== 'undefined' ? window : null);
+    if (w) {
+      try {
+        if (
+          w.minimized === true ||
+          w.isMinimized === true ||
+          w.windowState === 'minimized' ||
+          (w.innerWidth === 0 && w.innerHeight === 0) ||
+          (w.outerWidth === 0 && w.outerHeight === 0) ||
+          (typeof w.screenX === 'number' && w.screenX <= -32000) ||
+          (typeof w.screenY === 'number' && w.screenY <= -32000) ||
+          (typeof w.screenLeft === 'number' && w.screenLeft <= -32000) ||
+          (typeof w.screenTop === 'number' && w.screenTop <= -32000)
+        ) {
+          return true;
+        }
+      } catch (_) {}
+    }
     if (typeof doc.hasFocus === 'function') {
       try {
         return !doc.hasFocus();
@@ -2402,7 +2427,7 @@
       // after the Stop button is already gone. Once no Stop button and no new text arrive for >= 2.2s,
       // treat the lingering spinner as frozen UI rather than active generation so Auto-Continue runs in BG!
       // Ensure the grace timer NEVER expires if MCP connectingText, tool calls, or thinking indicators are active!
-      if (isBackgroundOrUnfocused(this.doc) && typeof now === 'number') {
+      if (isBackgroundOrUnfocused(this.doc, this.win) && typeof now === 'number') {
         const hasConnecting = Boolean(this.detectConnectingStatus(roots, turns));
         const hasToolOrThinking = hasActiveToolOrThinking(this.doc, this.win, roots);
         if (hasConnecting || hasToolOrThinking) {
@@ -2675,7 +2700,7 @@
               sr.stopAttempts += 1;
               sr.phaseAt = now;
               this.clickFn(stopBtn, this.win, sr.stopAttempts, this.randomFn);
-              if (isBackgroundOrUnfocused(this.doc)) {
+              if (isBackgroundOrUnfocused(this.doc, this.win)) {
                 this.triggerMainWorldClick(stopBtn, sr.stopAttempts, 'stop', 'Stop');
               }
               this.emitState();
@@ -2775,7 +2800,7 @@
 
           if (sendBtn) {
             this.clickFn(sendBtn, this.win, 1, this.randomFn);
-            if (isBackgroundOrUnfocused(this.doc) && (!inputEl || readPromptInputText(inputEl).length > 0)) {
+            if (isBackgroundOrUnfocused(this.doc, this.win) && (!inputEl || readPromptInputText(inputEl).length > 0)) {
               this.triggerMainWorldClick(sendBtn, 2, 'send', 'Send');
             }
             method = 'button';
@@ -3144,7 +3169,7 @@
     }
 
     findBgRetryCandidate(kind, visibleSet, now) {
-      if (!isBackgroundOrUnfocused(this.doc) || this.clickAttempts.size === 0) return null;
+      if (!isBackgroundOrUnfocused(this.doc, this.win) || this.clickAttempts.size === 0) return null;
       for (const [el, entry] of this.clickAttempts.entries()) {
         if (!entry || entry.kind !== kind) continue;
         const policy = this.getBgRetryPolicy(kind, entry.count);
@@ -3158,7 +3183,7 @@
     }
 
     getNextBgRetryDelayMs(visibleSet, now) {
-      if (!isBackgroundOrUnfocused(this.doc) || this.clickAttempts.size === 0) return 0;
+      if (!isBackgroundOrUnfocused(this.doc, this.win) || this.clickAttempts.size === 0) return 0;
       let minRemaining = 0;
       for (const [el, entry] of this.clickAttempts.entries()) {
         if (!entry) continue;
@@ -3392,8 +3417,12 @@
             this.resetStallMonitor(true);
             if (this.onStatsSave) this.onStatsSave(this.stats, { allow: 1 });
             this.clickFn(allowHit.item.el, this.win, 1, this.randomFn);
+            const isBgNow = isBackgroundOrUnfocused(this.doc, this.win);
+            if (isBgNow) {
+              this.triggerMainWorldClick(allowHit.item.el, 1, 'allow', allowHit.item.label);
+            }
             const tag = allowHit.tier === 'always' ? '始终允许' : '允许';
-            const bgTag = this.doc && this.doc.hidden ? ' [后台]' : '';
+            const bgTag = isBgNow ? ' [后台]' : '';
             this.setStatus('hudStatusClickedAllow', { label: allowHit.item.label });
             this.addLog(`✅ 自动点击[${tag}]${bgTag}：「${allowHit.item.label}」`);
             this.emitState();
@@ -3402,7 +3431,7 @@
               tier: allowHit.tier,
               label: allowHit.item.label,
               element: allowHit.item.el,
-              pendingRetryInMs: isBackgroundOrUnfocused(this.doc) ? BG_ALLOW_RETRY_DELAY_MS : 0
+              pendingRetryInMs: isBgNow ? BG_ALLOW_RETRY_DELAY_MS : 0
             };
           }
 
@@ -3496,7 +3525,7 @@
       // Layer B: Wait for streaming to finish + DOM settle
       if (this.isGenerating || connectingText) {
         let retryInMs = 0;
-        if (this.doc && isBackgroundOrUnfocused(this.doc) && this.bgNoStopSinceAt > 0) {
+        if (this.doc && isBackgroundOrUnfocused(this.doc, this.win) && this.bgNoStopSinceAt > 0) {
           const graceMs = Math.max(2200, this.settings.idleSettleMs);
           const rawGrace = graceMs - (now - this.bgNoStopSinceAt);
           retryInMs = Number.isFinite(rawGrace) ? Math.max(250, Math.min(30000, Math.round(rawGrace))) : 500;
@@ -3679,7 +3708,11 @@
       if (this.onStatsSave) this.onStatsSave(this.stats, { continue: 1 });
 
       this.clickFn(contHit.item.el, this.win, 1, this.randomFn);
-      const bgTag = this.doc && this.doc.hidden ? ' [后台]' : '';
+      const isBgNow = isBackgroundOrUnfocused(this.doc, this.win);
+      if (isBgNow) {
+        this.triggerMainWorldClick(contHit.item.el, 1, 'continue', contHit.item.label);
+      }
+      const bgTag = isBgNow ? ' [后台]' : '';
       this.setStatus('hudStatusClickedContinue', {
         task: this.taskContinueCount,
         max: this.settings.maxContinuesPerTask
@@ -3695,7 +3728,7 @@
         element: contHit.item.el,
         taskContinueCount: this.taskContinueCount,
         dailyContinueCount: this.stats.continueCount,
-        pendingRetryInMs: isBackgroundOrUnfocused(this.doc) ? BG_CONTINUE_RETRY_DELAY_MS : 0
+        pendingRetryInMs: isBgNow ? BG_CONTINUE_RETRY_DELAY_MS : 0
       };
     }
   }
@@ -3965,8 +3998,7 @@
     function canRunScanInCurrentVisibility() {
       if (!settingsReady) return false;
       if (engine.settings.backgroundMode) return true;
-      if (document.hidden) return false;
-      if (typeof document.hasFocus === 'function' && !document.hasFocus()) return false;
+      if (isBackgroundOrUnfocused(document, window)) return false;
       return true;
     }
 
@@ -4250,7 +4282,7 @@
             ? res.pendingRetryInMs + 120
             : 0;
       if (nextDelay <= 0) return;
-      if (engine.settings.backgroundMode && isBackgroundOrUnfocused(document)) {
+      if (engine.settings.backgroundMode && isBackgroundOrUnfocused(document, window)) {
         sendToBackground({
           type: 'GMAH_SCHEDULE_TICK',
           delayMs: nextDelay,
@@ -4278,7 +4310,12 @@
       if (!bgPort) {
         connectBackgroundPort();
       }
-      if (document.hidden && engine.settings.backgroundMode) {
+      if (!document.hidden && engine.settings.backgroundMode) {
+        // Returning from hidden / screen-off / sleep: re-acquire keepalive lock, refresh port & scan immediately
+        syncBackgroundKeepaliveLock();
+        forceReconnectBackgroundPort();
+        sendToBackground({ type: 'GMAH_TAB_KEEPALIVE' });
+      } else if (document.hidden && engine.settings.backgroundMode) {
         sendToBackground({ type: 'GMAH_TAB_KEEPALIVE' });
         sendToBackground({
           type: 'GMAH_SCHEDULE_TICK',
@@ -4306,7 +4343,13 @@
 
     function handleWindowFocus() {
       if (!isContextAlive()) return;
-      if (!bgPort) connectBackgroundPort();
+      if (engine.settings.backgroundMode) {
+        syncBackgroundKeepaliveLock();
+        forceReconnectBackgroundPort();
+        sendToBackground({ type: 'GMAH_TAB_KEEPALIVE' });
+      } else if (!bgPort) {
+        connectBackgroundPort();
+      }
       if (canRunScanInCurrentVisibility()) {
         runScanAndSchedule();
       }
@@ -4466,7 +4509,7 @@
 
     function scheduleScan(delay) {
       if (!isContextAlive() || !settingsReady) return;
-      if (isBackgroundOrUnfocused(document) && engine.settings.backgroundMode) {
+      if (isBackgroundOrUnfocused(document, window) && engine.settings.backgroundMode) {
         if (!microtaskQueued) {
           microtaskQueued = true;
           Promise.resolve().then(() => {
@@ -4605,7 +4648,7 @@
             quickReconnectCount = 0;
             lastQuickReconnectWindowAt = reconnectNow;
           }
-          if (isBackgroundOrUnfocused(document) && engine.settings.backgroundMode && quickReconnectCount < 3) {
+          if (isBackgroundOrUnfocused(document, window) && engine.settings.backgroundMode && quickReconnectCount < 3) {
             quickReconnectCount += 1;
             // Wake Service Worker via sendMessage before reconnecting Port so restarts don't burn retries
             if (typeof chrome.runtime.sendMessage === 'function') {

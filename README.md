@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v1.0.1-16a34a?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v2.0-16a34a?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,9 +24,9 @@
 </div>
 
 > [!NOTE]
-> ### ✅ Stable Release (v1.0.1)
-> **KenEasy Gemini MCP Auto Helper v1.0.1** is now officially released!
-> Featuring a completely refactored Notion-style UI (Paper Light &amp; Charcoal Dark), per-chat independent toggles &amp; isolated emergency stop, MAIN-world background/minimized click escalation, live connection wait timer, stall auto-stop &amp; custom reconnect prompt, human-like anti-throttling pacing, 6-layer circuit breaker, 4-language support, and 115/115 passing automated &amp; stress tests.
+> ### ✅ Stable Release (v2.0)
+> **KenEasy Gemini MCP Auto Helper v2.0** is now officially released!
+> Featuring a completely refactored Notion-style UI (Paper Light &amp; Charcoal Dark), per-chat independent toggles &amp; isolated emergency stop, MAIN-world background/minimized click escalation, live connection wait timer, stall auto-stop &amp; custom reconnect prompt, human-like anti-throttling pacing, 6-layer circuit breaker, 4-language support, and 116/116 passing automated &amp; stress tests.
 > - Customize your reconnect prompt or keywords anytime in the popup settings, or report Gemini UI updates on [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues).
 > - Star 🌟 and PR contributions are warmly welcomed!
 
@@ -44,8 +44,8 @@ The extension has been submitted for Chrome Web Store security review. Once appr
 
 Click either link below to **immediately download the `.zip` package with one click**:
 
-- 📦 **[Direct Download: Manual Install Bundle (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip)** (Recommended — extracts to `KenEasy-Gemini-MCP-Auto-Helper/` folder with docs)
-- 🏪 **[Direct Download: Clean Extension Zip (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip)** (Clean root containing `manifest.json`)
+- 📦 **[Direct Download: Manual Install Bundle (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip)** (Recommended — extracts to `KenEasy-Gemini-MCP-Auto-Helper/` folder with docs)
+- 🏪 **[Direct Download: Clean Extension Zip (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip)** (Clean root containing `manifest.json`)
 
 Installation steps:
 1. Click a link above to download the `.zip` file and extract it to a local folder (e.g. `E:\code\KenEasy-Gemini-MCP-Auto-Helper`).
@@ -250,10 +250,10 @@ Click the **"Restore Defaults"** button at the bottom of the extension popup. Th
 
 ## 📝 Changelog
 
-### v1.0.1 - 2026-11-24
+### v2.0 - 2026-11-24
 - **Notion-Style UI Complete Refactor**: Rebuilt HUD and Popup stylesheets with Paper Light (`#FFFFFF / #F7F6F3`) & Charcoal Dark (`#191919 / #202020`) palettes, 1px hairline borders, active drawer highlights, Clear/Refresh toolbars, and real-DOM 2x headless Chrome previews (`assets/notion-ui-preview.png`).
 - **Per-Chat Independent Controls & Isolated Emergency Stop**: Added URL-keyed `gmah_chat_overrides_v1` overrides, HUD **`This chat / Global`** segmented switcher, Popup **`This Conversation`** card, single-chat **`E-Stop`** isolated across SPA navigation, **`Stop All Chats`** broadcast action, `/app` → `/app/<id>` override migration, and one-click **`Reset`**.
-- **Background / Minimized Clicking & Deep Boundary Hardening**: Added `MAIN`-world click escalation (`mainWorldClickByToken`, piercing ShadowRoots & `<mat-chip>` across Allow, Continue, and Stall-Recovery Stop/Send), per-chat background heartbeat & `autoDiscardable` isolation, `1200ms` minimize follow-up wakeups, and 27 deep boundary/fuzz guards — verified at **115/115 passing tests**.
+- **Background / Minimized Clicking & Deep Boundary Hardening**: Added `MAIN`-world click escalation (`mainWorldClickByToken`, piercing ShadowRoots & `<mat-chip>` across Allow, Continue, and Stall-Recovery Stop/Send), per-chat background heartbeat & `autoDiscardable` isolation, `1200ms` minimize follow-up wakeups, and 27 deep boundary/fuzz guards — verified at **116/116 passing tests**.
 
 ### v1.0.0 (Official Release) - 2026-11-23
 - **Stall Auto-Stop & Custom Reconnect Prompt**: Automatically cancels stuck MCP/Gemini turns past the configured timeout (default 5 min) and sends a customizable reconnect prompt (default `继续，刚才mcp连接断开了`) with draft protection and per-task recovery cap.

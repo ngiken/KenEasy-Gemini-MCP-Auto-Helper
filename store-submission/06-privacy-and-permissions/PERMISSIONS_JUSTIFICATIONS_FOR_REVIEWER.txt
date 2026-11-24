@@ -1,16 +1,16 @@
 ================================================================================
-Chrome Web Store Reviewer - Permissions Justifications (v1.0.1)
+Chrome Web Store Reviewer - Permissions Justifications (v2.0)
 (直接复制每一项后面的英文文本粘贴到 Chrome 开发者后台对应权限说明输入框)
 ================================================================================
 
 1. Single Purpose Description (单一用途说明):
 --------------------------------------------------------------------------------
-Automates MCP (Model Context Protocol) tool permission approvals, continuation confirmation chips, per-conversation controls with isolated emergency stops, and stall auto-recovery exclusively on the Google Gemini web application.
+Automates MCP (Model Context Protocol) tool permission approvals, continuation confirmation chips, per-conversation controls with isolated emergency stops, background/minimized/sleep continuation, and stall auto-recovery exclusively on the Google Gemini web application.
 
 
 2. Host Permissions Justification (主机权限说明 - https://gemini.google.com/*):
 --------------------------------------------------------------------------------
-The extension exclusively interacts with Google Gemini (https://gemini.google.com/*) to detect MCP approval dialogs, click confirmation chips, enforce per-conversation toggles and isolated emergency stops, and render an on-page draggable status HUD. The extension requests no access to any other website or domain.
+The extension exclusively interacts with Google Gemini (https://gemini.google.com/*) to detect MCP approval dialogs, click confirmation chips, enforce per-conversation toggles and isolated emergency stops, maintain background/minimized continuation, and render an on-page draggable status HUD. The extension requests no access to any other website or domain.
 
 
 3. Permission: storage (存储权限):
@@ -25,12 +25,12 @@ Required to identify active Google Gemini tabs and their conversation path for p
 
 5. Permission: alarms (定时器/闹钟权限):
 --------------------------------------------------------------------------------
-Required to maintain periodic keepalive heartbeats and minimized-window follow-up wakeups in the Manifest V3 service worker so that automated background tasks do not stall or terminate prematurely when the browser window is minimized or inactive.
+Required to maintain periodic keepalive heartbeats, minimized-window follow-up wakeups, and post-sleep/background continuation ticks in the Manifest V3 service worker so that automated background tasks do not stall or terminate prematurely when the browser window is minimized, inactive, or waking from sleep.
 
 
 6. Permission: scripting (脚本注入权限):
 --------------------------------------------------------------------------------
-Required to (1) dynamically inject bundled content scripts into already-opened https://gemini.google.com/* tabs upon extension install or update without requiring a browser restart, and (2) execute a strictly local, self-contained world: "MAIN" helper (mainWorldClickByToken and a lightweight renderer wake ping) exclusively on Gemini tabs when background or minimized tab throttling blocks isolated-world clicks on Shadow DOM or Angular Material confirmation chips. No remote code is fetched or executed, and no arbitrary page data is extracted.
+Required to (1) dynamically inject bundled content scripts into already-opened https://gemini.google.com/* tabs upon extension install or update without requiring a browser restart, and (2) execute a strictly local, self-contained world: "MAIN" helper (mainWorldClickByToken and a lightweight renderer wake ping) exclusively on Gemini tabs when background, minimized, or unfocused tab throttling affects isolated-world clicks on Shadow DOM or Angular Material confirmation chips. No remote code is fetched or executed, and no arbitrary page data is extracted.
 
 
 7. Permission: notifications (桌面通知权限):

@@ -1,11 +1,11 @@
 ================================================================================
-Chrome Web Store - Data Usage & Privacy Declaration Guide (v1.0.1)
+Chrome Web Store - Data Usage & Privacy Declaration Guide (v2.0)
 (Chrome 开发者后台「隐私权规范 / Privacy practices」选项填写指引)
 ================================================================================
 
 【第 1 部分：单一用途说明 (Single purpose)】
 请在文本框中粘贴：
-Automates MCP (Model Context Protocol) tool permission approvals, continuation confirmation chips, per-conversation controls with isolated emergency stops, and stall auto-recovery exclusively on the Google Gemini web application.
+Automates MCP (Model Context Protocol) tool permission approvals, continuation confirmation chips, per-conversation controls with isolated emergency stops, background/minimized/sleep continuation, and stall auto-recovery exclusively on the Google Gemini web application.
 
 
 【第 2 部分：数据使用声明 (Data usage / Data collection)】
@@ -13,7 +13,7 @@ Automates MCP (Model Context Protocol) tool permission approvals, continuation c
 答：
 🔘 勾选：【I am not collecting or using data】(我不收集或使用任何数据)
 
-说明：本扩展所有逻辑（含单对话独立覆写、隔离急停与后台 MAIN 世界本地点击辅助）完全在本地运行，零服务器通信，不收集任何用户隐私、账号信息或网页内容。
+说明：本扩展所有逻辑（含单对话独立覆写、隔离急停、后台/最小化/熄屏唤醒恢复与后台 MAIN 世界本地点击辅助）完全在本地运行，零服务器通信，不收集任何用户隐私、账号信息或网页内容。
 
 
 【第 3 部分：隐私政策网址 (Privacy policy URL)】

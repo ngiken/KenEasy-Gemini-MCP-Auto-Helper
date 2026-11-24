@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0] - 2026-11-24
+
+### 🚀 Background, Minimized & Screen-Off / Sleep Continuity Overhaul (`content.js`, `manifest.json`, `defaults.js`, `popup.html`)
+- **Version 2.0 Bump**:
+  - Updated `manifest.json` `"version"` to `"2.0"` and aligned HUD/Popup release badges and localized labels to `2.0` / `v2.0`.
+- **Enhanced Background, Minimized & Screen-Off / Sleep Detection (`isBackgroundOrUnfocused`)**:
+  - Expanded visibility and window-state checks to cover minimized or occluded windows (`minimized`, `isMinimized`, `windowState === 'minimized'`, zero dimensions, off-screen coordinates, and `!doc.hasFocus()`).
+- **Immediate `MAIN`-World Click Escalation in Background / Minimized / Unfocused States**:
+  - Triggered `MAIN`-world click escalation (`triggerMainWorldClick`) on initial clicks for both `Always allow` and `Continue` chips when the tab is hidden, minimized, or unfocused in addition to retry and stall-recovery send flows.
+- **Post-Sleep / Screen-Off / Visibility Wakeup Recovery**:
+  - Re-acquires the shared background keepalive Web Lock (`syncBackgroundKeepaliveLock`), rotates/reconnects the Service Worker port (`forceReconnectBackgroundPort`), and sends a `GMAH_TAB_KEEPALIVE` wakeup when returning from hidden, screen-off, or sleep states.
+- **Test Suite & Package Alignment**:
+  - Updated version and background/sleep wakeup tests (`116/116` passing) and rebuilt `v2.0` store and manual-install packages alongside updated store listing and permission files.
+
+---
+
 ## [1.0.1] - 2026-11-24
 
 ### 🎨 Notion-Style UI Complete Refactor (`hud.css`, `popup.css`, `popup.html`, `hud.js`)

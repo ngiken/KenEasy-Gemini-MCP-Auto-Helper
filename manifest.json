@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "KenEasy Gemini MCP Auto Helper",
-  "version": "1.0.1",
-  "description": "Google Gemini MCP 自动化助手 v1.0.1：Notion 极简界面、单对话独立控制与隔离急停、后台主世界点击、超时自动续接与 6 层防刷熔断。",
+  "version": "2.0",
+  "description": "Google Gemini MCP 自动化助手 v2.0：后台/最小化/熄屏稳定继续、单对话独立控制与隔离急停、主世界点击、超时自动续接与 6 层防刷熔断。",
   "permissions": [
     "storage",
     "tabs",
