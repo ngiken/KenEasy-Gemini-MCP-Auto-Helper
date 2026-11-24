@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2] - 2026-11-24
+
+### 🎯 Default Model Lock & Auto-Switch Guard (`defaults.js`, `content.js`, `background.js`, `hud.js`, `hud.css`, `popup.html`, `popup.js`, `popup.css`)
+- **Automatic Default Model Enforcement (`modelLockEnabled`, `preferredModel`)**:
+  - Users can configure a default working model (via presets, free-text input, or one-click **"Use Current" / "Detect Models"** in both the Floating HUD and Extension Popup) and lock it globally or independently per conversation (`CHAT_OVERRIDE_KEYS`).
+  - Whenever Gemini is idle (including brand-new `/app` chats, before clicking **Continue**, and before **Stall Auto-Recovery** sends its reconnect prompt), the engine verifies the active model and automatically switches back if it drifted or was reset, without interrupting active streaming or MCP tool execution.
+- **Smart Cross-Language Matching & Adversarial Guard (`scoreModelMatch`, `isModelNameMatch`)**:
+  - Supports cross-language canonical aliases (`Fast` / `快速` / `高速`, `Thinking` / `思考` / `思考模式` / `思考モード` / `深度思考`), brand-prefix normalization (`2.5 Pro` ↔ `Gemini 2.5 Pro`), and `.0` version normalization (`3.0 Pro` ↔ `3 Pro`).
+  - Strictly blocks upsell/promotional items (`Upgrade to Google AI Pro`, `升级`, etc.), cross-tier collisions (e.g., target `Pro` will never match `Thinking with 3 Pro`), and decoy buttons inside `<model-response>`, `<nav>`, or `<code>`.
+- **Hard Error Stop & Anti-Flap Protection (`model_unavailable`)**:
+  - Cleanly dismisses open menus and stops all automation (Allow, Continue, and Stall Auto-Recovery) when the preferred model is disabled/quota-locked, missing from the picker, rejected by a rate-limit snackbar, lacks a usable switcher, or keeps being reverted by Gemini beyond `maxModelSwitchRetries` (configurable 1–10, default 3).
+  - Displays a red status indicator in HUD/Popup, sets a red `ERR` toolbar badge, and sends a localized OS desktop notification in `background.js` (clicking the alert restores and focuses the affected Gemini tab).
+- **Multi-Size, Zoom & Background/Minimized Hardening**:
+  - Detects model switchers across desktop `<header>` bars, bottom prompt composers, nested ShadowRoots, duplicate responsive triggers (prioritizing strictly visible active triggers), narrow/mobile icon-only triggers + `mat-bottom-sheet-container`, and Angular Material nested menu wrappers while ignoring hidden check/lock icons.
+  - Prevents background double-toggling of opened model menus in both `content.js` and `background.js` (`mainWorldClickByToken`), scrolls menu options into view on short screens, and adds responsive HUD clamping (`max-width`, `max-height`, scrollable `.gmah-body`, compact `@media` rules, and `visualViewport` resize tracking).
+- **Documentation & Verification**:
+  - Repaired `README.md` and `README.zh-CN.md` changelog history (restoring `v1.0.1` and aligning `v2.0` + `v2.2` entries) and expanded automated verification to **129/129 passing tests** across 8 suites (`tests/test_model_lock.js`).
+
+---
+
 ## [2.0] - 2026-11-24
 
 ### 🚀 Background, Minimized & Screen-Off / Sleep Continuity Overhaul (`content.js`, `manifest.json`, `defaults.js`, `popup.html`)

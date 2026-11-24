@@ -35,6 +35,10 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36), 0 0 0 1px rgba(0, 0, 0, 0.2);
   padding: 10px 11px;
   width: 274px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 20px);
+  display: flex;
+  flex-direction: column;
   transition: box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
@@ -156,6 +160,8 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* Notion-style Scope Bar (This Chat / Global + Chat Tag + Reset) */
@@ -514,6 +520,107 @@
   cursor: default;
 }
 
+/* Model Picker Panel inside HUD */
+#gmah-hud .gmah-model-pick {
+  max-width: 92px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#gmah-hud .gmah-model-state {
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 6px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+#gmah-hud .gmah-model-state.ok {
+  color: #6bc9a4;
+  background: rgba(45, 170, 126, 0.13);
+}
+
+#gmah-hud .gmah-model-state.warn {
+  color: #e8a85a;
+  background: rgba(217, 115, 13, 0.15);
+}
+
+#gmah-hud .gmah-model-input-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+#gmah-hud .gmah-model-input {
+  flex: 1;
+  min-width: 0;
+  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #e6e6e4;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 6px;
+  outline: none;
+  user-select: text;
+}
+
+#gmah-hud .gmah-model-input:focus {
+  border-color: #2383e2;
+}
+
+#gmah-hud .gmah-model-save {
+  background: rgba(35, 131, 226, 0.18);
+  border-color: rgba(35, 131, 226, 0.35);
+  color: #6eaef5;
+  flex-shrink: 0;
+}
+
+#gmah-hud .gmah-model-actions {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+#gmah-hud .gmah-model-actions button {
+  flex: 1;
+}
+
+#gmah-hud .gmah-model-chips-label {
+  margin-top: 3px;
+  margin-bottom: 3px;
+}
+
+#gmah-hud .gmah-model-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+#gmah-hud .gmah-model-chip {
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #c7c7c4;
+  font-family: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+#gmah-hud .gmah-model-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f1ef;
+}
+
+#gmah-hud .gmah-model-chip.active {
+  background: rgba(35, 131, 226, 0.2);
+  border-color: rgba(35, 131, 226, 0.4);
+  color: #6eaef5;
+}
+
 /* =========================================================
    Notion Light (Paper) Theme Mode
    ========================================================= */
@@ -761,4 +868,77 @@
   background: #edf6f3;
   border-color: rgba(15, 123, 108, 0.24);
   color: #0f7b6c;
+}
+
+#gmah-hud.gmah-theme-light .gmah-model-state.ok {
+  color: #0f7b6c;
+  background: #edf6f3;
+}
+
+#gmah-hud.gmah-theme-light .gmah-model-state.warn {
+  color: #b35c07;
+  background: #faebdd;
+}
+
+#gmah-hud.gmah-theme-light .gmah-model-input {
+  background: #ffffff;
+  border-color: rgba(55, 53, 47, 0.16);
+  color: #37352f;
+}
+
+#gmah-hud.gmah-theme-light .gmah-model-save {
+  background: #ebf3fb;
+  border-color: rgba(35, 131, 226, 0.28);
+  color: #2383e2;
+}
+
+#gmah-hud.gmah-theme-light .gmah-model-chip {
+  border-color: rgba(55, 53, 47, 0.12);
+  background: #ffffff;
+  color: #5a5955;
+}
+
+#gmah-hud.gmah-theme-light .gmah-model-chip:hover {
+  background: #efeee9;
+  color: #37352f;
+}
+
+#gmah-hud.gmah-theme-light .gmah-model-chip.active {
+  background: #ebf3fb;
+  border-color: rgba(35, 131, 226, 0.34);
+  color: #2383e2;
+}
+
+/* Responsive compact layout for narrow split-screens, small windows & high zoom */
+@media (max-width: 640px), (max-height: 560px) {
+  #gmah-hud {
+    right: 8px;
+    bottom: 12px;
+    font-size: 11px;
+  }
+
+  #gmah-hud .gmah-card {
+    width: 244px;
+    padding: 8px 9px;
+  }
+
+  #gmah-hud .gmah-body {
+    margin-top: 6px;
+    padding-top: 6px;
+    gap: 4px;
+  }
+
+  #gmah-hud .gmah-row {
+    padding: 2px 4px;
+    gap: 6px;
+  }
+
+  #gmah-hud .gmah-row-label {
+    font-size: 11px;
+  }
+
+  #gmah-hud .gmah-pill {
+    padding: 1px 6px;
+    font-size: 10.5px;
+  }
 }

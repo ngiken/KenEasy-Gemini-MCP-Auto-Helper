@@ -13,7 +13,22 @@
     'autoContinue',
     'backgroundMode',
     'stallAlertEnabled',
-    'stallAutoRecoverEnabled'
+    'stallAutoRecoverEnabled',
+    'modelLockEnabled'
+  ];
+
+  const MODEL_PRESETS = [
+    'Pro',
+    'Thinking',
+    'Fast',
+    '2.5 Pro',
+    '2.5 Flash'
+  ];
+
+  const MODEL_ALIAS_GROUPS = [
+    ['fast', '快速', '高速'],
+    ['thinking', '思考', '思考模式', '思考モード', '深度思考'],
+    ['pro']
   ];
 
   const SUPPORTED_LANGUAGES = ['zh-CN', 'zh-TW', 'en', 'ja'];
@@ -55,6 +70,12 @@
 
     // Human-like pacing / anti-throttling protection (randomized delays + natural typing + burst governor)
     humanPacingEnabled: true,
+
+    // Default model lock & auto-switch guard
+    modelLockEnabled: false,
+    preferredModel: '',
+    maxModelSwitchRetries: 3,
+    stopOnModelUnavailable: true,
 
     // Keyword lists
     alwaysAllowKeywords: [
@@ -434,9 +455,9 @@
     'zh-CN': {
       langLabel: '简体',
       hudTitle: 'MCP 助手',
-      betaBadge: '2.0',
-      betaBadgeTitle: '正式发布版 (2.0)',
-      hudTitleTip: '按住左键拖拽 · 点击标题折叠展开 · 2.0',
+      betaBadge: '2.2',
+      betaBadgeTitle: '正式发布版 (2.2)',
+      hudTitleTip: '按住左键拖拽 · 点击标题折叠展开 · 2.2',
       minBtnTitle: '最小化 / 展开',
       themeToggleToLight: '切换浅色模式',
       themeToggleToDark: '切换深色模式',
@@ -507,7 +528,7 @@
       inspectAddedAllow: '已加允许 ✓',
       inspectAddCont: '+继续词',
       inspectAddedCont: '已加继续 ✓',
-      logReady: '🚀 Gemini MCP Auto Helper 2.0 已就绪',
+      logReady: '🚀 Gemini MCP Auto Helper 2.2 已就绪',
       logClickedAllow: '✅ 自动点击[{tag}]：「{label}」',
       logRetriedAllow: '🔁 后台重试点击允许：「{label}」 ({attempt}/{max})',
       logClickedContinue: '▶️ 自动点击继续：「{label}」 ({task}/{max})',
@@ -538,7 +559,7 @@
       tagSingleAllow: '允许',
       popupTitle: 'Gemini MCP 助手',
       popupSubtitle: '自动允许 · 多语言黑白模式 · 防误触熔断',
-      popupBetaNotice: '✅ 正式发布版 (2.0)',
+      popupBetaNotice: '✅ 正式发布版 (2.2)',
       popupMasterTitle: '总开关',
       popupThemeLight: '☀️ 浅色模式',
       popupThemeDark: '🌙 深色模式',
@@ -649,14 +670,70 @@
       lblChatContinue: '自动点击继续',
       lblChatBackground: '后台 / 最小化运行',
       lblChatNotif: '桌面超时通知',
-      lblChatRecover: '超时自动续接'
+      lblChatRecover: '超时自动续接',
+      lblChatModelLock: '锁定默认模型',
+      hudRowModelLock: '默认模型',
+      modelUnset: '未设置',
+      modelUnknown: '未检测到',
+      modelPickTip: '点击设置或探测默认模型',
+      modelLockPillEnableTip: '点击开启：检测到模型偏离时自动切回默认模型',
+      modelLockPillDisableTip: '点击关闭默认模型锁定',
+      modelPanelCurrent: '当前模型：{current}',
+      modelPanelTarget: '默认模型',
+      modelPanelPlaceholder: '输入模型名（如 Pro / Thinking / 2.5 Pro）',
+      modelPanelSaveBtn: '保存',
+      modelPanelUseCurrentBtn: '设为当前',
+      modelPanelDetectBtn: '探测列表',
+      modelPanelSwitchNowBtn: '立即切回',
+      modelPanelPresetsLabel: '快速选择：',
+      modelPanelDetectedLabel: '页面探测到：',
+      modelPanelMismatch: '⚠️ 当前模型与默认不一致',
+      modelPanelMatched: '✓ 已匹配默认模型',
+      hudStatusModelSwitching: '🔄 正在切换至默认模型「{model}」({attempt}/{max})...',
+      hudStatusModelSwitched: '✅ 已切换至默认模型「{model}」',
+      hudStatusModelChecking: '🔍 正在校验默认模型「{model}」...',
+      breakerReasonModelNotFound: '模型列表中未找到默认模型「{model}」',
+      breakerReasonModelDisabled: '默认模型「{model}」当前不可用/已达上限',
+      breakerReasonModelNoSwitcher: '未找到可用的模型切换入口（目标：「{model}」）',
+      breakerReasonModelReverted: '默认模型「{model}」反复被切回或无法保持使用',
+      breakerReasonModelSwitchFailed: '多次尝试后仍无法切换至默认模型「{model}」',
+      logModelMismatch: '⚠️ 检测到当前模型「{current}」≠ 默认模型「{model}」，准备自动切回',
+      logModelSwitchOpen: '🔄 正在打开模型菜单尝试切换至「{model}」({attempt}/{max})',
+      logModelSwitched: '✅ 已成功切换至默认模型：「{model}」',
+      logModelVerified: '✅ 已校验当前模型为默认模型：「{model}」',
+      logModelDisabled: '❌ 目标模型「{model}」不可用/已锁定：{reason}',
+      logModelNotFound: '⚠️ 模型菜单中未找到「{model}」',
+      logModelNoSwitcher: '⚠️ 页面未检测到可用的模型切换按钮（目标：「{model}」）',
+      logModelReverted: '⚠️ 模型被切回为「{current}」（期望「{model}」，已尝试 {attempt}/{max}）',
+      logModelUnavailableWarn: '⚠️ 默认模型「{model}」暂不可用（{reason}），已延后重试',
+      logModelLockOn: '🔒 默认模型锁定已开启',
+      logModelLockOff: '🔓 默认模型锁定已关闭',
+      logPreferredModelSet: '🎯 已设置默认模型为：「{model}」',
+      secModelLock: '默认模型锁定与自动切换',
+      lblModelLockEnable: '启用默认模型锁定（偏离自动切回，不可用时报错停止）',
+      lblPreferredModel: '默认工作模型（可点选预设或输入任意模型名）',
+      phPreferredModel: '例如：Pro、Thinking、Fast、2.5 Pro',
+      lblCurrentDetectedModel: '页面当前模型',
+      lblModelMaxRetries: '切回失败重试上限',
+      lblStopOnModelUnavailable: '目标模型不可用或反复被切回时立即报错停止',
+      btnUseCurrentModel: '使用当前模型',
+      btnDetectModels: '探测模型',
+      btnSwitchModelNow: '🔄 立即检测并切回默认模型',
+      toastModelSetCurrent: '已将默认模型设为当前模型：「{model}」',
+      toastModelNotDetected: '未能在当前页面检测到模型名称，请先打开 Gemini 对话页',
+      toastModelDetectedCount: '已从页面探测到 {count} 个可选模型',
+      toastModelSwitchTriggered: '已触发检测并切换至默认模型：「{model}」',
+      toastModelNoTarget: '请先设置默认模型名称',
+      bgNotifModelErrorTitle: 'Gemini 默认模型不可用，已报错停止',
+      bgNotifModelErrorMsg: '{reason}。点击此处切回对应 Gemini 标签页处理。',
+      liveModelError: '模型异常停止'
     },
     'zh-TW': {
       langLabel: '繁體',
       hudTitle: 'MCP 助手',
-      betaBadge: '2.0',
-      betaBadgeTitle: '正式發布版 (2.0)',
-      hudTitleTip: '按住左鍵拖曳 · 點擊標題折疊展開 · 2.0',
+      betaBadge: '2.2',
+      betaBadgeTitle: '正式發布版 (2.2)',
+      hudTitleTip: '按住左鍵拖曳 · 點擊標題折疊展開 · 2.2',
       minBtnTitle: '最小化 / 展開',
       themeToggleToLight: '切換淺色模式',
       themeToggleToDark: '切換深色模式',
@@ -727,7 +804,7 @@
       inspectAddedAllow: '已加允許 ✓',
       inspectAddCont: '+繼續詞',
       inspectAddedCont: '已加繼續 ✓',
-      logReady: '🚀 Gemini MCP Auto Helper 2.0 已就緒',
+      logReady: '🚀 Gemini MCP Auto Helper 2.2 已就緒',
       logClickedAllow: '✅ 自動點擊[{tag}]：「{label}」',
       logRetriedAllow: '🔁 背景重試點擊允許：「{label}」 ({attempt}/{max})',
       logClickedContinue: '▶️ 自動點擊繼續：「{label}」 ({task}/{max})',
@@ -758,7 +835,7 @@
       tagSingleAllow: '允許',
       popupTitle: 'Gemini MCP 助手',
       popupSubtitle: '自動允許 · 多語言黑白模式 · 防誤觸熔斷',
-      popupBetaNotice: '✅ 正式發布版 (2.0)',
+      popupBetaNotice: '✅ 正式發布版 (2.2)',
       popupMasterTitle: '總開關',
       popupThemeLight: '☀️ 淺色模式',
       popupThemeDark: '🌙 深色模式',
@@ -869,14 +946,70 @@
       lblChatContinue: '自動點擊繼續',
       lblChatBackground: '背景 / 最小化運行',
       lblChatNotif: '桌面逾時通知',
-      lblChatRecover: '逾時自動續接'
+      lblChatRecover: '逾時自動續接',
+      lblChatModelLock: '鎖定預設模型',
+      hudRowModelLock: '預設模型',
+      modelUnset: '未設定',
+      modelUnknown: '未偵測到',
+      modelPickTip: '點擊設定或探測預設模型',
+      modelLockPillEnableTip: '點擊開啟：偵測到模型偏離時自動切回預設模型',
+      modelLockPillDisableTip: '點擊關閉預設模型鎖定',
+      modelPanelCurrent: '目前模型：{current}',
+      modelPanelTarget: '預設模型',
+      modelPanelPlaceholder: '輸入模型名稱（如 Pro / Thinking / 2.5 Pro）',
+      modelPanelSaveBtn: '儲存',
+      modelPanelUseCurrentBtn: '設為目前',
+      modelPanelDetectBtn: '探測列表',
+      modelPanelSwitchNowBtn: '立即切回',
+      modelPanelPresetsLabel: '快速選擇：',
+      modelPanelDetectedLabel: '頁面探測到：',
+      modelPanelMismatch: '⚠️ 目前模型與預設不一致',
+      modelPanelMatched: '✓ 已符合預設模型',
+      hudStatusModelSwitching: '🔄 正在切換至預設模型「{model}」({attempt}/{max})...',
+      hudStatusModelSwitched: '✅ 已切換至預設模型「{model}」',
+      hudStatusModelChecking: '🔍 正在校驗預設模型「{model}」...',
+      breakerReasonModelNotFound: '模型列表中未找到預設模型「{model}」',
+      breakerReasonModelDisabled: '預設模型「{model}」目前不可用/已達上限',
+      breakerReasonModelNoSwitcher: '未找到可用的模型切換入口（目標：「{model}」）',
+      breakerReasonModelReverted: '預設模型「{model}」反覆被切回或無法保持使用',
+      breakerReasonModelSwitchFailed: '多次嘗試後仍無法切換至預設模型「{model}」',
+      logModelMismatch: '⚠️ 偵測到目前模型「{current}」≠ 預設模型「{model}」，準備自動切回',
+      logModelSwitchOpen: '🔄 正在開啟模型選單嘗試切換至「{model}」({attempt}/{max})',
+      logModelSwitched: '✅ 已成功切換至預設模型：「{model}」',
+      logModelVerified: '✅ 已校驗目前模型為預設模型：「{model}」',
+      logModelDisabled: '❌ 目標模型「{model}」不可用/已鎖定：{reason}',
+      logModelNotFound: '⚠️ 模型選單中未找到「{model}」',
+      logModelNoSwitcher: '⚠️ 頁面未偵測到可用的模型切換按鈕（目標：「{model}」）',
+      logModelReverted: '⚠️ 模型被切回為「{current}」（期望「{model}」，已嘗試 {attempt}/{max}）',
+      logModelUnavailableWarn: '⚠️ 預設模型「{model}」暫不可用（{reason}），已延後重試',
+      logModelLockOn: '🔒 預設模型鎖定已開啟',
+      logModelLockOff: '🔓 預設模型鎖定已關閉',
+      logPreferredModelSet: '🎯 已設定預設模型為：「{model}」',
+      secModelLock: '預設模型鎖定與自動切換',
+      lblModelLockEnable: '啟用預設模型鎖定（偏離自動切回，不可用時報錯停止）',
+      lblPreferredModel: '預設工作模型（可點選預設或輸入任意模型名）',
+      phPreferredModel: '例如：Pro、Thinking、Fast、2.5 Pro',
+      lblCurrentDetectedModel: '頁面目前模型',
+      lblModelMaxRetries: '切回失敗重試上限',
+      lblStopOnModelUnavailable: '目標模型不可用或反覆被切回時立即報錯停止',
+      btnUseCurrentModel: '使用目前模型',
+      btnDetectModels: '探測模型',
+      btnSwitchModelNow: '🔄 立即偵測並切回預設模型',
+      toastModelSetCurrent: '已將預設模型設為目前模型：「{model}」',
+      toastModelNotDetected: '未能在目前頁面偵測到模型名稱，請先開啟 Gemini 對話頁',
+      toastModelDetectedCount: '已從頁面探測到 {count} 個可選模型',
+      toastModelSwitchTriggered: '已觸發偵測並切換至預設模型：「{model}」',
+      toastModelNoTarget: '請先設定預設模型名稱',
+      bgNotifModelErrorTitle: 'Gemini 預設模型不可用，已報錯停止',
+      bgNotifModelErrorMsg: '{reason}。點擊此處切回對應 Gemini 分頁處理。',
+      liveModelError: '模型異常停止'
     },
     en: {
       langLabel: 'EN',
       hudTitle: 'MCP Helper',
-      betaBadge: '2.0',
-      betaBadgeTitle: 'Stable Release (2.0)',
-      hudTitleTip: 'Hold & drag to move · Click title to collapse · 2.0',
+      betaBadge: '2.2',
+      betaBadgeTitle: 'Stable Release (2.2)',
+      hudTitleTip: 'Hold & drag to move · Click title to collapse · 2.2',
       minBtnTitle: 'Minimize / Expand',
       themeToggleToLight: 'Switch to Light Mode',
       themeToggleToDark: 'Switch to Dark Mode',
@@ -947,7 +1080,7 @@
       inspectAddedAllow: 'Added ✓',
       inspectAddCont: '+Continue',
       inspectAddedCont: 'Added ✓',
-      logReady: '🚀 Gemini MCP Auto Helper 2.0 ready',
+      logReady: '🚀 Gemini MCP Auto Helper 2.2 ready',
       logClickedAllow: '✅ Auto-clicked [{tag}]: "{label}"',
       logRetriedAllow: '🔁 Background retry Allow: "{label}" ({attempt}/{max})',
       logClickedContinue: '▶️ Auto-clicked Continue: "{label}" ({task}/{max})',
@@ -978,7 +1111,7 @@
       tagSingleAllow: 'Allow',
       popupTitle: 'Gemini MCP Helper',
       popupSubtitle: 'Auto-Allow · Multi-Lang & Theme · Safe Guard',
-      popupBetaNotice: '✅ Stable Release (2.0)',
+      popupBetaNotice: '✅ Stable Release (2.2)',
       popupMasterTitle: 'Master Switch',
       popupThemeLight: '☀️ Light',
       popupThemeDark: '🌙 Dark',
@@ -1089,14 +1222,70 @@
       lblChatContinue: 'Auto Continue',
       lblChatBackground: 'Run in background',
       lblChatNotif: 'Stall desktop alerts',
-      lblChatRecover: 'Stall auto-resume'
+      lblChatRecover: 'Stall auto-resume',
+      lblChatModelLock: 'Default model lock',
+      hudRowModelLock: 'Model Lock',
+      modelUnset: 'Unset',
+      modelUnknown: 'Unknown',
+      modelPickTip: 'Click to configure or detect default model',
+      modelLockPillEnableTip: 'Enable: auto-switch back when model drifts from default',
+      modelLockPillDisableTip: 'Disable default model lock',
+      modelPanelCurrent: 'Current: {current}',
+      modelPanelTarget: 'Default Model',
+      modelPanelPlaceholder: 'Model name (e.g. Pro / Thinking / 2.5 Pro)',
+      modelPanelSaveBtn: 'Save',
+      modelPanelUseCurrentBtn: 'Use Current',
+      modelPanelDetectBtn: 'Detect',
+      modelPanelSwitchNowBtn: 'Switch Now',
+      modelPanelPresetsLabel: 'Presets:',
+      modelPanelDetectedLabel: 'Detected on page:',
+      modelPanelMismatch: '⚠️ Active model differs from default',
+      modelPanelMatched: '✓ Matches default model',
+      hudStatusModelSwitching: '🔄 Switching to default model "{model}" ({attempt}/{max})...',
+      hudStatusModelSwitched: '✅ Switched to default model "{model}"',
+      hudStatusModelChecking: '🔍 Verifying default model "{model}"...',
+      breakerReasonModelNotFound: 'Default model "{model}" not found in model menu',
+      breakerReasonModelDisabled: 'Default model "{model}" is unavailable or limit reached',
+      breakerReasonModelNoSwitcher: 'Model switcher button unavailable (target: "{model}")',
+      breakerReasonModelReverted: 'Default model "{model}" kept reverting or cannot stay active',
+      breakerReasonModelSwitchFailed: 'Failed to switch to default model "{model}" after retries',
+      logModelMismatch: '⚠️ Active model "{current}" ≠ default "{model}", switching back',
+      logModelSwitchOpen: '🔄 Opening model menu to switch to "{model}" ({attempt}/{max})',
+      logModelSwitched: '✅ Switched to default model: "{model}"',
+      logModelVerified: '✅ Verified active model matches default: "{model}"',
+      logModelDisabled: '❌ Target model "{model}" unavailable/locked: {reason}',
+      logModelNotFound: '⚠️ Target model "{model}" not found in picker',
+      logModelNoSwitcher: '⚠️ No usable model switcher button detected (target: "{model}")',
+      logModelReverted: '⚠️ Model reverted to "{current}" (expected "{model}", attempt {attempt}/{max})',
+      logModelUnavailableWarn: '⚠️ Default model "{model}" temporarily unavailable ({reason}), backing off',
+      logModelLockOn: '🔒 Default model lock enabled',
+      logModelLockOff: '🔓 Default model lock disabled',
+      logPreferredModelSet: '🎯 Default model set to: "{model}"',
+      secModelLock: 'Default Model Lock & Auto-Switch',
+      lblModelLockEnable: 'Lock default model (auto-switch back, stop on error if unavailable)',
+      lblPreferredModel: 'Default working model (pick a preset or enter any model name)',
+      phPreferredModel: 'e.g. Pro, Thinking, Fast, 2.5 Pro',
+      lblCurrentDetectedModel: 'Detected active model',
+      lblModelMaxRetries: 'Max switch-back retries',
+      lblStopOnModelUnavailable: 'Stop with error if target model is unavailable or keeps reverting',
+      btnUseCurrentModel: 'Use Current',
+      btnDetectModels: 'Detect Models',
+      btnSwitchModelNow: '🔄 Check & Switch to Default Model Now',
+      toastModelSetCurrent: 'Default model set to active model: "{model}"',
+      toastModelNotDetected: 'Could not detect model on current tab; open a Gemini chat first',
+      toastModelDetectedCount: 'Detected {count} models on page',
+      toastModelSwitchTriggered: 'Triggered switch check for default model: "{model}"',
+      toastModelNoTarget: 'Please set a default model name first',
+      bgNotifModelErrorTitle: 'Gemini Default Model Unavailable (Stopped)',
+      bgNotifModelErrorMsg: '{reason}. Click here to open the Gemini tab.',
+      liveModelError: 'Model Error'
     },
     ja: {
       langLabel: '日本語',
       hudTitle: 'MCP ヘルパー',
-      betaBadge: '2.0',
-      betaBadgeTitle: '正式リリース版 (2.0)',
-      hudTitleTip: '左押下ドラッグで移動 · クリックで開閉 · 2.0',
+      betaBadge: '2.2',
+      betaBadgeTitle: '正式リリース版 (2.2)',
+      hudTitleTip: '左押下ドラッグで移動 · クリックで開閉 · 2.2',
       minBtnTitle: '最小化 / 展開',
       themeToggleToLight: 'ライトモードへ切替',
       themeToggleToDark: 'ダークモードへ切替',
@@ -1167,7 +1356,7 @@
       inspectAddedAllow: '追加済 ✓',
       inspectAddCont: '+続行語',
       inspectAddedCont: '追加済 ✓',
-      logReady: '🚀 Gemini MCP Auto Helper 2.0 準備完了',
+      logReady: '🚀 Gemini MCP Auto Helper 2.2 準備完了',
       logClickedAllow: '✅ 自動クリック[{tag}]: 「{label}」',
       logRetriedAllow: '🔁 バックグラウンド再試行(許可): 「{label}」 ({attempt}/{max})',
       logClickedContinue: '▶️ 自動続行クリック: 「{label}」 ({task}/{max})',
@@ -1198,7 +1387,7 @@
       tagSingleAllow: '許可',
       popupTitle: 'Gemini MCP ヘルパー',
       popupSubtitle: '自動許可 · 多言語 & 白黒テーマ · 誤爆防止',
-      popupBetaNotice: '✅ 正式リリース版 (2.0)',
+      popupBetaNotice: '✅ 正式リリース版 (2.2)',
       popupMasterTitle: 'マスタースイッチ',
       popupThemeLight: '☀️ ライト',
       popupThemeDark: '🌙 ダーク',
@@ -1309,7 +1498,63 @@
       lblChatContinue: '自動続行',
       lblChatBackground: 'バックグラウンド',
       lblChatNotif: '停滞通知',
-      lblChatRecover: '停滞自動再開'
+      lblChatRecover: '停滞自動再開',
+      lblChatModelLock: '既定モデル固定',
+      hudRowModelLock: '既定モデル',
+      modelUnset: '未設定',
+      modelUnknown: '未検出',
+      modelPickTip: 'クリックして既定モデルを設定・検出',
+      modelLockPillEnableTip: 'オン：モデルが切り替わったら既定モデルへ自動復帰',
+      modelLockPillDisableTip: '既定モデル固定をオフにする',
+      modelPanelCurrent: '現在モデル：{current}',
+      modelPanelTarget: '既定モデル',
+      modelPanelPlaceholder: 'モデル名を入力（例：Pro / Thinking / 2.5 Pro）',
+      modelPanelSaveBtn: '保存',
+      modelPanelUseCurrentBtn: '現在を使用',
+      modelPanelDetectBtn: '一覧検出',
+      modelPanelSwitchNowBtn: '今すぐ切替',
+      modelPanelPresetsLabel: 'プリセット：',
+      modelPanelDetectedLabel: 'ページ検出：',
+      modelPanelMismatch: '⚠️ 現在のモデルが既定と異なります',
+      modelPanelMatched: '✓ 既定モデルと一致しています',
+      hudStatusModelSwitching: '🔄 既定モデル「{model}」へ切替中 ({attempt}/{max})...',
+      hudStatusModelSwitched: '✅ 既定モデル「{model}」へ切り替えました',
+      hudStatusModelChecking: '🔍 既定モデル「{model}」を確認中...',
+      breakerReasonModelNotFound: 'モデル一覧に既定モデル「{model}」が見つかりません',
+      breakerReasonModelDisabled: '既定モデル「{model}」は現在利用不可/上限到達です',
+      breakerReasonModelNoSwitcher: 'モデル切替ボタンが見つかりません（対象：「{model}」）',
+      breakerReasonModelReverted: '既定モデル「{model}」が繰り返し戻されるため維持できません',
+      breakerReasonModelSwitchFailed: '再試行後も既定モデル「{model}」へ切り替えられませんでした',
+      logModelMismatch: '⚠️ 現在モデル「{current}」≠ 既定「{model}」、自動切替を開始',
+      logModelSwitchOpen: '🔄 モデルメニューを開いて「{model}」へ切替試行 ({attempt}/{max})',
+      logModelSwitched: '✅ 既定モデルへ切り替えました：「{model}」',
+      logModelVerified: '✅ 現在のモデルが既定と一致することを確認：「{model}」',
+      logModelDisabled: '❌ 対象モデル「{model}」は利用不可/ロック中：{reason}',
+      logModelNotFound: '⚠️ モデルメニューに「{model}」が見つかりません',
+      logModelNoSwitcher: '⚠️ 有効なモデル切替ボタンが検出できません（対象：「{model}」）',
+      logModelReverted: '⚠️ モデルが「{current}」に戻されました（既定「{model}」、{attempt}/{max}）',
+      logModelUnavailableWarn: '⚠️ 既定モデル「{model}」が一時的に利用不可（{reason}）、待機後に再試行',
+      logModelLockOn: '🔒 既定モデル固定を有効にしました',
+      logModelLockOff: '🔓 既定モデル固定を無効にしました',
+      logPreferredModelSet: '🎯 既定モデルを設定しました：「{model}」',
+      secModelLock: '既定モデル固定と自動切替',
+      lblModelLockEnable: '既定モデル固定を有効化（変化時に自動復帰、不可時はエラー停止）',
+      lblPreferredModel: '既定の作業モデル（プリセット選択または自由入力）',
+      phPreferredModel: '例：Pro、Thinking、Fast、2.5 Pro',
+      lblCurrentDetectedModel: 'ページ現在モデル',
+      lblModelMaxRetries: '切替失敗の再試行上限',
+      lblStopOnModelUnavailable: '対象モデルが利用不可・戻され続ける場合はエラー停止する',
+      btnUseCurrentModel: '現在モデルを使用',
+      btnDetectModels: 'モデル検出',
+      btnSwitchModelNow: '🔄 今すぐ既定モデルを確認・切替',
+      toastModelSetCurrent: '既定モデルを現在のモデルに設定しました：「{model}」',
+      toastModelNotDetected: '現在のページからモデルを検出できませんでした',
+      toastModelDetectedCount: 'ページから {count} 件のモデルを検出しました',
+      toastModelSwitchTriggered: '既定モデル「{model}」への確認・切替を開始しました',
+      toastModelNoTarget: '先に既定モデル名を設定してください',
+      bgNotifModelErrorTitle: 'Gemini 既定モデル利用不可のため停止',
+      bgNotifModelErrorMsg: '{reason}。クリックして該当のGeminiタブを確認します。',
+      liveModelError: 'モデル異常停止'
     }
   };
 
@@ -1367,6 +1612,184 @@
     const cleaned = val.replace(/[\r\n]+/g, ' ').trim();
     if (!cleaned) return fallback;
     return cleaned.slice(0, 200);
+  }
+
+  function sanitizeModelName(val, fallback) {
+    if (typeof val !== 'string') return typeof fallback === 'string' ? fallback : '';
+    const cleaned = val
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cleaned || DANGEROUS_OBJECT_KEYS.has(cleaned.toLowerCase())) {
+      return typeof fallback === 'string' ? fallback : '';
+    }
+    return cleaned.slice(0, 80);
+  }
+
+  const MODEL_UPSELL_KEYWORDS = [
+    'upgrade',
+    'subscribe',
+    'get gemini',
+    'try gemini advanced',
+    'google ai plan',
+    'google one',
+    'start trial',
+    'learn more',
+    '升级',
+    '升級',
+    '开通',
+    '開通',
+    '订阅',
+    '訂閱',
+    '了解更多',
+    'アップグレード',
+    '詳細を見る',
+    'プランを変更'
+  ];
+
+  function normalizeModelName(str) {
+    if (typeof str !== 'string') return '';
+    return stripEdgePunctuation(str)
+      .replace(/[▾▼⌄›>]+$/g, '')
+      .replace(/\b(\d+)\.0\b/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function stripGeminiBrandPrefix(norm) {
+    if (!norm) return '';
+    return norm.replace(/^gemini\s+/i, '').trim();
+  }
+
+  function getModelAliasGroupIndex(norm) {
+    if (!norm) return -1;
+    const bare = stripGeminiBrandPrefix(norm);
+    for (let i = 0; i < MODEL_ALIAS_GROUPS.length; i++) {
+      if (MODEL_ALIAS_GROUPS[i].indexOf(bare) >= 0) return i;
+    }
+    return -1;
+  }
+
+  function getLeadingModelAliasGroupIndex(norm) {
+    if (!norm) return -1;
+    const bare = stripGeminiBrandPrefix(norm);
+    for (let i = 0; i < MODEL_ALIAS_GROUPS.length; i++) {
+      for (const alias of MODEL_ALIAS_GROUPS[i]) {
+        if (bare === alias) return i;
+        if (isAsciiWord(alias)) {
+          try {
+            const re = new RegExp(`^${escapeRegex(alias)}(?:$|[^a-z0-9_])`, 'i');
+            if (re.test(bare)) return i;
+          } catch (_) {
+            if (bare.startsWith(alias + ' ')) return i;
+          }
+        } else if (bare.startsWith(alias)) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  function hasWordBoundaryMatch(haystack, needle) {
+    if (!haystack || !needle) return false;
+    if (needle.length > 80) return haystack.includes(needle);
+    if (isAsciiWord(needle)) {
+      try {
+        const re = new RegExp(`(?:^|[^a-z0-9_])${escapeRegex(needle)}(?:$|[^a-z0-9_])`, 'i');
+        return re.test(haystack);
+      } catch (_) {
+        return haystack.includes(needle);
+      }
+    }
+    return haystack.includes(needle);
+  }
+
+  function startsWithWordBoundary(haystack, needle) {
+    if (!haystack || !needle) return false;
+    if (needle.length > 80) return haystack.startsWith(needle);
+    if (isAsciiWord(needle)) {
+      try {
+        const re = new RegExp(`^${escapeRegex(needle)}(?:$|[^a-z0-9_])`, 'i');
+        return re.test(haystack);
+      } catch (_) {
+        return haystack.startsWith(needle);
+      }
+    }
+    return haystack.startsWith(needle);
+  }
+
+  /**
+   * Scores how well a candidate model label matches a user's target model name.
+   * Returns 0 for non-matches or upsell/promo items, and up to 100 for exact matches.
+   */
+  function scoreModelMatch(candidateTitle, candidateFullText, targetModel) {
+    const targetNorm = normalizeModelName(targetModel);
+    const titleNorm = normalizeModelName(candidateTitle);
+    const fullNorm = normalizeModelName(candidateFullText || candidateTitle);
+    if (!targetNorm || (!titleNorm && !fullNorm)) return 0;
+
+    // Never match upsell / marketing CTAs (e.g. "Upgrade to Google AI Pro") unless the user literally typed "upgrade"
+    if (
+      !containsKeyword(targetNorm, MODEL_UPSELL_KEYWORDS) &&
+      containsKeyword(titleNorm || fullNorm, MODEL_UPSELL_KEYWORDS)
+    ) {
+      return 0;
+    }
+
+    const targetBare = stripGeminiBrandPrefix(targetNorm);
+    const titleBare = stripGeminiBrandPrefix(titleNorm);
+
+    // 1. Exact title match
+    if (titleNorm && titleNorm === targetNorm) return 100;
+    if (titleBare && targetBare && titleBare === targetBare) return 95;
+
+    // 2. Canonical cross-language alias exact match (e.g. Fast <-> 快速 <-> 高速, Thinking <-> 思考 <-> 思考モード)
+    const targetGroup = getModelAliasGroupIndex(targetNorm);
+    const titleGroup = getModelAliasGroupIndex(titleNorm);
+    if (targetGroup >= 0 && titleGroup >= 0) {
+      return targetGroup === titleGroup ? 90 : 0;
+    }
+
+    // Prevent cross-tier false match (e.g. target "Pro" must NOT match "Thinking with 3 Pro" or "Fast")
+    const titleLeadingGroup = getLeadingModelAliasGroupIndex(titleNorm);
+    if (targetGroup >= 0 && titleLeadingGroup >= 0 && titleLeadingGroup !== targetGroup) {
+      return 0;
+    }
+
+    // 3. Alias prefix match (e.g. target "Thinking", title "Thinking with 3 Pro" or "思考 (3 Pro)")
+    if (targetGroup >= 0 && titleLeadingGroup === targetGroup) {
+      return 85;
+    }
+
+    // 4. Title starts with target with word boundary (e.g. target "2.5 Pro", title "2.5 Pro (experimental)")
+    if (titleBare && targetBare && startsWithWordBoundary(titleBare, targetBare)) {
+      return 80;
+    }
+
+    // 5. Title contains target with word boundary (e.g. target "2.5 Pro", title "Gemini 2.5 Pro Preview")
+    if (titleBare && targetBare && hasWordBoundaryMatch(titleBare, targetBare)) {
+      return 70;
+    }
+
+    // 6. Fallback against full text ONLY when title is empty (e.g. icon-only button with aria-label)
+    if (!titleNorm && fullNorm) {
+      if (fullNorm === targetNorm) return 95;
+      const fullBare = stripGeminiBrandPrefix(fullNorm);
+      if (targetGroup >= 0) {
+        for (const alias of MODEL_ALIAS_GROUPS[targetGroup]) {
+          if (hasWordBoundaryMatch(fullBare, alias)) return 65;
+        }
+      }
+      if (targetBare && hasWordBoundaryMatch(fullBare, targetBare)) return 60;
+    }
+
+    return 0;
+  }
+
+  function isModelNameMatch(currentModel, targetModel) {
+    return scoreModelMatch(currentModel, currentModel, targetModel) >= 60;
   }
 
   const DANGEROUS_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -1514,6 +1937,22 @@
         typeof src.humanPacingEnabled === 'boolean'
           ? src.humanPacingEnabled
           : DEFAULT_SETTINGS.humanPacingEnabled,
+
+      modelLockEnabled:
+        typeof src.modelLockEnabled === 'boolean'
+          ? src.modelLockEnabled
+          : DEFAULT_SETTINGS.modelLockEnabled,
+      preferredModel: sanitizeModelName(src.preferredModel, DEFAULT_SETTINGS.preferredModel),
+      maxModelSwitchRetries: clampNumber(
+        src.maxModelSwitchRetries,
+        DEFAULT_SETTINGS.maxModelSwitchRetries,
+        1,
+        10
+      ),
+      stopOnModelUnavailable:
+        typeof src.stopOnModelUnavailable === 'boolean'
+          ? src.stopOnModelUnavailable
+          : DEFAULT_SETTINGS.stopOnModelUnavailable,
 
       alwaysAllowKeywords: mergeKeywordArrays(
         DEFAULT_SETTINGS.alwaysAllowKeywords,
@@ -1842,6 +2281,8 @@
     CHAT_OVERRIDES_KEY,
     CHAT_OVERRIDE_KEYS,
     MAX_CHAT_OVERRIDES,
+    MODEL_PRESETS,
+    MODEL_ALIAS_GROUPS,
     SETTINGS_VERSION,
     SUPPORTED_LANGUAGES,
     SUPPORTED_THEMES,
@@ -1855,6 +2296,10 @@
     mergeSettings,
     migrateStoredSettings,
     parseKeywordInput,
+    sanitizeModelName,
+    normalizeModelName,
+    scoreModelMatch,
+    isModelNameMatch,
     normalizeText,
     stripEdgePunctuation,
     containsKeyword,

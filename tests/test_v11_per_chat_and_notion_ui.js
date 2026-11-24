@@ -655,7 +655,7 @@ function runTests(test) {
 
       // Click Auto Continue (3rd row) under 'chat' scope -> marks row custom & reveals reset button
       const rows = rootEl.querySelectorAll('.gmah-row');
-      assert.strictEqual(rows.length, 6);
+      assert.strictEqual(rows.length, 7);
       rows[2].querySelector('.gmah-pill').click();
       assert.deepStrictEqual(toggled[0], { key: 'autoContinue', scope: 'chat' });
       assert.ok(rows[2].className.includes('gmah-row-custom'));

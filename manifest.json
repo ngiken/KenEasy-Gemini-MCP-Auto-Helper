@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "KenEasy Gemini MCP Auto Helper",
-  "version": "2.0",
-  "description": "Google Gemini MCP 自动化助手 v2.0：后台/最小化/熄屏稳定继续、单对话独立控制与隔离急停、主世界点击、超时自动续接与 6 层防刷熔断。",
+  "version": "2.2",
+  "description": "Google Gemini MCP 自动化助手 v2.2：默认模型锁定与自动切回（不可用报错停机）、全尺寸响应、后台/最小化稳定继续、单对话独立控制与 6 层防刷熔断。",
   "permissions": [
     "storage",
     "tabs",

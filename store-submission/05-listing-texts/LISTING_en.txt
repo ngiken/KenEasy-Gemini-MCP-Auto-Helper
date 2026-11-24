@@ -8,20 +8,25 @@ KenEasy Gemini MCP Auto Helper
 ============================================================
 2. Summary / Short Description (max 132 chars)
 ============================================================
-v2.0 background, minimized & sleep/screen-off continuation, per-chat controls & isolated E-stop, MAIN-world clicks & 6-layer breaker.
+v2.2 default model lock & auto-switch (error stop if unavailable), responsive multi-size support, BG/sleep continuation & 6-layer guard.
 
 ============================================================
 3. Detailed Description (Paste everything below into description box)
 ============================================================
 KenEasy Gemini MCP Auto Helper is an open-source productivity extension engineered exclusively for Google Gemini (gemini.google.com).
 
-It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, enabling continuous, unattended AI workflows while shielding your account with per-chat controls, isolated emergency stops, background/minimized/sleep click hardening, and an industrial-grade 6-layer circuit breaker.
+It automates repetitive MCP (Model Context Protocol) tool permission dialogs and continue action chips, locks your preferred working model with automatic drift recovery and hard error stops, and shields your account with per-chat controls, isolated emergency stops, background/minimized/sleep click hardening, and an industrial-grade 6-layer circuit breaker.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✨ KEY FEATURES (V2.0)
+✨ KEY FEATURES (V2.2)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🛌 1. BACKGROUND, MINIMIZED & SCREEN-OFF / SLEEP CONTINUATION 🆕
+🎯 0. DEFAULT MODEL LOCK & RESPONSIVE AUTO-SWITCH GUARD 🆕
+• Configure your preferred working model (presets, custom input, or one-click "Use Current" / "Detect Models") globally or per chat. Whenever Gemini drifts or resets (including on fresh `/app` chats, before Continue, and before Stall Auto-Recovery), the extension automatically switches back without interrupting active streaming.
+• Works across desktop `<header>` bars, composer toolbars, Shadow DOM, narrow mobile icon triggers + bottom sheets, high zoom (`visualViewport` HUD clamping), and minimized/background tabs with double-toggle prevention.
+• If the preferred model is disabled/quota-locked, missing, rejected by an error banner, or repeatedly reverted beyond your retry cap, automation halts cleanly (`model_unavailable`), shows a red `ERR` icon badge, and dispatches an OS desktop alert.
+
+🛌 1. BACKGROUND, MINIMIZED & SCREEN-OFF / SLEEP CONTINUATION
 • Strengthens background, minimized, and unfocused window detection and triggers `MAIN`-world click escalation on initial clicks for both `Always allow` and `Continue` chips (in addition to retries and stall-recovery send) when hidden, minimized, or unfocused.
 • Re-acquires the shared background keepalive Web Lock, rotates/reconnects the Service Worker port, and runs an immediate scan upon returning from hidden, screen-off, or sleep states, paired with `autoDiscardable` per-chat protection and `1200ms` minimize follow-up wakeups.
 

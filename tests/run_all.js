@@ -7,7 +7,8 @@ const suites = [
   { name: 'v0.3 Background Persistence, Click Retries, E2E Sandbox & UI Reliability', mod: require('./test_v03_background_and_reliability.js') },
   { name: 'v0.3 Stress Marathon, Adversarial Safety, i18n Parity & Multi-Tab Audit', mod: require('./test_v03_stress_and_adversarial.js') },
   { name: 'v1.0 Deep Boundary Stress, Adversarial Fuzzing & Multi-Tab Lifecycle', mod: require('./test_v10_boundary_fuzz.js') },
-  { name: 'v1.1 Per-Chat Overrides, Isolated Emergency Stop, MAIN-World BG & Notion UI', mod: require('./test_v11_per_chat_and_notion_ui.js') }
+  { name: 'v1.1 Per-Chat Overrides, Isolated Emergency Stop, MAIN-World BG & Notion UI', mod: require('./test_v11_per_chat_and_notion_ui.js') },
+  { name: 'Default Model Lock, Responsive Auto-Switch & Error Stop Guard', mod: require('./test_model_lock.js') }
 ];
 
 let passed = 0;

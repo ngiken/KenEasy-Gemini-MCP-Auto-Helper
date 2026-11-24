@@ -1602,6 +1602,1033 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Default Model Lock & Responsive Model Switcher Detection (Desktop / Mobile / Zoom / BG)
+  // ---------------------------------------------------------------------------
+
+  const MODEL_SWITCHER_SELECTORS = [
+    'bard-mode-switcher button',
+    'bard-mode-switcher [role="button"]',
+    '[data-test-id="bard-mode-menu-button"]',
+    '[data-test-id*="bard-mode-menu"] button',
+    '[data-test-id*="model-selector"]',
+    '[data-test-id*="model-switcher"]',
+    '[data-test-id*="mode-switcher"] button',
+    '[data-test-id*="bard-mode"] button',
+    'button.gds-mode-switch-button',
+    'button.input-area-switch',
+    'model-picker button',
+    'model-switcher button',
+    '.model-picker-button',
+    '.model-selector-button',
+    'button[aria-haspopup="menu"][aria-label*="model" i]',
+    'button[aria-haspopup="listbox"][aria-label*="model" i]',
+    'button[aria-label*="switch model" i]',
+    'button[aria-label*="choose model" i]',
+    'button[aria-label*="select model" i]',
+    'button[aria-label*="open mode picker" i]',
+    'button[aria-label*="mode picker" i]',
+    'button[aria-label*="model" i]',
+    'button[aria-label*="模型"]',
+    'button[aria-label*="模式选择"]',
+    'button[aria-label*="模式選擇"]',
+    'button[aria-label*="モデル"]',
+    'button[aria-label*="モードを選択"]',
+    '[role="button"][aria-label*="model" i]',
+    '[role="button"][aria-label*="模型"]',
+    '[role="button"][aria-label*="モデル"]'
+  ];
+
+  const MODEL_MENU_CONTAINER_SELECTORS = [
+    'bard-mode-switcher-menu',
+    '[data-test-id*="bard-mode-menu"]',
+    '[data-test-id*="model-menu"]',
+    '.bard-mode-list',
+    '.mat-mdc-menu-panel',
+    'mat-bottom-sheet-container',
+    '.mat-bottom-sheet-container',
+    '[role="menu"]',
+    '[role="listbox"]',
+    '.cdk-overlay-pane',
+    'mat-dialog-container',
+    '[role="dialog"]'
+  ];
+
+  const MODEL_OPTION_SELECTORS = [
+    '[role="menuitemradio"]',
+    '[role="menuitem"]',
+    '[role="option"]',
+    'button.mat-mdc-menu-item',
+    'button.bard-mode-list-button',
+    'button[data-test-id*="mode"]',
+    'button[data-test-id*="model"]',
+    '.mode-option',
+    '.model-option',
+    'button',
+    '[role="button"]'
+  ];
+
+  const MODEL_UNAVAILABLE_KEYWORDS = [
+    'limit reached',
+    'reached your limit',
+    'usage limit',
+    'usage cap',
+    'quota exceeded',
+    'unavailable',
+    'not available',
+    'temporarily unavailable',
+    'coming soon',
+    'locked',
+    '已达上限',
+    '已達上限',
+    '达到使用上限',
+    '達到使用上限',
+    '额度已用完',
+    '額度已用完',
+    '配额已用完',
+    '配額已用完',
+    '暂不可用',
+    '暫不可用',
+    '不可用',
+    '无法使用',
+    '無法使用',
+    '上限に達しました',
+    '利用できません',
+    '利用上限'
+  ];
+
+  const MODEL_SWITCH_ERROR_KEYWORDS = [
+    "can't switch",
+    'cannot switch',
+    'unable to switch',
+    'model unavailable',
+    'model is unavailable',
+    'switched to',
+    'switched back',
+    'limit reached',
+    'reached your limit',
+    'usage limit',
+    'quota exceeded',
+    '无法切换',
+    '無法切換',
+    '模型不可用',
+    '已切换',
+    '已切換',
+    '已达上限',
+    '已達上限',
+    '额度已用完',
+    '額度已用完',
+    '切り替えられません',
+    '切り替わりました',
+    '利用できません',
+    '上限に達しました'
+  ];
+
+  const MODEL_UPSELL_OPTION_KEYWORDS = [
+    'upgrade',
+    'subscribe',
+    'get gemini',
+    'try gemini advanced',
+    'google ai plan',
+    'google one',
+    'start trial',
+    'learn more',
+    'close',
+    'dismiss',
+    '升级',
+    '升級',
+    '开通',
+    '開通',
+    '订阅',
+    '訂閱',
+    '了解更多',
+    '关闭',
+    '關閉',
+    'アップグレード',
+    '詳細を見る',
+    'プランを変更',
+    '閉じる'
+  ];
+
+  const NON_MODEL_TRIGGER_KEYWORDS = [
+    'send',
+    'stop',
+    'upload',
+    'attach',
+    'add file',
+    'microphone',
+    'voice',
+    'settings',
+    'account',
+    'profile',
+    'sign out',
+    'log out',
+    'new chat',
+    'feedback',
+    'help',
+    'upgrade',
+    'delete',
+    'copy',
+    'edit',
+    'share',
+    'tools',
+    'extensions',
+    '发送',
+    '傳送',
+    '停止',
+    '上传',
+    '上傳',
+    '麦克风',
+    '麥克風',
+    '设置',
+    '設定',
+    '新对话',
+    '新對話',
+    '升级',
+    '升級',
+    '删除',
+    '刪除',
+    '复制',
+    '複製',
+    '工具',
+    '送信',
+    '新しいチャット'
+  ];
+
+  const GENERIC_MODEL_TRIGGER_LABELS = new Set([
+    'model',
+    'models',
+    'mode',
+    'modes',
+    'switch model',
+    'choose model',
+    'select model',
+    'open mode picker',
+    'mode picker',
+    'model picker',
+    'model switcher',
+    'gemini',
+    '模型',
+    '模式',
+    '切换模型',
+    '切換模型',
+    '选择模型',
+    '選擇模型',
+    '打开模式选择器',
+    '開啟模式選擇器',
+    'モデル',
+    'モード',
+    'モデルを選択',
+    'モードを選択'
+  ]);
+
+  const KNOWN_MODEL_NAME_HINTS = [
+    'pro',
+    'fast',
+    'thinking',
+    'flash',
+    'ultra',
+    'deep research',
+    '2.5',
+    '2.0',
+    '3.0',
+    '3.1',
+    '快速',
+    '思考',
+    '高速',
+    '深度思考',
+    '思考モード',
+    '深度研究'
+  ];
+
+  const MODEL_DROPDOWN_ICON_SELECTOR =
+    'mat-icon[fonticon="keyboard_arrow_down"],mat-icon[fonticon="expand_more"],mat-icon[fonticon="arrow_drop_down"],mat-icon[data-mat-icon-name="keyboard_arrow_down"],mat-icon[data-mat-icon-name="expand_more"],mat-icon[data-mat-icon-name="arrow_drop_down"]';
+
+  const MODEL_CHECK_ICON_SELECTOR =
+    'mat-icon[fonticon="check"],mat-icon[fonticon="done"],mat-icon[fonticon="check_circle"],mat-icon[fonticon="radio_button_checked"],mat-icon[data-mat-icon-name="check"],mat-icon[data-mat-icon-name="done"],mat-icon[data-mat-icon-name="check_circle"]';
+
+  const MODEL_LOCK_ICON_SELECTOR =
+    'mat-icon[fonticon="lock"],mat-icon[fonticon="lock_outline"],mat-icon[fonticon="block"],mat-icon[data-mat-icon-name="lock"],mat-icon[data-mat-icon-name="lock_outline"],mat-icon[data-mat-icon-name="block"]';
+
+  const MODEL_SWITCH_OPEN_SETTLE_MS = 350;
+  const MODEL_SWITCH_OPEN_TIMEOUT_MS = 1800;
+  const MODEL_SWITCH_VERIFY_SETTLE_MS = 550;
+  const MODEL_SWITCH_VERIFY_TIMEOUT_MS = 1800;
+  const MODEL_SWITCH_RETRY_BACKOFF_MS = 1100;
+  const MODEL_REVERT_WINDOW_MS = 90000;
+  const MODEL_UNAVAILABLE_SOFT_COOLDOWN_MS = 30000;
+
+  function isIgnoredForModelSwitcher(el) {
+    let cur = el;
+    let depth = 0;
+    const visited = new Set();
+    if (cur && cur.nodeType !== 1) {
+      try {
+        cur = cur.parentElement || cur.parentNode || null;
+        if (cur && cur.nodeType === 11 && cur.host) cur = cur.host;
+      } catch (_) {
+        cur = null;
+      }
+    }
+    while (cur && cur.nodeType === 1 && depth++ < 64) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        if (cur.id === 'gmah-hud') return true;
+        if (cur.getAttribute && cur.getAttribute('data-gmah-ignore') === 'true') return true;
+        const tag = (cur.tagName || '').toUpperCase();
+        // Explicitly ALLOW <HEADER> because Gemini's model switcher can live in the top header bar
+        if (
+          tag === 'NAV' ||
+          tag === 'ASIDE' ||
+          tag === 'PRE' ||
+          tag === 'CODE' ||
+          tag === 'TEXTAREA' ||
+          tag === 'INPUT' ||
+          tag === 'SCRIPT' ||
+          tag === 'STYLE' ||
+          tag === 'MODEL-RESPONSE' ||
+          tag === 'USER-QUERY'
+        ) {
+          return true;
+        }
+        const cls =
+          typeof cur.className === 'string'
+            ? cur.className
+            : (cur.getAttribute && cur.getAttribute('class')) || '';
+        if (/\b(model-response|response-container|user-query)\b/i.test(cls)) return true;
+        if (cur.getAttribute) {
+          const role = (cur.getAttribute('role') || '').toLowerCase();
+          if (role === 'navigation' || role === 'menubar') return true;
+          if (cur.getAttribute('contenteditable') === 'true') return true;
+          if ((cur.getAttribute('data-message-author-role') || '').toLowerCase() === 'model') return true;
+          const testId = (cur.getAttribute('data-test-id') || '').toLowerCase();
+          if (
+            testId.includes('conversation-list') ||
+            testId.includes('sidebar') ||
+            testId.includes('sidenav') ||
+            testId.includes('feedback') ||
+            testId.includes('survey')
+          ) {
+            return true;
+          }
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
+      }
+    }
+    return false;
+  }
+
+  function isNodeDisabled(el) {
+    if (!el || el.nodeType !== 1) return false;
+    try {
+      if (el.disabled === true) return true;
+      if (el.getAttribute) {
+        if (el.getAttribute('disabled') !== null) return true;
+        if (el.getAttribute('aria-disabled') === 'true') return true;
+      }
+      const cls =
+        typeof el.className === 'string'
+          ? el.className
+          : (el.getAttribute && el.getAttribute('class')) || '';
+      if (
+        /\b(disabled|is-disabled|mat-mdc-menu-item-disabled|mdc-list-item--disabled|locked|unavailable)\b/i.test(
+          cls
+        )
+      ) {
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /**
+   * Like isElementVisible(), but does NOT treat disabled / aria-disabled elements as invisible,
+   * so Model Guard can distinguish a disabled/locked model option from a missing one.
+   */
+  function isNodeDisplayed(el, win, doc, opts) {
+    if (!el || el.nodeType !== 1) return false;
+    try {
+      if (el.hidden === true) return false;
+      if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return false;
+    } catch (_) {}
+
+    const w = win || (typeof window !== 'undefined' ? window : null);
+    const d = doc || (el.ownerDocument || (typeof document !== 'undefined' ? document : null));
+    const isPageHidden = Boolean(d && d.hidden === true);
+    const isBgOrUnfocused = Boolean(d && isBackgroundOrUnfocused(d, w));
+    let isWindowMinimized = false;
+    try {
+      isWindowMinimized = Boolean(
+        isPageHidden &&
+          (!w ||
+            (w.innerWidth === 0 && w.innerHeight === 0) ||
+            (w.outerWidth === 0 && w.outerHeight === 0) ||
+            (typeof w.screenX === 'number' && w.screenX <= -32000) ||
+            (typeof w.screenY === 'number' && w.screenY <= -32000) ||
+            w.minimized === true ||
+            w.isMinimized === true ||
+            w.windowState === 'minimized')
+      );
+    } catch (_) {}
+    const relaxHiddenLayout = Boolean(opts && opts.relaxHiddenLayout && isBgOrUnfocused);
+
+    let selfDisplay = '';
+    let cur = el;
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 64) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        if (cur.hidden === true) return false;
+        if (cur.getAttribute && cur.getAttribute('aria-hidden') === 'true') return false;
+        const curCls =
+          typeof cur.className === 'string'
+            ? cur.className
+            : (cur.getAttribute && cur.getAttribute('class')) || '';
+        if (/\b(ng-hide|cdk-visually-hidden|visually-hidden|display-none|d-none|invisible)\b/i.test(curCls)) {
+          return false;
+        }
+        if (w && typeof w.getComputedStyle === 'function') {
+          const style = w.getComputedStyle(cur);
+          if (style) {
+            if (cur === el) selfDisplay = style.display || '';
+            if (style.display === 'none' || style.visibility === 'hidden') return false;
+            const op = parseFloat(style.opacity);
+            if (!relaxHiddenLayout && style.opacity !== '' && Number.isFinite(op) && op === 0) return false;
+            if (cur === el) {
+              if (
+                (!relaxHiddenLayout && style.width === '0px' && style.height === '0px') ||
+                (typeof style.transform === 'string' && /scale\(\s*0(?:\s*,\s*0)?\s*\)/i.test(style.transform))
+              ) {
+                return false;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
+      }
+    }
+
+    if (!relaxHiddenLayout && !isWindowMinimized && selfDisplay !== 'contents' && typeof el.getBoundingClientRect === 'function') {
+      try {
+        const rect = el.getBoundingClientRect();
+        if (rect && rect.width === 0 && rect.height === 0) return false;
+      } catch (_) {}
+    }
+    return true;
+  }
+
+  function cleanModelTriggerText(raw) {
+    if (typeof raw !== 'string') return '';
+    let s = raw
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/[▾▼⌄›>]+$/g, '')
+      .trim();
+    if (!s) return '';
+
+    // Extract model name from descriptive aria-label / title patterns on compact/narrow screens
+    // e.g. "Switch model, currently Pro", "Open mode picker: 2.5 Pro", "当前模型：思考", "切换模型 (Pro)"
+    const parenMatch = s.match(/[（(]([^（）()]{1,40})[)）]\s*$/);
+    if (parenMatch) {
+      const prefixNorm = D.normalizeText(s.slice(0, parenMatch.index));
+      if (
+        prefixNorm.includes('model') ||
+        prefixNorm.includes('mode') ||
+        prefixNorm.includes('模型') ||
+        prefixNorm.includes('模式') ||
+        prefixNorm.includes('モデル')
+      ) {
+        s = parenMatch[1].trim();
+      }
+    }
+
+    s = s
+      .replace(
+        /^(?:open\s+mode\s+picker|mode\s+picker|model\s+switcher|model\s+selector|switch\s+model|choose\s+model|select\s+model|current\s+model|model|mode|切换模型|切換模型|选择模型|選擇模型|当前模型|當前模型|打开模式选择器|開啟模式選擇器|模型|模式|モデルを選択|モードを選択|現在のモデル|モデル)\s*[,，:：\-–—]\s*/i,
+        ''
+      )
+      .replace(/^(?:currently|selected|当前为|當前為|当前|當前)\s*[:：]?\s*/i, '')
+      .replace(/\s*(?:selected|已选|已選|選択中)$/i, '')
+      .trim();
+
+    return s;
+  }
+
+  function extractModelLabelFromTrigger(el) {
+    if (!el) return { label: '', isGeneric: true };
+    let visibleText = '';
+    try {
+      visibleText = cleanModelTriggerText(extractVisibleLabelText(el, true));
+    } catch (_) {}
+
+    const normVis = D.normalizeModelName(visibleText);
+    if (visibleText && visibleText.length <= 48 && normVis && !GENERIC_MODEL_TRIGGER_LABELS.has(normVis)) {
+      return { label: visibleText, isGeneric: false };
+    }
+
+    // Fallback for narrow / mobile / icon-only viewports: inspect aria-label / title / data attributes
+    const attrSources = [];
+    try {
+      if (el.getAttribute) {
+        attrSources.push(el.getAttribute('aria-label') || '');
+        attrSources.push(el.getAttribute('title') || '');
+        attrSources.push(el.getAttribute('data-model-name') || '');
+        attrSources.push(el.getAttribute('data-model') || '');
+      }
+    } catch (_) {}
+
+    for (const rawAttr of attrSources) {
+      const cleaned = cleanModelTriggerText(rawAttr);
+      const normAttr = D.normalizeModelName(cleaned);
+      if (cleaned && cleaned.length <= 48 && normAttr && !GENERIC_MODEL_TRIGGER_LABELS.has(normAttr)) {
+        return { label: cleaned, isGeneric: false };
+      }
+    }
+
+    return { label: visibleText || '', isGeneric: true };
+  }
+
+  function hasDropdownArrowIcon(el) {
+    if (!el || typeof el.querySelector !== 'function') return false;
+    try {
+      if (el.querySelector(MODEL_DROPDOWN_ICON_SELECTOR)) return true;
+      const icons = el.querySelectorAll('mat-icon, .material-symbols-outlined, .material-symbols-rounded, .google-symbols');
+      for (let i = 0; i < icons.length; i++) {
+        const txt = D.normalizeText(icons[i].textContent || '');
+        if (txt === 'keyboard_arrow_down' || txt === 'expand_more' || txt === 'arrow_drop_down' || txt === 'unfold_more') {
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function isInsideHeaderOrComposer(el) {
+    let cur = el;
+    let depth = 0;
+    const visited = new Set();
+    while (cur && cur.nodeType === 1 && depth++ < 20) {
+      if (visited.has(cur)) break;
+      visited.add(cur);
+      try {
+        const tag = (cur.tagName || '').toUpperCase();
+        if (
+          tag === 'HEADER' ||
+          tag === 'BARD-MODE-SWITCHER' ||
+          tag === 'INPUT-AREA-V2' ||
+          tag === 'RICH-TEXTAREA' ||
+          tag === 'MODEL-PICKER' ||
+          tag === 'MODEL-SWITCHER'
+        ) {
+          return true;
+        }
+        const cls =
+          typeof cur.className === 'string'
+            ? cur.className
+            : (cur.getAttribute && cur.getAttribute('class')) || '';
+        if (
+          /\b(top-bar|header|input-area|prompt-input|composer|text-input-field|mode-switcher|model-picker|model-selector)\b/i.test(
+            cls
+          )
+        ) {
+          return true;
+        }
+      } catch (_) {}
+      try {
+        cur = cur.parentElement || (cur.getRootNode && cur.getRootNode().host) || null;
+      } catch (_) {
+        cur = null;
+      }
+    }
+    return false;
+  }
+
+  function isDisallowedModelTrigger(el) {
+    if (!el) return true;
+    if (isIgnoredForModelSwitcher(el)) return true;
+    if (isInsideMenu(el) || isStopButtonElement(el)) return true;
+    const tag = (el.tagName || '').toUpperCase();
+    if (tag === 'A' && el.getAttribute && el.getAttribute('href')) return true;
+    const aria = D.normalizeText((el.getAttribute && el.getAttribute('aria-label')) || '');
+    const vis = D.normalizeText(extractVisibleLabelText(el, true));
+    const combined = `${vis} ${aria}`.trim();
+    if (combined && D.containsKeyword(combined, NON_MODEL_TRIGGER_KEYWORDS)) {
+      // Allow triggers whose aria explicitly says "switch model" even if it contains a generic word
+      const explicitlyModel =
+        combined.includes('model') ||
+        combined.includes('模型') ||
+        combined.includes('モデル') ||
+        combined.includes('mode picker') ||
+        combined.includes('模式选择') ||
+        combined.includes('模式選擇');
+      if (!explicitlyModel) return true;
+    }
+    return false;
+  }
+
+  function findModelSwitcherButton(doc, win, searchRoots, preferredModel) {
+    if (!doc) return null;
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
+    const seen = new Set();
+
+    // Pass 1: Explicit Gemini model switcher selectors (covers desktop header, composer bar, narrow/mobile layouts).
+    // When responsive layouts keep both desktop & mobile switchers in DOM, prefer strictly visible, enabled,
+    // and readable-label triggers over 0x0/opacity:0 or icon-only duplicates.
+    let bestExplicit = null;
+    for (const sel of MODEL_SWITCHER_SELECTORS) {
+      const nodes = queryAllFromRoots(roots, sel, []);
+      for (const n of nodes) {
+        if (!n || seen.has(n)) continue;
+        seen.add(n);
+        if (isDisallowedModelTrigger(n)) continue;
+        const strictVis = isNodeDisplayed(n, win, doc, { relaxHiddenLayout: false });
+        if (!strictVis && !isNodeDisplayed(n, win, doc, { relaxHiddenLayout: true })) continue;
+        const info = extractModelLabelFromTrigger(n);
+        const disabled = isNodeDisabled(n);
+        const score = (strictVis ? 100 : 10) + (!info.isGeneric ? 20 : 0) + (!disabled ? 5 : 0);
+        if (!bestExplicit || score > bestExplicit.score) {
+          bestExplicit = {
+            el: n,
+            label: info.label,
+            isGeneric: info.isGeneric,
+            disabled,
+            source: 'selector',
+            score
+          };
+        }
+      }
+    }
+    if (bestExplicit) return bestExplicit;
+
+    // Pass 2: Heuristic fallback for unknown/new responsive layouts (buttons with aria-haspopup or dropdown chevron
+    // inside header or composer whose label matches a known model hint or the user's preferredModel)
+    const buttons = queryAllFromRoots(roots, 'button, [role="button"]', []);
+    let bestHeuristic = null;
+    for (const btn of buttons) {
+      if (!btn || seen.has(btn)) continue;
+      seen.add(btn);
+      if (isDisallowedModelTrigger(btn)) continue;
+      if (!isNodeDisplayed(btn, win, doc, { relaxHiddenLayout: true })) continue;
+      if (!isInsideHeaderOrComposer(btn)) continue;
+
+      const hasPopup = Boolean(
+        btn.getAttribute &&
+          (btn.getAttribute('aria-haspopup') === 'menu' ||
+            btn.getAttribute('aria-haspopup') === 'listbox' ||
+            btn.getAttribute('aria-haspopup') === 'dialog' ||
+            btn.getAttribute('aria-haspopup') === 'true')
+      );
+      const hasChevron = hasDropdownArrowIcon(btn);
+      if (!hasPopup && !hasChevron) continue;
+
+      const info = extractModelLabelFromTrigger(btn);
+      if (!info.label || info.label.length > 40) continue;
+
+      const matchesTarget = Boolean(preferredModel && D.isModelNameMatch(info.label, preferredModel));
+      const matchesHint = Boolean(D.containsKeyword(info.label, KNOWN_MODEL_NAME_HINTS));
+      if (!matchesTarget && !matchesHint) continue;
+
+      const score = (matchesTarget ? 20 : 10) + (hasPopup ? 5 : 0) + (hasChevron ? 3 : 0);
+      if (!bestHeuristic || score > bestHeuristic.score) {
+        bestHeuristic = {
+          el: btn,
+          label: info.label,
+          isGeneric: info.isGeneric,
+          disabled: isNodeDisabled(btn),
+          source: 'heuristic',
+          score
+        };
+      }
+    }
+
+    return bestHeuristic;
+  }
+
+  function extractOptionTitleAndText(el) {
+    if (!el) return { title: '', fullText: '' };
+    let fullText = '';
+    try {
+      fullText = extractVisibleLabelText(el, true);
+    } catch (_) {}
+    if (!fullText && el.getAttribute) {
+      fullText = (el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
+    }
+
+    let title = '';
+    const titleSelectors = [
+      '.mode-title',
+      '.mode-name',
+      '.bard-mode-title',
+      '.model-title',
+      '.model-name',
+      '.title',
+      '.gds-title-m',
+      '.gds-title-s',
+      '.gds-label-l',
+      '.mdc-list-item__primary-text',
+      '[data-test-id*="title"]',
+      '[data-test-id*="name"]',
+      'strong',
+      'h1',
+      'h2',
+      'h3',
+      'h4'
+    ];
+    if (typeof el.querySelector === 'function') {
+      for (const sel of titleSelectors) {
+        try {
+          const hit = el.querySelector(sel);
+          if (hit) {
+            const t = extractVisibleLabelText(hit, true);
+            if (t && t.length <= 64) {
+              title = t;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!title && fullText) {
+      // Unwrap single-child Angular Material wrappers (e.g. button > .mat-mdc-menu-item-text > div)
+      // so the first non-icon child block provides the clean model title instead of title + description.
+      let scope = el;
+      for (let depth = 0; depth < 4 && scope && scope.children; depth++) {
+        const nonIconChildren = [];
+        for (let i = 0; i < scope.children.length; i++) {
+          const ch = scope.children[i];
+          if (ch && !isIconOrDecorativeNode(ch)) nonIconChildren.push(ch);
+        }
+        if (nonIconChildren.length === 1) {
+          scope = nonIconChildren[0];
+          continue;
+        }
+        if (nonIconChildren.length > 1) {
+          const firstTxt = extractVisibleLabelText(nonIconChildren[0], true);
+          if (firstTxt && firstTxt.length <= 64 && firstTxt.length < fullText.length) {
+            title = firstTxt;
+          }
+          break;
+        }
+        break;
+      }
+
+      if (!title) {
+        const rawText = String(el.innerText || el.textContent || '');
+        const firstLine = rawText
+          .split(/[\r\n]+/)
+          .map((line) => line.replace(/[\u200B-\u200D\uFEFF]/g, '').trim())
+          .find((line) => line.length > 0);
+        if (firstLine && firstLine.length <= 64 && firstLine.length < fullText.length) {
+          title = firstLine;
+        }
+      }
+      if (!title) {
+        title = fullText.slice(0, 64);
+      }
+    }
+
+    return {
+      title: cleanModelTriggerText(title || ''),
+      fullText: fullText.replace(/\s+/g, ' ').trim()
+    };
+  }
+
+  function isIconElementVisible(icon, win, doc) {
+    if (!icon || icon.nodeType !== 1) return false;
+    try {
+      if (icon.hidden === true) return false;
+      const cls =
+        typeof icon.className === 'string'
+          ? icon.className
+          : (icon.getAttribute && icon.getAttribute('class')) || '';
+      if (/\b(hidden|invisible|d-none|display-none|ng-hide)\b/i.test(cls)) return false;
+      const w = win || (typeof window !== 'undefined' ? window : null);
+      if (w && typeof w.getComputedStyle === 'function') {
+        const st = w.getComputedStyle(icon);
+        if (st) {
+          if (st.display === 'none' || st.visibility === 'hidden') return false;
+          const op = parseFloat(st.opacity);
+          if (st.opacity !== '' && Number.isFinite(op) && op === 0) return false;
+        }
+      }
+    } catch (_) {}
+    void doc;
+    return true;
+  }
+
+  function isOptionSelected(el, win, doc) {
+    if (!el || el.nodeType !== 1) return false;
+    try {
+      if (el.getAttribute) {
+        if (el.getAttribute('aria-checked') === 'true') return true;
+        if (el.getAttribute('aria-selected') === 'true') return true;
+        if (el.getAttribute('aria-current') === 'true') return true;
+        if (el.getAttribute('data-selected') === 'true') return true;
+      }
+      const cls =
+        typeof el.className === 'string'
+          ? el.className
+          : (el.getAttribute && el.getAttribute('class')) || '';
+      if (/\b(selected|is-selected|mat-mdc-option-active|bard-mode-selected)\b/i.test(cls)) {
+        return true;
+      }
+      if (typeof el.querySelectorAll === 'function') {
+        const matchedChecks = el.querySelectorAll(MODEL_CHECK_ICON_SELECTOR);
+        for (let i = 0; i < matchedChecks.length; i++) {
+          if (isIconElementVisible(matchedChecks[i], win, doc)) return true;
+        }
+        const icons = el.querySelectorAll(
+          'mat-icon, .material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp, .material-icons, .google-symbols'
+        );
+        for (let i = 0; i < icons.length; i++) {
+          if (!isIconElementVisible(icons[i], win, doc)) continue;
+          const iconTxt = D.normalizeText(icons[i].textContent || '');
+          if (iconTxt === 'check' || iconTxt === 'done' || iconTxt === 'check_circle') {
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function getOptionUnavailableReason(el, fullText, title, win, doc) {
+    if (isNodeDisabled(el)) return 'disabled';
+    try {
+      if (typeof el.querySelectorAll === 'function') {
+        const matchedLocks = el.querySelectorAll(MODEL_LOCK_ICON_SELECTOR);
+        for (let i = 0; i < matchedLocks.length; i++) {
+          if (isIconElementVisible(matchedLocks[i], win, doc)) return 'locked';
+        }
+        const icons = el.querySelectorAll(
+          'mat-icon, .material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp, .material-icons, .google-symbols'
+        );
+        for (let i = 0; i < icons.length; i++) {
+          if (!isIconElementVisible(icons[i], win, doc)) continue;
+          const iconTxt = D.normalizeText(icons[i].textContent || '');
+          if (iconTxt === 'lock' || iconTxt === 'lock_outline' || iconTxt === 'block') {
+            return 'locked';
+          }
+        }
+      }
+    } catch (_) {}
+    const hit = D.containsKeyword(fullText || title, MODEL_UNAVAILABLE_KEYWORDS);
+    if (hit) return hit;
+    return null;
+  }
+
+  function collectModelOptionsInContainer(container, win, doc) {
+    if (!container || typeof container.querySelectorAll !== 'function') return [];
+    const roots = collectSearchRoots(container, []);
+    const raw = queryAllFromRoots(roots, MODEL_OPTION_SELECTORS.join(','), []);
+    const seen = new Set();
+    const candidates = [];
+
+    for (const el of raw) {
+      if (!el || seen.has(el)) continue;
+      seen.add(el);
+      if (isIgnoredForModelSwitcher(el)) continue;
+      if (!isNodeDisplayed(el, win, doc, { relaxHiddenLayout: true })) continue;
+      const tag = (el.tagName || '').toUpperCase();
+      if (tag === 'A' && el.getAttribute && el.getAttribute('href')) continue;
+
+      const { title, fullText } = extractOptionTitleAndText(el);
+      if (!title && !fullText) continue;
+      if ((title || fullText).length > 80) continue;
+
+      // Skip close/upgrade/promo CTAs inside model menus or bottom sheets
+      if (D.containsKeyword(title || fullText, MODEL_UPSELL_OPTION_KEYWORDS)) {
+        const isPureClose = /^(?:close|dismiss|关闭|關閉|閉じる)$/i.test(D.normalizeModelName(title || fullText));
+        const hasUpgrade = D.containsKeyword(fullText || title, [
+          'upgrade',
+          'subscribe',
+          'get gemini',
+          'google ai plan',
+          '升级',
+          '升級',
+          '开通',
+          '訂閱',
+          '订阅',
+          'アップグレード',
+          'learn more',
+          '了解更多'
+        ]);
+        if (isPureClose || hasUpgrade) continue;
+      }
+
+      candidates.push({
+        el,
+        title: title || fullText,
+        fullText: fullText || title,
+        selected: isOptionSelected(el, win, doc),
+        unavailableReason: getOptionUnavailableReason(el, fullText, title, win, doc)
+      });
+    }
+
+    // Deduplicate nested interactive wrappers sharing the same title
+    const byEl = new Map();
+    for (const c of candidates) byEl.set(c.el, c);
+    const dropSet = new Set();
+    for (const c of candidates) {
+      let p = null;
+      try {
+        p = c.el.parentElement || (c.el.getRootNode && c.el.getRootNode().host) || null;
+      } catch (_) {}
+      let depth = 0;
+      const visited = new Set();
+      while (p && depth++ < 16) {
+        if (visited.has(p)) break;
+        visited.add(p);
+        if (byEl.has(p)) {
+          const parentItem = byEl.get(p);
+          const role = (c.el.getAttribute && c.el.getAttribute('role') || '').toLowerCase();
+          const isPreferred =
+            (c.el.tagName || '').toUpperCase() === 'BUTTON' ||
+            role === 'menuitemradio' ||
+            role === 'option';
+          if (isPreferred) {
+            dropSet.add(parentItem.el);
+          } else {
+            dropSet.add(c.el);
+          }
+          break;
+        }
+        try {
+          p = p.parentElement || (p.getRootNode && p.getRootNode().host) || null;
+        } catch (_) {
+          p = null;
+        }
+      }
+    }
+
+    return candidates
+      .filter((c) => !dropSet.has(c.el))
+      .map((c) => Object.assign({}, c, { disabled: Boolean(c.unavailableReason) }));
+  }
+
+  function isLikelyModelPickerOptions(options, preferredModel) {
+    if (!Array.isArray(options) || options.length === 0) return false;
+    let modelLikeCount = 0;
+    for (const opt of options) {
+      if (preferredModel && D.scoreModelMatch(opt.title, opt.fullText, preferredModel) >= 60) {
+        return true;
+      }
+      if (D.containsKeyword(opt.title, KNOWN_MODEL_NAME_HINTS)) {
+        modelLikeCount += 1;
+      } else if (opt.selected && opt.title.length <= 36) {
+        modelLikeCount += 0.5;
+      }
+    }
+    return modelLikeCount >= 1;
+  }
+
+  function findOpenModelMenu(doc, win, searchRoots, triggerEl, preferredModel) {
+    if (!doc) return null;
+    const roots = Array.isArray(searchRoots) ? searchRoots : collectSearchRoots(doc.body || doc, []);
+    const containers = [];
+    const seen = new Set();
+
+    // 1. Direct aria-controls / aria-owns reference from the trigger button (works across any viewport size)
+    if (triggerEl && triggerEl.getAttribute) {
+      for (const attr of ['aria-controls', 'aria-owns']) {
+        try {
+          const idRef = (triggerEl.getAttribute(attr) || '').trim();
+          if (idRef && typeof doc.getElementById === 'function') {
+            const target = doc.getElementById(idRef);
+            if (target && !seen.has(target)) {
+              seen.add(target);
+              containers.push({ node: target, explicit: true });
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Overlay / Menu / Bottom-Sheet / Dialog containers (desktop + mobile/narrow responsive layouts)
+    for (const sel of MODEL_MENU_CONTAINER_SELECTORS) {
+      const matched = queryAllFromRoots(roots, sel, []);
+      for (const node of matched) {
+        if (!node || seen.has(node) || isIgnoredForModelSwitcher(node)) continue;
+        seen.add(node);
+        const isExplicit =
+          sel.includes('bard-mode') || sel.includes('model-menu');
+        containers.push({ node, explicit: isExplicit });
+      }
+    }
+
+    let best = null;
+    for (const entry of containers) {
+      const node = entry.node;
+      if (!isNodeDisplayed(node, win, doc, { relaxHiddenLayout: true })) continue;
+      const options = collectModelOptionsInContainer(node, win, doc);
+      if (options.length === 0) continue;
+      if (!entry.explicit && !isLikelyModelPickerOptions(options, preferredModel)) continue;
+      const score = (entry.explicit ? 100 : 0) + options.length;
+      if (!best || score > best.score) {
+        best = { container: node, options, score };
+      }
+    }
+
+    return best;
+  }
+
+  function dismissModelMenu(doc, win, triggerEl, menuContainer, clickFn) {
+    const w = win || (typeof window !== 'undefined' ? window : null);
+    const escOpts = {
+      key: 'Escape',
+      code: 'Escape',
+      keyCode: 27,
+      which: 27,
+      bubbles: true,
+      cancelable: true,
+      composed: true
+    };
+    const targets = [menuContainer, doc && doc.body, doc, w].filter(Boolean);
+    for (const target of targets) {
+      if (typeof target.dispatchEvent !== 'function') continue;
+      try {
+        if (w && typeof w.KeyboardEvent === 'function') {
+          target.dispatchEvent(new w.KeyboardEvent('keydown', escOpts));
+          target.dispatchEvent(new w.KeyboardEvent('keyup', escOpts));
+        } else {
+          target.dispatchEvent(Object.assign({ type: 'keydown', target }, escOpts));
+          target.dispatchEvent(Object.assign({ type: 'keyup', target }, escOpts));
+        }
+        break;
+      } catch (_) {}
+    }
+
+    try {
+      if (doc && typeof doc.querySelector === 'function') {
+        const backdrop = doc.querySelector('.cdk-overlay-backdrop');
+        if (backdrop && isNodeDisplayed(backdrop, w, doc, { relaxHiddenLayout: true })) {
+          if (typeof clickFn === 'function') clickFn(backdrop, w, 1);
+          else if (typeof backdrop.click === 'function') backdrop.click();
+          return;
+        }
+      }
+    } catch (_) {}
+
+    try {
+      if (triggerEl && triggerEl.getAttribute && triggerEl.getAttribute('aria-expanded') === 'true') {
+        if (typeof clickFn === 'function') clickFn(triggerEl, w, 1);
+        else if (typeof triggerEl.click === 'function') triggerEl.click();
+      }
+    } catch (_) {}
+  }
+
   class GmahEngine {
     constructor(options) {
       const opts = options || {};
@@ -1668,6 +2695,19 @@
       this.stallRecoveryCount = 0;
       this.stallRecoveryBlockedFp = null;
       this.stallRecoveryBaselineFp = null;
+
+      // Default model lock & auto-switch guard state
+      this.detectedModel = '';
+      this.availableModels = [];
+      this.modelGuard = null;
+      this.modelSwitchFailures = 0;
+      this.consecutiveModelReverts = 0;
+      this.recentModelSwitchTimestamps = [];
+      this.lastModelSwitchAt = 0;
+      this.lastModelVerifiedAt = 0;
+      this.modelUnavailableCooldownUntil = 0;
+      this.modelMismatchActive = false;
+      this.lastModelSuccessTurnFp = null;
 
       this.circuitBreaker = {
         tripped: false,
@@ -1737,6 +2777,30 @@
         }
         if (!Number.isFinite(this.stallRecovery.phaseAt) || this.stallRecovery.phaseAt > now) {
           this.stallRecovery.phaseAt = now;
+        }
+      }
+      if (!Number.isFinite(this.lastModelSwitchAt) || this.lastModelSwitchAt > now) {
+        this.lastModelSwitchAt = 0;
+      }
+      if (!Number.isFinite(this.lastModelVerifiedAt) || this.lastModelVerifiedAt > now) {
+        this.lastModelVerifiedAt = 0;
+      }
+      if (!Number.isFinite(this.modelUnavailableCooldownUntil) || this.modelUnavailableCooldownUntil > now + 120000) {
+        this.modelUnavailableCooldownUntil = 0;
+      }
+      if (Array.isArray(this.recentModelSwitchTimestamps)) {
+        this.recentModelSwitchTimestamps = this.recentModelSwitchTimestamps.filter(
+          (ts) => Number.isFinite(ts) && ts <= now && ts >= now - MODEL_REVERT_WINDOW_MS
+        );
+      } else {
+        this.recentModelSwitchTimestamps = [];
+      }
+      if (this.modelGuard) {
+        if (!Number.isFinite(this.modelGuard.startedAt) || this.modelGuard.startedAt > now) {
+          this.modelGuard.startedAt = now;
+        }
+        if (!Number.isFinite(this.modelGuard.phaseAt) || this.modelGuard.phaseAt > now) {
+          this.modelGuard.phaseAt = now;
         }
       }
       if (this.clickAttempts && this.clickAttempts.size > 0) {
@@ -1890,6 +2954,11 @@
         stallConnectingLabel: this.stallConnectingLabel,
         stallRecoveryActive: Boolean(this.stallRecovery),
         stallRecoveryCount: this.stallRecoveryCount,
+        detectedModel: this.detectedModel || '',
+        availableModels: Array.isArray(this.availableModels) ? this.availableModels.slice() : [],
+        modelMismatchActive: Boolean(this.modelMismatchActive),
+        modelSwitchingActive: Boolean(this.modelGuard),
+        modelSwitchFailures: this.modelSwitchFailures,
         lastStatusText: this.lastStatusText,
         circuitBreaker: Object.assign({}, this.circuitBreaker),
         logs: this.logs.slice()
@@ -1941,6 +3010,20 @@
         this.clearBreaker('单次任务上限已提高，自动解除任务熔断');
         return true;
       }
+      if (this.circuitBreaker.reasonCode === 'model_unavailable') {
+        const failedModel =
+          this.circuitBreaker.reasonVars && typeof this.circuitBreaker.reasonVars.model === 'string'
+            ? this.circuitBreaker.reasonVars.model
+            : '';
+        if (
+          !this.settings.modelLockEnabled ||
+          !this.settings.preferredModel ||
+          (failedModel && failedModel !== this.settings.preferredModel)
+        ) {
+          this.clearBreaker();
+          return true;
+        }
+      }
       return false;
     }
 
@@ -1950,10 +3033,16 @@
         if (!this.stallRecovery || !this.stallRecovery.manual) {
           this.resetStallMonitor(true);
         }
+        if (this.modelGuard && !this.modelGuard.manual) {
+          this.resetModelGuardState(true);
+        }
       } else {
         if (!this.settings.stallAutoRecoverEnabled && this.stallRecovery && !this.stallRecovery.manual) {
           this.stallRecovery = null;
           this.stallRecoveryBlockedFp = null;
+        }
+        if (!this.settings.modelLockEnabled && this.modelGuard && !this.modelGuard.manual) {
+          this.resetModelGuardState(true);
         }
         if (!this.settings.stallAlertEnabled && this.stallAlertActive) {
           this.stallAlertActive = false;
@@ -2293,6 +3382,12 @@
       }
       this.stallRecoveryCount = 0;
       this.stallRecoveryBaselineFp = null;
+      this.resetModelGuardState(true);
+      this.modelSwitchFailures = 0;
+      this.consecutiveModelReverts = 0;
+      this.recentModelSwitchTimestamps = [];
+      this.modelUnavailableCooldownUntil = 0;
+      this.modelMismatchActive = false;
       this.setStatus('hudStatusMonitoring');
       this.addLog(logMsg || '✅ 已解除熔断并重置本次任务计数');
       if (this.onBreakerClear) {
@@ -2305,6 +3400,9 @@
       this.resetStallMonitor(true);
       this.stallRecoveryCount = 0;
       this.stallRecoveryBaselineFp = null;
+      this.modelSwitchFailures = 0;
+      this.consecutiveModelReverts = 0;
+      this.modelUnavailableCooldownUntil = 0;
       this.suppressInitialContinueUntil = 0;
       this.taskContinueCount = 0;
       this.stagnantCount = 0;
@@ -2332,6 +3430,13 @@
       const prevKey = this.conversationKey;
       const prevStallAlert = this.settings ? this.settings.stallAlertEnabled : true;
       this.resetStallMonitor(true);
+      this.resetModelGuardState(false);
+      this.modelSwitchFailures = 0;
+      this.consecutiveModelReverts = 0;
+      this.recentModelSwitchTimestamps = [];
+      this.modelUnavailableCooldownUntil = 0;
+      this.modelMismatchActive = false;
+      this.lastModelSuccessTurnFp = null;
       this.stallRecoveryCount = 0;
       this.stallRecoveryBaselineFp = null;
       this.lastUrl = newUrl;
@@ -2614,6 +3719,18 @@
       };
 
       const executeFillPhase = (sr) => {
+        if (
+          !sr.manual &&
+          sr.typedChars === 0 &&
+          this.settings.modelLockEnabled &&
+          this.settings.preferredModel
+        ) {
+          const modelRes = this.stepModelGuard(now, turns, searchRoots);
+          if (modelRes) {
+            return modelRes;
+          }
+        }
+
         const inputEl = findPromptInput(this.doc, this.win, searchRoots);
         if (!inputEl) {
           if (now - sr.phaseAt < 4000) {
@@ -3052,6 +4169,715 @@
       return this.stepStallRecovery(now, turns, searchRoots, { stalled: false, elapsedMs: this.stallElapsedMs, fp: this.stallFingerprint });
     }
 
+    resetModelGuardState(keepDetected) {
+      this.modelGuard = null;
+      if (!keepDetected) {
+        this.detectedModel = '';
+      }
+    }
+
+    updateAvailableModelsFromOptions(options) {
+      if (!Array.isArray(options) || options.length === 0) return;
+      const seen = new Set();
+      const list = [];
+      for (const opt of options) {
+        if (!opt || typeof opt.title !== 'string') continue;
+        const clean = D.sanitizeModelName(opt.title, '');
+        if (!clean) continue;
+        const key = clean.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        list.push(clean);
+        if (list.length >= 16) break;
+      }
+      if (list.length > 0) {
+        this.availableModels = list;
+      }
+    }
+
+    detectCurrentModelInfo(searchRoots) {
+      if (!this.doc) return { switcher: null, detectedModel: this.detectedModel || '' };
+      const roots = Array.isArray(searchRoots)
+        ? searchRoots
+        : collectSearchRoots(this.doc.body || this.doc, []);
+      const switcher = findModelSwitcherButton(this.doc, this.win, roots, this.settings.preferredModel);
+      if (switcher && !switcher.isGeneric && switcher.label) {
+        this.detectedModel = switcher.label;
+      }
+      // If a model menu is already open (e.g. user opened it or narrow-screen inspection), also read options & active check
+      const openMenu = findOpenModelMenu(
+        this.doc,
+        this.win,
+        roots,
+        switcher ? switcher.el : null,
+        this.settings.preferredModel
+      );
+      if (openMenu && openMenu.options.length > 0) {
+        this.updateAvailableModelsFromOptions(openMenu.options);
+        const sel = openMenu.options.find((o) => o.selected);
+        if (sel && sel.title) {
+          this.detectedModel = sel.title;
+        }
+      }
+      return { switcher, openMenu, detectedModel: this.detectedModel || '' };
+    }
+
+    detectModelSwitchErrorBanner(searchRoots) {
+      if (!this.doc) return null;
+      const roots = Array.isArray(searchRoots)
+        ? searchRoots
+        : collectSearchRoots(this.doc.body || this.doc, []);
+      const alertNodes = queryAllFromRoots(roots, ALERT_COMBINED_SELECTOR, []);
+      for (const n of alertNodes) {
+        if (isIgnoredAncestor(n) || !isNodeDisplayed(n, this.win, this.doc)) continue;
+        const txt = (n.innerText || n.textContent || '').trim();
+        if (!txt || txt.length > 240) continue;
+        const hit = D.containsKeyword(txt, MODEL_SWITCH_ERROR_KEYWORDS);
+        if (hit) return hit;
+      }
+      return null;
+    }
+
+    handleModelUnavailableFailure(now, targetModel, breakerReasonKey, logKey, logVars, isHardImmediate) {
+      this.modelGuard = null;
+      this.modelSwitchFailures += 1;
+      const maxRetries = Math.max(1, Number(this.settings.maxModelSwitchRetries) || 3);
+      const effectiveLimit = isHardImmediate ? Math.min(2, maxRetries) : maxRetries;
+
+      if (logKey) {
+        this.addLog(this.tr(logKey, logVars || { model: targetModel }));
+      }
+
+      if (this.modelSwitchFailures >= effectiveLimit) {
+        this.modelMismatchActive = true;
+        if (this.settings.stopOnModelUnavailable) {
+          this.tripBreaker('model_unavailable', null, breakerReasonKey, { model: targetModel });
+          return {
+            action: 'tripped',
+            reason: 'model_unavailable',
+            detail: breakerReasonKey,
+            model: targetModel
+          };
+        }
+        this.modelUnavailableCooldownUntil = now + MODEL_UNAVAILABLE_SOFT_COOLDOWN_MS;
+        this.modelSwitchFailures = 0;
+        const reasonText = this.tr(breakerReasonKey, { model: targetModel });
+        this.addLog(this.tr('logModelUnavailableWarn', { model: targetModel, reason: reasonText }));
+        this.emitState();
+        return {
+          action: 'model_unavailable_warn',
+          model: targetModel,
+          reason: breakerReasonKey,
+          retryInMs: MODEL_UNAVAILABLE_SOFT_COOLDOWN_MS
+        };
+      }
+
+      this.modelUnavailableCooldownUntil = now + MODEL_SWITCH_RETRY_BACKOFF_MS;
+      this.emitState();
+      return {
+        action: 'wait',
+        reason: 'model_switch_retry_backoff',
+        model: targetModel,
+        attempt: this.modelSwitchFailures,
+        max: effectiveLimit,
+        retryInMs: MODEL_SWITCH_RETRY_BACKOFF_MS
+      };
+    }
+
+    stepModelGuard(now, turns, searchRoots) {
+      const info = this.detectCurrentModelInfo(searchRoots);
+      const switcher = info.switcher;
+      const isManualActive = Boolean(this.modelGuard && this.modelGuard.manual);
+      const targetModel =
+        (this.modelGuard && this.modelGuard.targetModel) ||
+        D.sanitizeModelName(this.settings.preferredModel, '');
+      const lockActive = Boolean(
+        this.settings.enabled && this.settings.modelLockEnabled && targetModel
+      );
+
+      if (!isManualActive && !lockActive) {
+        this.modelMismatchActive = Boolean(
+          targetModel && this.detectedModel && !D.isModelNameMatch(this.detectedModel, targetModel)
+        );
+        return null;
+      }
+
+      const maxRetries = Math.max(1, Number(this.settings.maxModelSwitchRetries) || 3);
+
+      // Reset consecutive revert streak once the conversation makes real new output progress on target model
+      const curTurnFp = computeResponseFingerprint(turns);
+      if (this.lastModelSuccessTurnFp && curTurnFp && curTurnFp !== this.lastModelSuccessTurnFp) {
+        this.consecutiveModelReverts = 0;
+        this.recentModelSwitchTimestamps = [];
+        this.lastModelSuccessTurnFp = null;
+      }
+
+      // 1. Continue an in-progress multi-step model switch / inspection state machine
+      if (this.modelGuard) {
+        const mg = this.modelGuard;
+        const triggerEl =
+          (mg.triggerEl && mg.triggerEl.isConnected ? mg.triggerEl : null) ||
+          (switcher ? switcher.el : null);
+
+        if (mg.phase === 'selecting') {
+          const openMenu =
+            info.openMenu ||
+            findOpenModelMenu(this.doc, this.win, searchRoots, triggerEl, mg.targetModel);
+
+          if (!openMenu) {
+            const elapsed = now - mg.phaseAt;
+            if (elapsed >= 700 && mg.openAttempts < 2 && triggerEl && !isNodeDisabled(triggerEl)) {
+              mg.openAttempts += 1;
+              mg.phaseAt = now;
+              this.clickFn(triggerEl, this.win, mg.openAttempts, this.randomFn);
+              if (isBackgroundOrUnfocused(this.doc, this.win)) {
+                this.triggerMainWorldClick(triggerEl, mg.openAttempts, 'model_trigger', 'Model');
+              }
+              this.emitState();
+              return {
+                action: 'model_switch_open_retry',
+                model: mg.targetModel,
+                attempt: mg.openAttempts,
+                retryInMs: MODEL_SWITCH_OPEN_SETTLE_MS
+              };
+            }
+            if (elapsed < MODEL_SWITCH_OPEN_TIMEOUT_MS) {
+              this.emitState();
+              return {
+                action: 'wait',
+                reason: 'model_switch_awaiting_menu',
+                model: mg.targetModel,
+                retryInMs: Math.max(200, Math.min(400, MODEL_SWITCH_OPEN_TIMEOUT_MS - elapsed))
+              };
+            }
+            if (mg.inspectOnly) {
+              this.modelGuard = null;
+              this.emitState();
+              return { action: 'model_detect_failed', models: this.availableModels.slice() };
+            }
+            return this.handleModelUnavailableFailure(
+              now,
+              mg.targetModel,
+              'breakerReasonModelSwitchFailed',
+              'logModelNoSwitcher',
+              { model: mg.targetModel },
+              false
+            );
+          }
+
+          this.updateAvailableModelsFromOptions(openMenu.options);
+          const selectedOpt = openMenu.options.find((o) => o.selected) || null;
+          if (selectedOpt && selectedOpt.title) {
+            this.detectedModel = selectedOpt.title;
+          }
+
+          // Pure model list inspection (e.g. user clicked "Detect Models")
+          if (mg.inspectOnly) {
+            dismissModelMenu(this.doc, this.win, triggerEl, openMenu.container, this.clickFn);
+            this.modelGuard = null;
+            this.emitState();
+            return {
+              action: 'model_detected',
+              models: this.availableModels.slice(),
+              currentModel: this.detectedModel
+            };
+          }
+
+          // Already selected in menu (e.g. narrow-screen icon-only button check)
+          if (selectedOpt && D.isModelNameMatch(selectedOpt.title, mg.targetModel)) {
+            dismissModelMenu(this.doc, this.win, triggerEl, openMenu.container, this.clickFn);
+            this.modelGuard = null;
+            this.modelSwitchFailures = 0;
+            this.modelMismatchActive = false;
+            this.lastModelVerifiedAt = now;
+            this.addLog(this.tr('logModelVerified', { model: selectedOpt.title }));
+            this.setStatus('hudStatusMonitoring');
+            this.emitState();
+            return {
+              action: 'model_verified',
+              model: selectedOpt.title,
+              targetModel: mg.targetModel
+            };
+          }
+
+          // Score every candidate option in the open menu / bottom-sheet
+          let bestOpt = null;
+          let bestScore = 0;
+          for (const opt of openMenu.options) {
+            const score = D.scoreModelMatch(opt.title, opt.fullText, mg.targetModel);
+            if (score >= 60 && score > bestScore) {
+              bestScore = score;
+              bestOpt = opt;
+            }
+          }
+
+          if (!bestOpt) {
+            dismissModelMenu(this.doc, this.win, triggerEl, openMenu.container, this.clickFn);
+            return this.handleModelUnavailableFailure(
+              now,
+              mg.targetModel,
+              'breakerReasonModelNotFound',
+              'logModelNotFound',
+              { model: mg.targetModel },
+              false
+            );
+          }
+
+          if (bestOpt.disabled) {
+            dismissModelMenu(this.doc, this.win, triggerEl, openMenu.container, this.clickFn);
+            return this.handleModelUnavailableFailure(
+              now,
+              mg.targetModel,
+              'breakerReasonModelDisabled',
+              'logModelDisabled',
+              { model: mg.targetModel, reason: bestOpt.unavailableReason || 'disabled' },
+              true
+            );
+          }
+
+          // Scroll into view safely for compact / short-height scrollable menus
+          if (!isBackgroundOrUnfocused(this.doc, this.win) && typeof bestOpt.el.scrollIntoView === 'function') {
+            try {
+              bestOpt.el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            } catch (_) {}
+          }
+
+          this.clickFn(bestOpt.el, this.win, 1, this.randomFn);
+          if (
+            isBackgroundOrUnfocused(this.doc, this.win) &&
+            bestOpt.el.isConnected !== false &&
+            !isOptionSelected(bestOpt.el, this.win, this.doc)
+          ) {
+            this.triggerMainWorldClick(bestOpt.el, 2, 'model_option', bestOpt.title);
+          }
+          this.recordAutomatedAction(now);
+
+          mg.phase = 'verifying';
+          mg.phaseAt = now;
+          mg.chosenTitle = bestOpt.title;
+          mg.optionEl = bestOpt.el;
+          this.setStatus('hudStatusModelChecking', { model: mg.targetModel });
+          this.emitState();
+          return {
+            action: 'model_switch_select',
+            model: bestOpt.title,
+            targetModel: mg.targetModel,
+            element: bestOpt.el,
+            retryInMs: MODEL_SWITCH_VERIFY_SETTLE_MS
+          };
+        }
+
+        if (mg.phase === 'verifying') {
+          const errBanner = this.detectModelSwitchErrorBanner(searchRoots);
+          if (errBanner) {
+            if (info.openMenu) {
+              dismissModelMenu(this.doc, this.win, triggerEl, info.openMenu.container, this.clickFn);
+            }
+            return this.handleModelUnavailableFailure(
+              now,
+              mg.targetModel,
+              'breakerReasonModelDisabled',
+              'logModelDisabled',
+              { model: mg.targetModel, reason: errBanner },
+              true
+            );
+          }
+
+          const elapsed = now - mg.phaseAt;
+          const triggerMatchesNow = Boolean(
+            switcher &&
+              !switcher.isGeneric &&
+              switcher.label &&
+              D.isModelNameMatch(switcher.label, mg.targetModel)
+          );
+          const menuSelectedMatches = Boolean(
+            info.openMenu &&
+              info.openMenu.options.some(
+                (o) => o.selected && D.isModelNameMatch(o.title, mg.targetModel)
+              )
+          );
+
+          if (triggerMatchesNow || menuSelectedMatches) {
+            if (info.openMenu) {
+              dismissModelMenu(this.doc, this.win, triggerEl, info.openMenu.container, this.clickFn);
+            }
+            const resolvedModel =
+              (switcher && !switcher.isGeneric && switcher.label) ||
+              mg.chosenTitle ||
+              mg.targetModel;
+            this.detectedModel = resolvedModel;
+            this.modelGuard = null;
+            this.modelSwitchFailures = 0;
+            this.modelMismatchActive = false;
+            this.lastModelSwitchAt = now;
+            this.lastModelVerifiedAt = now;
+            this.lastModelSuccessTurnFp = curTurnFp;
+            this.recentModelSwitchTimestamps.push(now);
+            this.setStatus('hudStatusModelSwitched', { model: resolvedModel });
+            this.addLog(this.tr('logModelSwitched', { model: resolvedModel }));
+            this.emitState();
+            return {
+              action: 'model_switched',
+              model: resolvedModel,
+              targetModel: mg.targetModel
+            };
+          }
+
+          // On narrow icon-only viewports, if the menu closed cleanly after clicking the enabled option and no error banner appeared
+          if (
+            switcher &&
+            switcher.isGeneric &&
+            !info.openMenu &&
+            elapsed >= MODEL_SWITCH_VERIFY_SETTLE_MS
+          ) {
+            const resolvedModel = mg.chosenTitle || mg.targetModel;
+            this.detectedModel = resolvedModel;
+            this.modelGuard = null;
+            this.modelSwitchFailures = 0;
+            this.modelMismatchActive = false;
+            this.lastModelSwitchAt = now;
+            this.lastModelVerifiedAt = now;
+            this.lastModelSuccessTurnFp = curTurnFp;
+            this.recentModelSwitchTimestamps.push(now);
+            this.setStatus('hudStatusModelSwitched', { model: resolvedModel });
+            this.addLog(this.tr('logModelSwitched', { model: resolvedModel }));
+            this.emitState();
+            return {
+              action: 'model_switched',
+              model: resolvedModel,
+              targetModel: mg.targetModel
+            };
+          }
+
+          if (elapsed < MODEL_SWITCH_VERIFY_TIMEOUT_MS) {
+            this.emitState();
+            return {
+              action: 'wait',
+              reason: 'model_switch_verifying',
+              model: mg.targetModel,
+              retryInMs: Math.max(250, Math.min(450, MODEL_SWITCH_VERIFY_TIMEOUT_MS - elapsed))
+            };
+          }
+
+          if (info.openMenu) {
+            dismissModelMenu(this.doc, this.win, triggerEl, info.openMenu.container, this.clickFn);
+          }
+          return this.handleModelUnavailableFailure(
+            now,
+            mg.targetModel,
+            'breakerReasonModelSwitchFailed',
+            'logModelReverted',
+            {
+              model: mg.targetModel,
+              current: this.detectedModel || '?',
+              attempt: this.modelSwitchFailures + 1,
+              max: maxRetries
+            },
+            false
+          );
+        }
+
+        this.modelGuard = null;
+        return null;
+      }
+
+      // 2. Idle check: verify whether the active model matches preferredModel
+      if (this.modelUnavailableCooldownUntil > now) {
+        if (this.modelSwitchFailures > 0) {
+          // Active retry backoff: hold off Auto-Continue until retry runs
+          const rem = Math.max(150, Math.min(10000, this.modelUnavailableCooldownUntil - now));
+          this.emitState();
+          return {
+            action: 'wait',
+            reason: 'model_switch_retry_backoff',
+            model: targetModel,
+            retryInMs: rem
+          };
+        }
+        // Soft-warning cooldown when stopOnModelUnavailable is false: let normal work continue
+        return null;
+      }
+
+      if (!switcher) {
+        return this.handleModelUnavailableFailure(
+          now,
+          targetModel,
+          'breakerReasonModelNoSwitcher',
+          'logModelNoSwitcher',
+          { model: targetModel },
+          false
+        );
+      }
+
+      // Trigger clearly shows a model name that matches preferredModel
+      if (!switcher.isGeneric && switcher.label && D.isModelNameMatch(switcher.label, targetModel)) {
+        this.detectedModel = switcher.label;
+        this.modelMismatchActive = false;
+        this.modelSwitchFailures = 0;
+        this.lastModelVerifiedAt = now;
+        return null;
+      }
+
+      // Narrow-screen icon-only trigger: trust recent verified menu check for 15s to avoid opening menu every tick
+      if (
+        switcher.isGeneric &&
+        this.detectedModel &&
+        D.isModelNameMatch(this.detectedModel, targetModel) &&
+        this.lastModelVerifiedAt > 0 &&
+        now - this.lastModelVerifiedAt < 15000
+      ) {
+        this.modelMismatchActive = false;
+        return null;
+      }
+
+      // Mismatch or unverified icon-only trigger!
+      if (!switcher.isGeneric) {
+        this.modelMismatchActive = true;
+        // Anti-flap revert protection: if Gemini keeps reverting the model right after we switched it
+        if (this.lastModelSwitchAt > 0 && now - this.lastModelSwitchAt <= MODEL_REVERT_WINDOW_MS) {
+          this.consecutiveModelReverts += 1;
+          this.lastModelSwitchAt = 0;
+          this.addLog(
+            this.tr('logModelReverted', {
+              model: targetModel,
+              current: switcher.label || '?',
+              attempt: this.consecutiveModelReverts,
+              max: maxRetries
+            })
+          );
+          if (this.consecutiveModelReverts >= maxRetries) {
+            if (this.settings.stopOnModelUnavailable) {
+              this.tripBreaker('model_unavailable', null, 'breakerReasonModelReverted', {
+                model: targetModel
+              });
+              return {
+                action: 'tripped',
+                reason: 'model_unavailable',
+                detail: 'breakerReasonModelReverted',
+                model: targetModel
+              };
+            }
+            this.modelUnavailableCooldownUntil = now + MODEL_UNAVAILABLE_SOFT_COOLDOWN_MS;
+            this.consecutiveModelReverts = 0;
+            this.emitState();
+            return {
+              action: 'model_unavailable_warn',
+              model: targetModel,
+              reason: 'breakerReasonModelReverted',
+              retryInMs: MODEL_UNAVAILABLE_SOFT_COOLDOWN_MS
+            };
+          }
+        } else if (this.modelSwitchFailures === 0) {
+          this.addLog(
+            this.tr('logModelMismatch', {
+              current: switcher.label || '?',
+              model: targetModel
+            })
+          );
+        }
+      }
+
+      if (switcher.disabled) {
+        return this.handleModelUnavailableFailure(
+          now,
+          targetModel,
+          'breakerReasonModelDisabled',
+          'logModelDisabled',
+          { model: targetModel, reason: 'switcher_disabled' },
+          true
+        );
+      }
+
+      // Open the model switcher menu to select targetModel
+      this.clickFn(switcher.el, this.win, 1, this.randomFn);
+      if (
+        isBackgroundOrUnfocused(this.doc, this.win) &&
+        !(switcher.el.getAttribute && switcher.el.getAttribute('aria-expanded') === 'true') &&
+        !findOpenModelMenu(this.doc, this.win, null, switcher.el, targetModel)
+      ) {
+        this.triggerMainWorldClick(switcher.el, 1, 'model_trigger', switcher.label || 'Model');
+      }
+      const attemptNum = Math.min(maxRetries, this.modelSwitchFailures + 1);
+      this.modelGuard = {
+        phase: 'selecting',
+        targetModel,
+        startedAt: now,
+        phaseAt: now,
+        openAttempts: 1,
+        manual: false,
+        inspectOnly: false,
+        triggerEl: switcher.el
+      };
+      this.setStatus('hudStatusModelSwitching', {
+        model: targetModel,
+        attempt: attemptNum,
+        max: maxRetries
+      });
+      this.addLog(
+        this.tr('logModelSwitchOpen', {
+          model: targetModel,
+          attempt: attemptNum,
+          max: maxRetries
+        })
+      );
+      this.emitState();
+      return {
+        action: 'model_switch_open',
+        model: targetModel,
+        currentModel: this.detectedModel,
+        element: switcher.el,
+        retryInMs: MODEL_SWITCH_OPEN_SETTLE_MS
+      };
+    }
+
+    /**
+     * Manual trigger from HUD / Popup: either detect available models on the page (`inspectOnly: true`)
+     * or immediately verify & switch to `preferredModel`.
+     */
+    forceModelCheckOrSwitch(opts) {
+      if (!this.doc) return { action: 'noop', reason: 'no_doc' };
+      const options = opts || {};
+      const inspectOnly = Boolean(options.inspectOnly);
+      const currentHref = this.win && this.win.location ? this.win.location.href : this.lastUrl;
+      if (isNonChatGeminiUrl(currentHref || this.lastUrl)) {
+        return { action: 'noop', reason: 'non_chat_page' };
+      }
+      if (!inspectOnly && this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
+        return { action: 'blocked', reason: 'emergency_stop' };
+      }
+
+      const now = this.safeNow();
+      const searchRoots = collectSearchRoots(this.doc.body || this.doc, []);
+      const turns = getAssistantTurns(this.doc, searchRoots);
+      const info = this.detectCurrentModelInfo(searchRoots);
+
+      if (inspectOnly) {
+        if (info.openMenu && info.openMenu.options.length > 0) {
+          this.updateAvailableModelsFromOptions(info.openMenu.options);
+          this.emitState();
+          return {
+            action: 'model_detected',
+            models: this.availableModels.slice(),
+            currentModel: this.detectedModel
+          };
+        }
+        if (!info.switcher || info.switcher.disabled) {
+          this.emitState();
+          return {
+            action: 'noop',
+            reason: 'model_switcher_not_found',
+            currentModel: this.detectedModel
+          };
+        }
+        this.clickFn(info.switcher.el, this.win, 1, this.randomFn);
+        if (
+          isBackgroundOrUnfocused(this.doc, this.win) &&
+          !(info.switcher.el.getAttribute && info.switcher.el.getAttribute('aria-expanded') === 'true') &&
+          !findOpenModelMenu(this.doc, this.win, null, info.switcher.el, '')
+        ) {
+          this.triggerMainWorldClick(info.switcher.el, 1, 'model_trigger', 'Model');
+        }
+        this.modelGuard = {
+          phase: 'selecting',
+          targetModel: D.sanitizeModelName(this.settings.preferredModel, ''),
+          startedAt: now,
+          phaseAt: now,
+          openAttempts: 1,
+          manual: true,
+          inspectOnly: true,
+          triggerEl: info.switcher.el
+        };
+        this.emitState();
+        return {
+          action: 'model_switch_open',
+          inspectOnly: true,
+          element: info.switcher.el,
+          retryInMs: MODEL_SWITCH_OPEN_SETTLE_MS
+        };
+      }
+
+      const targetModel = D.sanitizeModelName(options.model || this.settings.preferredModel, '');
+      if (!targetModel) {
+        return { action: 'noop', reason: 'no_preferred_model' };
+      }
+      if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'model_unavailable') {
+        this.clearBreaker();
+      }
+      this.modelSwitchFailures = 0;
+      this.consecutiveModelReverts = 0;
+      this.modelUnavailableCooldownUntil = 0;
+      this.lastModelVerifiedAt = 0;
+
+      if (info.switcher && !info.switcher.isGeneric && info.switcher.label && D.isModelNameMatch(info.switcher.label, targetModel)) {
+        this.detectedModel = info.switcher.label;
+        this.modelMismatchActive = false;
+        this.lastModelVerifiedAt = now;
+        this.addLog(this.tr('logModelVerified', { model: info.switcher.label }));
+        this.emitState();
+        return { action: 'model_verified', model: info.switcher.label, targetModel };
+      }
+
+      if (!info.switcher) {
+        return this.handleModelUnavailableFailure(
+          now,
+          targetModel,
+          'breakerReasonModelNoSwitcher',
+          'logModelNoSwitcher',
+          { model: targetModel },
+          false
+        );
+      }
+      if (info.switcher.disabled) {
+        return this.handleModelUnavailableFailure(
+          now,
+          targetModel,
+          'breakerReasonModelDisabled',
+          'logModelDisabled',
+          { model: targetModel, reason: 'switcher_disabled' },
+          true
+        );
+      }
+
+      this.clickFn(info.switcher.el, this.win, 1, this.randomFn);
+      if (
+        isBackgroundOrUnfocused(this.doc, this.win) &&
+        !(info.switcher.el.getAttribute && info.switcher.el.getAttribute('aria-expanded') === 'true') &&
+        !findOpenModelMenu(this.doc, this.win, null, info.switcher.el, targetModel)
+      ) {
+        this.triggerMainWorldClick(info.switcher.el, 1, 'model_trigger', info.switcher.label || 'Model');
+      }
+      this.modelGuard = {
+        phase: 'selecting',
+        targetModel,
+        startedAt: now,
+        phaseAt: now,
+        openAttempts: 1,
+        manual: true,
+        inspectOnly: false,
+        triggerEl: info.switcher.el
+      };
+      this.setStatus('hudStatusModelSwitching', {
+        model: targetModel,
+        attempt: 1,
+        max: Math.max(1, Number(this.settings.maxModelSwitchRetries) || 3)
+      });
+      this.addLog(
+        this.tr('logModelSwitchOpen', {
+          model: targetModel,
+          attempt: 1,
+          max: Math.max(1, Number(this.settings.maxModelSwitchRetries) || 3)
+        })
+      );
+      this.emitState();
+      return {
+        action: 'model_switch_open',
+        manual: true,
+        model: targetModel,
+        element: info.switcher.el,
+        retryInMs: MODEL_SWITCH_OPEN_SETTLE_MS
+      };
+    }
+
     detectQuotaOrError(turns, searchRoots) {
       if (!this.settings.stopOnQuotaOrError) return null;
 
@@ -3346,11 +5172,20 @@
         this.suppressInitialContinueUntil = 0;
       }
 
-      // Emergency stop blocks EVERYTHING (both Allow & Continue & Recovery)
-      if (this.circuitBreaker.tripped && this.circuitBreaker.reasonCode === 'emergency_stop') {
+      // Emergency stop & hard model-unavailable error block EVERYTHING (Allow, Continue & Recovery)
+      if (
+        this.circuitBreaker.tripped &&
+        (this.circuitBreaker.reasonCode === 'emergency_stop' ||
+          this.circuitBreaker.reasonCode === 'model_unavailable')
+      ) {
+        if (this.modelGuard && this.modelGuard.manual && this.modelGuard.inspectOnly) {
+          const inspectRes = this.stepModelGuard(now, turns, searchRoots);
+          if (inspectRes) return inspectRes;
+        }
+        this.detectCurrentModelInfo(searchRoots);
         this.resetStallMonitor(true);
         this.emitState();
-        return { action: 'blocked', reason: 'emergency_stop' };
+        return { action: 'blocked', reason: this.circuitBreaker.reasonCode };
       }
 
       // Allow an explicit user-triggered "Resume Now" (manual force-recovery) to finish even if auto-monitoring is paused
@@ -3364,7 +5199,14 @@
         if (manualRes) return manualRes;
       }
 
+      // Allow an explicit user-triggered model detection or manual switch to finish even if auto-monitoring is paused
+      if (this.modelGuard && this.modelGuard.manual) {
+        const manualModelRes = this.stepModelGuard(now, turns, searchRoots);
+        if (manualModelRes) return manualModelRes;
+      }
+
       if (!this.settings.enabled) {
+        this.detectCurrentModelInfo(searchRoots);
         this.resetStallMonitor(true);
         this.emitState();
         return { action: 'noop', reason: 'disabled' };
@@ -3499,6 +5341,16 @@
         return recoverResult;
       }
       this.maybeTriggerStallAlert(now, stallInfo);
+
+      // 1.5 Default Model Lock & Auto-Switch Guard (runs when idle, BEFORE Auto-Continue)
+      if (!isWaiting) {
+        const modelResult = this.stepModelGuard(now, turns, searchRoots);
+        if (modelResult) {
+          return modelResult;
+        }
+      } else {
+        this.detectCurrentModelInfo(searchRoots);
+      }
 
       // 2. Check Auto-Continue (strictly guarded by 6-layer anti-quota-burn circuit breaker)
       if (!this.settings.autoContinue) {
@@ -3755,7 +5607,15 @@
     findPromptInput,
     findSendButton,
     readPromptInputText,
-    defaultFillPromptInput
+    defaultFillPromptInput,
+    isIgnoredForModelSwitcher,
+    isNodeDisabled,
+    isNodeDisplayed,
+    cleanModelTriggerText,
+    extractModelLabelFromTrigger,
+    findModelSwitcherButton,
+    findOpenModelMenu,
+    dismissModelMenu
   };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = root.GMAH_ENGINE;
@@ -4040,6 +5900,8 @@
         engine.addLog(nextVal ? '🔔 桌面通知提醒已开启' : '🔕 桌面通知提醒已关闭');
       } else if (key === 'stallAutoRecoverEnabled') {
         engine.addLog(engine.tr(nextVal ? 'logStallRecoverOn' : 'logStallRecoverOff'));
+      } else if (key === 'modelLockEnabled') {
+        engine.addLog(engine.tr(nextVal ? 'logModelLockOn' : 'logModelLockOff'));
       }
       engine.emitState();
     }
@@ -4076,6 +5938,40 @@
         onToggleBackground: (scope) => toggleScopedSetting('backgroundMode', scope, 'hudRowBackground'),
         onToggleNotification: (scope) => toggleScopedSetting('stallAlertEnabled', scope, 'hudRowNotif'),
         onToggleStallRecover: (scope) => toggleScopedSetting('stallAutoRecoverEnabled', scope, 'hudRowStallRecover'),
+        onToggleModelLock: (scope) => toggleScopedSetting('modelLockEnabled', scope, 'hudRowModelLock'),
+        onSetPreferredModel: (modelName) => {
+          if (!isContextAlive()) return;
+          const clean = D.sanitizeModelName(modelName, '');
+          engine.updateSettings({ preferredModel: clean }, true);
+          if (clean) {
+            engine.addLog(engine.tr('logPreferredModelSet', { model: clean }));
+          }
+          engine.emitState();
+          if (clean && engine.settings.modelLockEnabled && canRunScanInCurrentVisibility()) {
+            scheduleScan(200);
+          }
+        },
+        onUseCurrentModel: () => {
+          if (!isContextAlive()) return '';
+          const info = engine.detectCurrentModelInfo();
+          const detected = D.sanitizeModelName(info && info.detectedModel, '');
+          if (detected) {
+            engine.updateSettings({ preferredModel: detected }, true);
+            engine.addLog(engine.tr('logPreferredModelSet', { model: detected }));
+            engine.emitState();
+          }
+          return detected;
+        },
+        onDetectModels: () => {
+          if (!isContextAlive()) return;
+          const res = engine.forceModelCheckOrSwitch({ inspectOnly: true });
+          scheduleFollowupForResult(res);
+        },
+        onForceModelSwitch: () => {
+          if (!isContextAlive()) return;
+          const res = engine.forceModelCheckOrSwitch({ inspectOnly: false });
+          scheduleFollowupForResult(res);
+        },
         onResetChatOverride: () => {
           if (!isContextAlive()) return;
           engine.clearChatOverride(true);
@@ -4289,10 +6185,12 @@
           reason: res.reason || res.action || 'bg_followup'
         });
       } else {
-        const isRecoverStep =
-          (typeof res.action === 'string' && res.action.startsWith('stall_recover_')) ||
-          (typeof res.reason === 'string' && res.reason.startsWith('stall_recover_'));
-        if (isRecoverStep) {
+        const isMultiStep =
+          (typeof res.action === 'string' &&
+            (res.action.startsWith('stall_recover_') || res.action.startsWith('model_switch_'))) ||
+          (typeof res.reason === 'string' &&
+            (res.reason.startsWith('stall_recover_') || res.reason.startsWith('model_switch_')));
+        if (isMultiStep) {
           scheduleScan(nextDelay);
         }
       }
@@ -4760,6 +6658,25 @@
           const res = engine.forceStallRecovery();
           scheduleFollowupForResult(res);
           sendResponse({ ok: true, result: res, state: engine.getState() });
+        } else if (msg.type === 'GMAH_DETECT_MODELS') {
+          const res = engine.forceModelCheckOrSwitch({ inspectOnly: true });
+          scheduleFollowupForResult(res);
+          sendResponse({ ok: true, result: res, state: engine.getState() });
+        } else if (msg.type === 'GMAH_FORCE_MODEL_SWITCH') {
+          const res = engine.forceModelCheckOrSwitch({
+            inspectOnly: false,
+            model: typeof msg.model === 'string' ? msg.model : undefined
+          });
+          scheduleFollowupForResult(res);
+          sendResponse({ ok: true, result: res, state: engine.getState() });
+        } else if (msg.type === 'GMAH_USE_CURRENT_MODEL') {
+          const info = engine.detectCurrentModelInfo();
+          const detected = D.sanitizeModelName(info && info.detectedModel, '');
+          if (detected) {
+            engine.updateSettings({ preferredModel: detected }, true);
+            engine.addLog(engine.tr('logPreferredModelSet', { model: detected }));
+          }
+          sendResponse({ ok: true, detectedModel: detected, state: engine.getState() });
         } else if (msg.type === 'GMAH_RESET_HUD_POS') {
           if (hud && typeof hud.resetPosition === 'function') {
             hud.resetPosition();

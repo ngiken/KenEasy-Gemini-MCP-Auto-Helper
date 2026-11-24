@@ -4,7 +4,7 @@
   <h1>KenEasy Gemini MCP Auto Helper</h1>
 
   <p>
-    专为 <b>Google Gemini</b> 网页端打造的 MCP 工具自动化放行与连续对话扩展：全新 <b>Notion 风格极简 UI（浅色纸感 / 深色炭灰）</b>，支持<b>单对话独立开关与隔离紧急停止</b>，自动点击「始终允许」权限与「继续 / Yes」追问芯片，配备<b>后台 / 最小化 MAIN 世界点击升级、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、一键立即续接、拟人防降速节流</b>及<b>MV3 永不断线后台保活引擎</b>，支持<b>简体中文 / 繁體中文 / English / 日本語</b>四语言实时切换、零飞角按住拖拽悬浮窗、超时桌面通知及 6 层防刷额度熔断保护。
+    专为 <b>Google Gemini</b> 网页端打造的 MCP 工具自动化放行与连续对话扩展：全新支持<b>默认模型锁定与全尺寸自动切换守护（偏离自动切回、不可用或反复被切回时立即报错停止）</b>、<b>Notion 风格极简 UI（浅色纸感 / 深色炭灰）</b>、<b>单对话独立开关与隔离紧急停止</b>，自动点击「始终允许」权限与「继续 / Yes」追问芯片，配备<b>后台 / 最小化 / 熄屏 MAIN 世界点击升级、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、一键立即续接、拟人防降速节流</b>及<b>MV3 永不断线后台保活引擎</b>，支持<b>简体中文 / 繁體中文 / English / 日本語</b>四语言实时切换、零飞角按住拖拽悬浮窗、超时桌面通知及 6 层防刷额度熔断保护。
   </p>
 
   <p>
@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v2.0-16a34a?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v2.2-16a34a?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,10 +24,10 @@
 </div>
 
 > [!NOTE]
-> ### ✅ v2.0 正式发布版
-> **KenEasy Gemini MCP Auto Helper v2.0** 现已正式发布！
-> 全新重构 Notion 极简双主题 UI（浅色纸感 / 深色炭灰）、单对话独立开关与隔离紧急停止、后台 / 最小化 MAIN 世界点击升级、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、拟人防降速节流、MV3 后台保活及 6 层防刷熔断器均已通过全部 **116/116** 项自动化与压力测试验证。
-> - 如遇到 Gemini 页面新弹窗或想补充自定义续接话术，可直接在设置面板中自定义，或前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 反馈。
+> ### ✅ v2.2 正式发布版
+> **KenEasy Gemini MCP Auto Helper v2.2** 现已正式发布！
+> 全新推出**默认模型锁定与全尺寸自动切换守护**（支持桌面宽屏、分屏、窄屏移动端、高缩放比例与后台最小化，检测到模型偏离自动切回默认模型，目标模型不可用或反复被切回时立即报错停止并弹出 `ERR` 桌面通知），叠加 Notion 极简双主题 UI、单对话独立开关与隔离急停、后台 / 最小化 / 熄屏 MAIN 世界点击升级、超时自动续接、拟人防降速节流与 6 层防刷熔断器，全部 **129/129** 项自动化与端到端测试全通过。
+> - 可在悬浮窗或设置弹窗中一键设置/探测默认模型、自定义续接话术或关键词，欢迎前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 反馈。
 > - 欢迎各位开发者 Star 🌟 与提交 PR，共同完善 Gemini 网页端自动化生态！
 
 ---
@@ -44,24 +44,32 @@
 
 直接点击下方任意一个下载链接即可**一键自动下载 `.zip` 安装包**：
 
-- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
-- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip)**（解压即根目录 `manifest.json`）
+- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v2.2-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.2/KenEasy-Gemini-MCP-Auto-Helper-v2.2-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
+- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v2.2-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.2/KenEasy-Gemini-MCP-Auto-Helper-v2.2-store.zip)**（解压即根目录 `manifest.json`）
 
 安装步骤：
 1. 点击上方链接下载 `.zip` 压缩包并解压到本地目录（例如 `E:\code\KenEasy-Gemini-MCP-Auto-Helper`）。
-3. 打开 Chrome 或 Edge 浏览器，在地址栏输入：
+2. 打开 Chrome 或 Edge 浏览器，在地址栏输入：
    - **Chrome 浏览器**：`chrome://extensions/`
    - **Edge 浏览器**：`edge://extensions/`
-4. 开启页面右上角的 **「开发者模式」（Developer mode）** 开关。
-5. 点击页面左上方出现的 **「加载已解压的扩展程序」（Load unpacked）** 按钮。
-6. 在弹出的本地文件选择器中，选中包含 `manifest.json` 的项目根目录文件夹。
-7. 打开或刷新 [Google Gemini 网页端](https://gemini.google.com/)，即可在页面中看到全新的悬浮控制窗，点击浏览器右上角扩展图标可打开完整设置面板。
+3. 开启页面右上角的 **「开发者模式」（Developer mode）** 开关。
+4. 点击页面左上方出现的 **「加载已解压的扩展程序」（Load unpacked）** 按钮。
+5. 在弹出的本地文件选择器中，选中包含 `manifest.json` 的项目根目录文件夹。
+6. 打开或刷新 [Google Gemini 网页端](https://gemini.google.com/)，即可在页面中看到全新的悬浮控制窗，点击浏览器右上角扩展图标可打开完整设置面板。
 
 ---
 
 ## 🎬 核心功能实操演示（最新重点升级）
 
-### 0. 全新 Notion 风格极简 UI & 单对话独立控制 / 隔离紧急停止 🆕
+### 0. 默认模型锁定与全尺寸自动切换守护（v2.2 🆕）
+> 只需设定一次你希望使用的默认工作模型（如 `Pro`、`Thinking`、`Fast`、`2.5 Pro` 或任意自定义模型名），扩展会在**桌面宽屏、分屏窗口、窄屏移动端底部抽屉、高缩放比例与后台/最小化窗口**下持续核对 Gemini 当前模型状态：
+>
+> - **偏离自动切回**：在新对话 `/app` 落地页、点击「继续」之前以及「超时自动续接」发送文字之前，若检测到当前模型不是你的默认模型，会先暂停操作并自动切回默认模型（流式输出与 MCP 工具执行期间绝不打断）。
+> - **跨语言智能匹配与防误触**：兼容中/英/繁/日模型别名（`Fast` / `快速` / `高速`、`Thinking` / `思考` / `思考モード`、`Gemini 2.5 Pro` ↔ `2.5 Pro`、`3.0 Pro` ↔ `3 Pro`），自动过滤推销项（`Upgrade to Google AI Pro`、`升级`等）并防止跨档位误点（目标 `Pro` 绝不误点 `Thinking with 3 Pro`）。
+> - **不可用自动报错停止**：当目标模型在菜单中置灰/带锁/提示达上限、菜单中未找到、切换后弹出限流报错条，或被 Gemini 反复切回超过设定重试上限（默认 3 次）时，自动关闭菜单并触发 `model_unavailable` 硬熔断——全面停止自动允许、自动继续与自动续接，扩展图标亮起红色 `ERR` 角标并发送桌面报警通知。
+> - **悬浮窗 & 弹窗快捷配置**：支持在 HUD 折叠模型面板与 Popup 中一键「设为当前」「探测列表」「立即切回」，并支持按单对话独立开关模型锁定。
+
+### 1. 全新 Notion 风格极简 UI & 单对话独立控制 / 隔离紧急停止
 > 彻底重构悬浮窗（HUD）与设置弹窗（Popup）视觉体系，采用 Notion 标志性的**浅色纸感（`#FFFFFF / #F7F6F3`）与深色炭灰（`#191919 / #202020`）中性色板**、1px 极细边框、微灰悬停反馈与低饱和语义标签，零霓虹光晕、更耐看克制。
 
 <div align="center">
@@ -116,8 +124,9 @@
 
 | 能力分类 | 核心特性 | 详细技术说明 |
 | :--- | :--- | :--- |
-| **Notion 极简界面** 🆕 | 浅色纸感 / 深色炭灰 | 全面重构 HUD 与 Popup 视觉系统，采用 1px 极细边框、微灰悬停与低饱和语义色，日志/探测抽屉配备高亮指示与清空/刷新工具栏，全程零 `innerHTML`（兼容 Trusted Types CSP）。 |
-| **单对话独立控制** 🆕 | 作用域隔离 + 落地页迁移 | 按会话 URL 自动区分对话，在 HUD（`本对话 / 全局默认` 分段栏）与 Popup（`当前对话独立控制` 卡片）独立开关 6 项能力，支持蓝点提示与一键「恢复全局」。 |
+| **默认模型锁定** 🆕 | 自动切回 + 不可用报错停机 | 支持全局或单对话锁定默认工作模型，兼容 `<header>`、输入框栏、Shadow DOM、窄屏底部抽屉、高缩放（`visualViewport`）与后台最小化；模型不可用或反复被切回时立即硬熔断、亮红 `ERR` 角标并桌面告警。 |
+| **Notion 极简界面** | 浅色纸感 / 深色炭灰 | 全面重构 HUD 与 Popup 视觉系统，采用 1px 极细边框、微灰悬停与低饱和语义色，日志/探测抽屉配备高亮指示与清空/刷新工具栏，支持小窗响应式布局，全程零 `innerHTML`（兼容 Trusted Types CSP）。 |
+| **单对话独立控制** | 作用域隔离 + 落地页迁移 | 按会话 URL 自动区分对话，在 HUD（`本对话 / 全局默认` 分段栏）与 Popup（`当前对话独立控制` 卡片）独立开关 7 项能力（含默认模型锁定），支持蓝点提示与一键「恢复全局」。 |
 | **隔离紧急停止** 🆕 | 仅停本对话 / 停止全部 | 「紧急停止」仅封锁当前对话并持久化（切去其他对话继续运行，切回自动恢复急停状态）；另设独立「停止全部对话」按钮按需全局急停。 |
 | **后台 MAIN 世界点击** 🆕 | 最小化 / 切屏防失效 | MV3 长连接 Port + `chrome.alarms` 心跳 + 最小化 `1200ms` 跟进唤醒，隐藏态点击失败自动升级至 `MAIN` 世界穿透 ShadowRoot / `<mat-chip>`，且按对话精确控制防休眠。 |
 | **MCP 权限穿透** | 优先「始终允许」 | 优先寻找并点击 `始终允许 / Always allow`，支持通过 Material Web Components `<slot>` 投影穿透与 `role="menu"` / `role="menuitem"` 下拉菜单定位。 |
@@ -148,7 +157,7 @@
                 [ 持续观察输出 DOM，必须保持静止 1.8 秒以上 ]
                                           │
                   ▼ 层级 C: 操作冷却防抖（避免高频并发连击）
-                [ 每次点击「继续」后强制冷却 3.0 秒冷却缓冲 ]
+                [ 每次点击「继续」后强制冷却 4.0 秒冷却缓冲 ]
                                           │
                   ▼ 层级 D: 单次任务继续上限（单次提问防死循环）
                  [ 达到单次上限（默认 10 次）] ──► 🛑 任务熔断（发新提问自动复位）
@@ -165,7 +174,7 @@
 
 1. **层级 A · 额度/限流/报错断路**：一旦识别到 Gemini 返回诸如 `reached your limit`、`额度已用完`、`请稍后再试` 或系统故障提示，立即切断点击引擎并提示用户。
 2. **层级 B · 输出停稳等待（默认 1.8s）**：严格等候流式输出停止，光标消失且内容保持稳定 1.8 秒后才触发判别，绝不抢跑。
-3. **层级 C · 继续冷却缓冲（默认 3.0s）**：每次触发「继续」后施加冷却间隔，防止网络抖动导致的短时间重复请求。
+3. **层级 C · 继续冷却缓冲（默认 4.0s）**：每次触发「继续」后施加冷却间隔，防止网络抖动导致的短时间重复请求。
 4. **层级 D · 单次任务继续上限（默认 10 次）**：单个任务内继续次数超过设定阈值即触发熔断；用户一旦输入新消息提问，计数器自动清零。
 5. **层级 E · 每日总上限（默认 0 = 无限制）**：支持用户为全天累计点击设定安全总额度，跨天（次日 00:00）自动按日历重置。
 6. **层级 F · 完工信号与智能放行**：识别到回答末尾明确包含「已全部完成」、「所有任务已处理完毕」等完工信号时自动跳过；若 Gemini 虽提及完成但在末尾询问下一步并展示明确的 `↪ Yes` 追问芯片，则智能放行继续。
@@ -243,16 +252,33 @@ popup.js, popup.html, popup.css
 打开 Popup 设置面板，点击底部的 **「恢复默认」** 按钮，即可将所有配置项与熔断阈值一键复位至官方推荐的安全默认值。
 </details>
 
+<details>
+<summary><b>Q7: 启用「默认模型锁定」后，如果我设定的模型达上限或无法使用会怎样？</b></summary>
+
+1. 在悬浮窗「默认模型」面板或 Popup 设置卡片中，点选/输入默认模型（或点「设为当前」），并开启「默认模型锁定」。
+2. 一旦 Gemini 切换或重置到其他模型，扩展会在下次继续/续接前自动将其切回。
+3. 若目标模型被置灰锁定、菜单中不存在、弹出限流报错，或被 Gemini 反复切回超过重试上限（默认 3 次），扩展会立即触发 `model_unavailable` 硬熔断停止所有自动化，在图标显示红色 **`ERR`** 角标并弹出桌面通知，避免在错误模型上浪费对话轮次。
+</details>
+
 ---
 
 ## 📝 更新记录
 
-### v2.0 - 2026-11-24
+### [v2.2](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v2.2) - 2026-11-24
+- **默认模型锁定与全尺寸自动切换守护**：新增 `modelLockEnabled`、`preferredModel`、`maxModelSwitchRetries`、`stopOnModelUnavailable` 配置，支持全局与单对话独立控制；HUD 内置无 `innerHTML` 可折叠模型配置面板，Popup 新增预设/探测模型芯片与一键「使用当前模型 / 探测模型 / 立即切回」；空闲、续点「继续」及超时自动续接前自动校验并切回默认模型。
+- **宽屏 / 分屏 / 窄屏 / 高缩放 / 后台全兼容**：兼容顶部 `<header>`、输入框工具栏、嵌套 Shadow DOM、重复响应式触发器筛选、窄屏图标化入口 + `mat-bottom-sheet-container` 底部抽屉、隐藏勾选/锁图标过滤、小窗 HUD 内部滚动与 `visualViewport` 缩放贴边约束，并在后台/最小化 `MAIN` 世界点击中加入防重复切换保护。
+- **不可用报错停机与防回弹保护**：覆盖模型置灰/锁定、列表缺失、切换报错提示条及反复被切回等异常，超限后立即触发 `model_unavailable` 全面停机、亮红 `ERR` 角标并发送系统桌面报警；全量自动化测试扩展至 **129/129 全通过**。
+
+### [v2.0](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v2.0) - 2026-11-24
+- **后台 / 最小化 / 熄屏休眠稳定继续全面加固**：扩展 `isBackgroundOrUnfocused` 判定以覆盖窗口最小化、遮挡与离屏状态，并在后台/最小化状态下对「始终允许」和「继续」芯片首击同步升级 `MAIN` 世界点击（`triggerMainWorldClick`），与重试及超时续接流程形成完整闭环。
+- **熄屏 / 休眠后唤醒自动恢复**：从隐藏、熄屏或系统休眠恢复时自动重新获取防冻结 Web Lock（`syncBackgroundKeepaliveLock`）、重建 Service Worker 长连接端口（`forceReconnectBackgroundPort`）并立即执行一轮扫描（**116/116 全通过**）。
+
+### [v1.0.1](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v1.0.1) - 2026-11-24
 - **全新 Notion 风格 UI 全面重构**：重写 HUD 与 Popup 视觉样式（浅色纸感 `#FFFFFF / #F7F6F3` + 深色炭灰 `#191919 / #202020`、1px 极细边框、微灰悬停与低饱和语义色），新增日志清空 / 探测刷新工具栏与抽屉高亮态，并提供 2x 无头 Chrome 真实 DOM 预览图。
 - **单对话独立控制与隔离紧急停止**：新增 `gmah_chat_overrides_v1` 会话级覆写存储、HUD **`本对话 / 全局默认`** 分段切换栏、Popup **`当前对话独立控制`** 卡片与 **`停止全部对话`** 分离按钮；单对话紧急停止跨路由持久化且互不干扰，支持 `/app` → `/app/<id>` 新建对话自动迁移与一键「恢复全局」。
-- **后台 / 最小化点击与深层边界加固**：新增 `MAIN` 世界点击升级（穿透 ShadowRoot 与 `<mat-chip>`，覆盖允许、继续与超时续接停止/发送）、按对话隔离的后台心跳与防休眠策略、最小化 `1200ms` 跟进唤醒，以及 27 项深度压力/模糊防线；全量测试扩展至 **116/116 全通过**。
+- **后台 / 最小化点击与深层边界加固**：新增 `MAIN` 世界点击升级（穿透 ShadowRoot 与 `<mat-chip>`）、按对话隔离的后台心跳与防休眠策略、最小化 `1200ms` 跟进唤醒，以及 27 项深度压力/模糊防线（**115/115 全通过**）。
 
-### v1.0.0 正式版 - 2026-11-23
+### [v1.0.0 正式版](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v1.0.0) - 2026-11-23
 - **连接卡死自动终止与自定义续接**：超过设定阈值（默认 5 分钟）自动终止卡死的 MCP/Gemini 回合，保护用户草稿并发送可自定义续接话术（默认「继续，刚才mcp连接断开了」），支持单任务最大恢复次数上限。
 - **实时等待计时与一键「立即续接」**：HUD 与弹窗实时显示当前连接/等待耗时，并新增一键「立即续接」按钮，无需干等超时即可立即恢复对话。
 - **拟人防降速节流**：内置随机停顿缓冲、分段打字输入、悬停偏移点击与 60 秒滚动防突发节流，避免高频触发风控降速。

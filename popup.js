@@ -20,7 +20,8 @@
       { id: 'chatAutoContinue', key: 'autoContinue' },
       { id: 'chatBackgroundMode', key: 'backgroundMode' },
       { id: 'chatStallAlertEnabled', key: 'stallAlertEnabled' },
-      { id: 'chatStallAutoRecoverEnabled', key: 'stallAutoRecoverEnabled' }
+      { id: 'chatStallAutoRecoverEnabled', key: 'stallAutoRecoverEnabled' },
+      { id: 'chatModelLockEnabled', key: 'modelLockEnabled' }
     ];
 
     function byId(id) {
@@ -106,7 +107,9 @@
         'stopOnQuotaOrError',
         'humanPacingEnabled',
         'stallAlertEnabled',
-        'stallAutoRecoverEnabled'
+        'stallAutoRecoverEnabled',
+        'modelLockEnabled',
+        'stopOnModelUnavailable'
       ];
       for (const id of boolIds) {
         const el = byId(id);
@@ -128,8 +131,12 @@
       setVal('stallAutoRecoverMinutes', s.stallAutoRecoverMinutes);
       setVal('maxStallRecoveriesPerTask', s.maxStallRecoveriesPerTask);
       setVal('stallAutoRecoverPrompt', s.stallAutoRecoverPrompt);
+      setVal('preferredModel', s.preferredModel || '');
+      setVal('maxModelSwitchRetries', s.maxModelSwitchRetries);
       setVal('customAlwaysAllowKeywords', (s.customAlwaysAllowKeywords || []).join('\n'));
       setVal('customContinueKeywords', (s.customContinueKeywords || []).join('\n'));
+
+      renderModelChips(s, currentTabState);
 
       const btnToggleNotif = byId('btnToggleNotif');
       if (btnToggleNotif) {
@@ -208,6 +215,44 @@
       }
     }
 
+    function renderModelChips(settings, tabState) {
+      const wrap = byId('modelPresetChips');
+      if (!wrap || !d || typeof d.createElement !== 'function') return;
+      wrap.textContent = '';
+      const s = settings || currentSettings || D.DEFAULT_SETTINGS;
+      const pref = (s.preferredModel || '').trim().toLowerCase();
+      const detected =
+        tabState && Array.isArray(tabState.availableModels) ? tabState.availableModels : [];
+      const presets = Array.isArray(D.MODEL_PRESETS) ? D.MODEL_PRESETS : ['Pro', 'Thinking', 'Fast'];
+      const seen = new Set();
+      const combined = [];
+      for (const name of detected.concat(presets)) {
+        if (typeof name !== 'string') continue;
+        const clean = name.trim();
+        if (!clean) continue;
+        const key = clean.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        combined.push(clean);
+        if (combined.length >= 12) break;
+      }
+      for (const name of combined) {
+        const chip = d.createElement('button');
+        chip.type = 'button';
+        chip.className = pref && name.toLowerCase() === pref ? 'model-chip active' : 'model-chip';
+        chip.textContent = name;
+        chip.addEventListener('click', () => {
+          const inp = byId('preferredModel');
+          if (inp) inp.value = name;
+          saveSettings(
+            Object.assign({}, readSettingsFromForm(), { preferredModel: name }),
+            tr('toastModelSetCurrent', { model: name })
+          );
+        });
+        wrap.appendChild(chip);
+      }
+    }
+
     function renderStats(stats, settings) {
       const st = D.normalizeStats(stats);
       const s = D.mergeSettings(settings);
@@ -222,6 +267,21 @@
       currentTabState = tabState || null;
       currentTabMeta = meta || null;
       renderChatControl(tabState);
+      renderModelChips(currentSettings, tabState);
+
+      const detectedBadge = byId('detectedModelBadge');
+      if (detectedBadge) {
+        const detected = tabState && tabState.detectedModel ? String(tabState.detectedModel) : '';
+        detectedBadge.textContent = detected || tr('modelUnknown');
+        const mismatch = Boolean(
+          tabState && tabState.settings && tabState.settings.modelLockEnabled && tabState.modelMismatchActive
+        );
+        detectedBadge.className = mismatch
+          ? 'model-live-pill warn'
+          : detected
+            ? 'model-live-pill ok'
+            : 'model-live-pill';
+      }
 
       const liveEl = byId('statLive');
       if (!liveEl) return;
@@ -241,7 +301,10 @@
         return;
       }
       if (tabState.circuitBreaker && tabState.circuitBreaker.tripped) {
-        liveEl.textContent = tr('liveTripped');
+        liveEl.textContent =
+          tabState.circuitBreaker.reasonCode === 'model_unavailable'
+            ? tr('liveModelError')
+            : tr('liveTripped');
         liveEl.className = 'badge-stop';
       } else if (!tabState.settings || !tabState.settings.enabled) {
         liveEl.textContent = tr('livePaused');
@@ -322,6 +385,19 @@
             byId('stallAutoRecoverPrompt')
               ? getStr('stallAutoRecoverPrompt')
               : currentSettings.stallAutoRecoverPrompt,
+          modelLockEnabled: getBool('modelLockEnabled', D.DEFAULT_SETTINGS.modelLockEnabled),
+          preferredModel:
+            byId('preferredModel')
+              ? D.sanitizeModelName(getStr('preferredModel'), '')
+              : currentSettings.preferredModel,
+          maxModelSwitchRetries: getNum(
+            'maxModelSwitchRetries',
+            D.DEFAULT_SETTINGS.maxModelSwitchRetries
+          ),
+          stopOnModelUnavailable: getBool(
+            'stopOnModelUnavailable',
+            D.DEFAULT_SETTINGS.stopOnModelUnavailable
+          ),
           customAlwaysAllowKeywords: D.parseKeywordInput(getStr('customAlwaysAllowKeywords')),
           customContinueKeywords: D.parseKeywordInput(getStr('customContinueKeywords'))
         })
@@ -573,7 +649,9 @@
         'stopOnQuotaOrError',
         'humanPacingEnabled',
         'stallAlertEnabled',
-        'stallAutoRecoverEnabled'
+        'stallAutoRecoverEnabled',
+        'modelLockEnabled',
+        'stopOnModelUnavailable'
       ];
       for (const id of autoSyncToggleIds) {
         const el = byId(id);
@@ -593,6 +671,8 @@
         'stallAutoRecoverMinutes',
         'maxStallRecoveriesPerTask',
         'stallAutoRecoverPrompt',
+        'preferredModel',
+        'maxModelSwitchRetries',
         'customAlwaysAllowKeywords',
         'customContinueKeywords'
       ];
@@ -606,6 +686,79 @@
             scheduleAutoSave();
           });
         }
+      }
+
+      const btnUseCurrentModel = byId('btnUseCurrentModel');
+      if (btnUseCurrentModel) {
+        btnUseCurrentModel.addEventListener('click', () => {
+          sendToActiveGeminiTab({ type: 'GMAH_USE_CURRENT_MODEL' }, (state, meta) => {
+            renderLiveStatus(state, meta);
+            const detected = state && state.detectedModel ? String(state.detectedModel) : '';
+            if (detected) {
+              const inp = byId('preferredModel');
+              if (inp) inp.value = detected;
+              saveSettings(
+                Object.assign({}, readSettingsFromForm(), { preferredModel: detected }),
+                tr('toastModelSetCurrent', { model: detected })
+              );
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast(tr('toastNeedsReload'), true);
+            } else {
+              showToast(tr('toastModelNotDetected'), true);
+            }
+          });
+        });
+      }
+
+      const btnDetectModels = byId('btnDetectModels');
+      if (btnDetectModels) {
+        btnDetectModels.addEventListener('click', () => {
+          sendToActiveGeminiTab({ type: 'GMAH_DETECT_MODELS' }, (state, meta) => {
+            renderLiveStatus(state, meta);
+            if (!state) {
+              showToast(meta && meta.reason === 'needs_reload' ? tr('toastNeedsReload') : tr('toastNoGeminiTab'), true);
+              return;
+            }
+            const count = Array.isArray(state.availableModels) ? state.availableModels.length : 0;
+            if (count > 0) {
+              showToast(tr('toastModelDetectedCount', { count }));
+            } else {
+              // Menu opens asynchronously; fetch refreshed state shortly after
+              setTimeout(() => {
+                sendToActiveGeminiTab({ type: 'GMAH_GET_STATE' }, (refreshed, refreshedMeta) => {
+                  renderLiveStatus(refreshed, refreshedMeta);
+                  const n = refreshed && Array.isArray(refreshed.availableModels) ? refreshed.availableModels.length : 0;
+                  if (n > 0) showToast(tr('toastModelDetectedCount', { count: n }));
+                  else showToast(tr('toastModelNotDetected'), true);
+                });
+              }, 700);
+            }
+          });
+        });
+      }
+
+      const btnSwitchModelNow = byId('btnSwitchModelNow');
+      if (btnSwitchModelNow) {
+        btnSwitchModelNow.addEventListener('click', () => {
+          const target = D.sanitizeModelName(
+            byId('preferredModel') ? byId('preferredModel').value : currentSettings.preferredModel,
+            ''
+          );
+          if (!target) {
+            showToast(tr('toastModelNoTarget'), true);
+            return;
+          }
+          sendToActiveGeminiTab({ type: 'GMAH_FORCE_MODEL_SWITCH', model: target }, (state, meta) => {
+            renderLiveStatus(state, meta);
+            if (state) {
+              showToast(tr('toastModelSwitchTriggered', { model: target }));
+            } else if (meta && meta.reason === 'needs_reload') {
+              showToast(tr('toastNeedsReload'), true);
+            } else {
+              showToast(tr('toastNoGeminiTab'), true);
+            }
+          });
+        });
       }
 
       const btnToggleNotif = byId('btnToggleNotif');

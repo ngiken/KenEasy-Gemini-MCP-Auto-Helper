@@ -1,5 +1,5 @@
 ================================================================================
-Chrome Web Store Reviewer - Permissions Justifications (v2.0)
+Chrome Web Store Reviewer - Permissions Justifications (v2.2)
 (直接复制每一项后面的英文文本粘贴到 Chrome 开发者后台对应权限说明输入框)
 ================================================================================
 

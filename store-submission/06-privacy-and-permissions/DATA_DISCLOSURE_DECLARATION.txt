@@ -1,5 +1,5 @@
 ================================================================================
-Chrome Web Store - Data Usage & Privacy Declaration Guide (v2.0)
+Chrome Web Store - Data Usage & Privacy Declaration Guide (v2.2)
 (Chrome 开发者后台「隐私权规范 / Privacy practices」选项填写指引)
 ================================================================================
 

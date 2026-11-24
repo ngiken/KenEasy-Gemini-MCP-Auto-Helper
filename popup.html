@@ -14,10 +14,10 @@
         <div class="brand-info">
           <div class="brand-title-row">
             <h1 data-i18n="popupTitle">Gemini MCP 助手</h1>
-            <span class="badge-beta" id="popupBetaBadge" data-i18n="betaBadge">v2.0</span>
+            <span class="badge-beta" id="popupBetaBadge" data-i18n="betaBadge">v2.2</span>
           </div>
-          <p class="subtitle" data-i18n="popupSubtitle">自动允许 · 多语言黑白模式 · 防误触熔断</p>
-          <div class="beta-notice" data-i18n="popupBetaNotice">✅ 正式发布版 (v2.0)</div>
+          <p class="subtitle" data-i18n="popupSubtitle">自动允许 · 默认模型锁定 · 多语言防误触</p>
+          <div class="beta-notice" data-i18n="popupBetaNotice">✅ 正式发布版 (v2.2)</div>
         </div>
       </div>
       <label class="switch" title="总开关" data-i18n-title="popupMasterTitle">
@@ -91,6 +91,10 @@
           <span data-i18n="hudRowStallRecover">超时自动续接</span>
           <input type="checkbox" id="chatStallAutoRecoverEnabled" />
         </label>
+        <label class="chat-toggle-item">
+          <span data-i18n="lblChatModelLock">锁定默认模型</span>
+          <input type="checkbox" id="chatModelLockEnabled" />
+        </label>
       </div>
 
       <div class="chat-action-row">
@@ -132,6 +136,37 @@
         <span data-i18n="lblShowHud">在 Gemini 页面显示悬浮窗</span>
         <input type="checkbox" id="showHud" />
       </label>
+    </section>
+
+    <section class="card">
+      <div class="card-header-row">
+        <h2 data-i18n="secModelLock">默认模型锁定与自动切换</h2>
+        <span class="model-live-pill" id="detectedModelBadge" data-i18n="modelUnknown">未检测到</span>
+      </div>
+      <label class="toggle-row">
+        <span data-i18n="lblModelLockEnable">启用默认模型锁定（偏离自动切回，不可用时报错停止）</span>
+        <input type="checkbox" id="modelLockEnabled" />
+      </label>
+      <label class="field">
+        <span data-i18n="lblPreferredModel">默认工作模型（可点选预设或输入任意模型名）</span>
+        <input type="text" id="preferredModel" maxlength="80" placeholder="例如：Pro、Thinking、Fast、2.5 Pro" data-i18n-placeholder="phPreferredModel" />
+      </label>
+      <div class="model-preset-chips" id="modelPresetChips"></div>
+      <div class="inline-actions-2">
+        <button type="button" id="btnUseCurrentModel" class="btn secondary btn-sm" data-i18n="btnUseCurrentModel">使用当前模型</button>
+        <button type="button" id="btnDetectModels" class="btn secondary btn-sm" data-i18n="btnDetectModels">探测模型</button>
+      </div>
+      <div class="inline-field">
+        <label class="field">
+          <span data-i18n="lblModelMaxRetries">切回失败重试上限</span>
+          <input type="number" id="maxModelSwitchRetries" min="1" max="10" step="1" />
+        </label>
+      </div>
+      <label class="toggle-row">
+        <span data-i18n="lblStopOnModelUnavailable">目标模型不可用或反复被切回时立即报错停止</span>
+        <input type="checkbox" id="stopOnModelUnavailable" />
+      </label>
+      <button type="button" id="btnSwitchModelNow" class="btn secondary btn-sm" data-i18n="btnSwitchModelNow">🔄 立即检测并切回默认模型</button>
     </section>
 
     <section class="card">

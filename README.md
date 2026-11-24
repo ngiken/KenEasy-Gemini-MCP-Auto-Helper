@@ -4,7 +4,7 @@
   <h1>KenEasy Gemini MCP Auto Helper</h1>
 
   <p>
-    An intelligent automation extension tailored for <b>Google Gemini</b> web UI: redesigned with a clean <b>Notion-style UI (Paper Light &amp; Charcoal Dark)</b>, <b>per-chat independent toggles &amp; isolated emergency stop</b>, auto-approval of MCP tool permissions ("Always allow"), "Continue / Yes" follow-up chip clicking, <b>MAIN-world background/minimized click escalation, live MCP wait timer, stall auto-stop &amp; custom reconnect prompt (default: "继续，刚才mcp连接断开了"), one-click "Resume Now", human-like anti-throttling pacing, and a never-sleep MV3 background engine</b>, with <b>4 languages</b>, zero-glitch hold-to-drag HUD, desktop stall alerts, and a 6-layer circuit breaker.
+    An intelligent automation extension tailored for <b>Google Gemini</b> web UI: featuring <b>Default Model Lock &amp; Responsive Auto-Switch Guard (auto-switches back on drift, hard error stop when unavailable)</b>, a clean <b>Notion-style UI (Paper Light &amp; Charcoal Dark)</b>, <b>per-chat independent toggles &amp; isolated emergency stop</b>, auto-approval of MCP tool permissions ("Always allow"), "Continue / Yes" follow-up chip clicking, <b>MAIN-world background/minimized/sleep click escalation, live MCP wait timer, stall auto-stop &amp; custom reconnect prompt (default: "继续，刚才mcp连接断开了"), one-click "Resume Now", human-like anti-throttling pacing, and a never-sleep MV3 background engine</b>, with <b>4 languages</b>, zero-glitch hold-to-drag HUD, desktop stall alerts, and a 6-layer circuit breaker.
   </p>
 
   <p>
@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v2.0-16a34a?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v2.2-16a34a?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,10 +24,10 @@
 </div>
 
 > [!NOTE]
-> ### ✅ Stable Release (v2.0)
-> **KenEasy Gemini MCP Auto Helper v2.0** is now officially released!
-> Featuring a completely refactored Notion-style UI (Paper Light &amp; Charcoal Dark), per-chat independent toggles &amp; isolated emergency stop, MAIN-world background/minimized click escalation, live connection wait timer, stall auto-stop &amp; custom reconnect prompt, human-like anti-throttling pacing, 6-layer circuit breaker, 4-language support, and 116/116 passing automated &amp; stress tests.
-> - Customize your reconnect prompt or keywords anytime in the popup settings, or report Gemini UI updates on [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues).
+> ### ✅ Stable Release (v2.2)
+> **KenEasy Gemini MCP Auto Helper v2.2** is now officially released!
+> Introducing **Default Model Lock &amp; Responsive Auto-Switch Guard** (auto-detects &amp; switches back to your preferred model across desktop, split-screen, narrow/mobile, high-zoom, and minimized/background windows — and halts with a clear `ERR` alert if the model is unavailable or keeps reverting), alongside Notion-style UI, per-chat independent toggles &amp; isolated emergency stop, MAIN-world background/sleep continuation, stall auto-resume, human-like pacing, 6-layer circuit breaker, 4-language support, and **129/129** passing automated &amp; E2E tests.
+> - Customize your default model, reconnect prompt, or keywords anytime in the HUD or popup settings, or report Gemini UI updates on [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues).
 > - Star 🌟 and PR contributions are warmly welcomed!
 
 ---
@@ -44,8 +44,8 @@ The extension has been submitted for Chrome Web Store security review. Once appr
 
 Click either link below to **immediately download the `.zip` package with one click**:
 
-- 📦 **[Direct Download: Manual Install Bundle (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-manual-install.zip)** (Recommended — extracts to `KenEasy-Gemini-MCP-Auto-Helper/` folder with docs)
-- 🏪 **[Direct Download: Clean Extension Zip (`KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.0/KenEasy-Gemini-MCP-Auto-Helper-v2.0-store.zip)** (Clean root containing `manifest.json`)
+- 📦 **[Direct Download: Manual Install Bundle (`KenEasy-Gemini-MCP-Auto-Helper-v2.2-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.2/KenEasy-Gemini-MCP-Auto-Helper-v2.2-manual-install.zip)** (Recommended — extracts to `KenEasy-Gemini-MCP-Auto-Helper/` folder with docs)
+- 🏪 **[Direct Download: Clean Extension Zip (`KenEasy-Gemini-MCP-Auto-Helper-v2.2-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v2.2/KenEasy-Gemini-MCP-Auto-Helper-v2.2-store.zip)** (Clean root containing `manifest.json`)
 
 Installation steps:
 1. Click a link above to download the `.zip` file and extract it to a local folder (e.g. `E:\code\KenEasy-Gemini-MCP-Auto-Helper`).
@@ -61,7 +61,15 @@ Installation steps:
 
 ## 🎬 Core Features Walkthrough & Demos (Latest Highlights)
 
-### 0. Notion-Style UI Refactor & Per-Chat Independent Controls / Isolated Emergency Stop 🆕
+### 0. Default Model Lock & Responsive Auto-Switch Guard (v2.2 🆕)
+> Set your preferred working model once (e.g., `Pro`, `Thinking`, `Fast`, `2.5 Pro`, or any custom model name) — the extension continuously verifies Gemini's active model across **desktop wide screens, split-screen windows, narrow/mobile bottom sheets, high zoom levels, and minimized/background tabs**.
+>
+> - **Automatic Drift Recovery**: Automatically selects your default model on fresh `/app` chats, before clicking **Continue**, and before **Stall Auto-Recovery** sends its reconnect prompt — without ever interrupting active streaming or MCP tool calls.
+> - **Cross-Language & Anti-Collision Matching**: Understands localized labels (`Fast` / `快速` / `高速`, `Thinking` / `思考` / `思考モード`, `Gemini 2.5 Pro` ↔ `2.5 Pro`), ignores upsell banners (`Upgrade to Google AI Pro`), and prevents cross-tier collisions (target `Pro` never clicks `Thinking with 3 Pro`).
+> - **Hard Error Stop When Unavailable**: If the preferred model is disabled/quota-locked, missing from the picker, rejected by an error banner, or repeatedly reverted by Gemini beyond your retry cap (default 3), automation halts cleanly (`model_unavailable`), shows a red `ERR` badge on the extension icon, and sends a localized OS desktop notification so you never waste turns on the wrong model.
+> - **One-Click Controls Everywhere**: Configure, auto-detect available models, or snap to the active page model directly from the collapsible **HUD Model Panel** or the **Extension Popup**, with independent per-chat on/off overrides.
+
+### 1. Notion-Style UI Refactor & Per-Chat Independent Controls / Isolated Emergency Stop
 > Both the Floating HUD and Extension Popup have been completely redesigned around Notion's calm, flat aesthetic: **Paper Light (`#FFFFFF / #F7F6F3`, `#37352F` ink)** and **Charcoal Dark (`#191919 / #202020`, `#E6E6E4` text)** palettes, 1px hairline borders, subtle hover fills, and low-saturation semantic tones with zero neon glows.
 
 <div align="center">
@@ -119,8 +127,9 @@ Every Gemini conversation (automatically keyed by URL: `/app/<id>`, `/u/<n>/app/
 
 | Category | Feature | Technical Breakdown |
 | :--- | :--- | :--- |
-| **Notion-Style UI** 🆕 | Paper Light & Charcoal Dark | Flat Notion-inspired aesthetic across HUD & Popup with 1px hairline borders, subtle hover states, active drawer highlights, Clear/Refresh toolbars, and strict zero-`innerHTML` Trusted Types CSP compliance. |
-| **Per-Chat Controls** 🆕 | Scoped Overrides & Migration | Independently toggle 6 core switches per conversation via the HUD (`This chat / Global` bar) or Popup (`This Conversation` card), with blue override markers, one-click `Reset`, and `/app` → `/app/<id>` migration. |
+| **Default Model Lock** 🆕 | Auto-Switch & Hard Error Stop | Locks your preferred working model globally or per chat across `<header>`, composer bar, Shadow DOM, narrow mobile bottom sheets, high zoom (`visualViewport`), and background/minimized tabs; halts with red `ERR` badge & OS alert if unavailable or repeatedly reverted. |
+| **Notion-Style UI** | Paper Light & Charcoal Dark | Flat Notion-inspired aesthetic across HUD & Popup with 1px hairline borders, subtle hover states, active drawer highlights, Clear/Refresh toolbars, responsive compact `@media` rules, and strict zero-`innerHTML` Trusted Types CSP compliance. |
+| **Per-Chat Controls** | Scoped Overrides & Migration | Independently toggle 7 core switches (including Model Lock) per conversation via the HUD (`This chat / Global` bar) or Popup (`This Conversation` card), with blue override markers, one-click `Reset`, and `/app` → `/app/<id>` migration. |
 | **Isolated E-Stop** 🆕 | Single-Chat vs. All-Chats | **E-Stop** / **Stop this chat** halts only the current conversation and persists across navigation while other chats keep running; **Stop All Chats** broadcasts emergency stop to all Gemini tabs on demand. |
 | **Background Engine** 🆕 | MAIN-World Escalation & Keepalive | Combines ~19.5s MV3 SW keepalive, 4-min Port rotation, unthrottled SW ticks, `1200ms` minimize follow-up wakeups, per-chat `autoDiscardable: false` isolation, and `MAIN`-world Shadow DOM / chip click escalation. |
 | **MCP Auto-Approval** | Always Allow Priority | Prefers and auto-clicks `Always allow` (and localized equivalents), penetrating Material Web Components `<slot>` projections, split inline `<span>` labels, and `role="menu"` / `role="menuitem"` dropdowns. |
@@ -246,16 +255,33 @@ No. The engine applies an explicit exclusion blacklist (blocking terms like dele
 Click the **"Restore Defaults"** button at the bottom of the extension popup. This resets all thresholds, cooldowns, and keyword sets to safe official defaults.
 </details>
 
+<details>
+<summary><b>Q7: How does Default Model Lock work if my preferred model hits its quota or becomes unavailable?</b></summary>
+
+1. Open the HUD **Model Lock** picker (or the **Default Model Lock** card in Popup), click **"Use Current"** or pick/enter your target model (e.g., `Pro`, `Thinking`, `2.5 Pro`), and enable **Model Lock**.
+2. Whenever Gemini drifts or resets to another model, the extension automatically switches back before continuing.
+3. If the target model is disabled/locked, missing, rejected by a quota banner, or keeps getting reverted beyond your configured retry limit (default 3), the extension triggers a hard `model_unavailable` stop, flags a red **`ERR`** badge, and sends a desktop notification so you can switch models or reset cleanly.
+</details>
+
 ---
 
 ## 📝 Changelog
 
-### v2.0 - 2026-11-24
+### [v2.2](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v2.2) - 2026-11-24
+- **Default Model Lock & Responsive Auto-Switch Guard**: Added global & per-chat model locking (`modelLockEnabled`, `preferredModel`, `maxModelSwitchRetries`, `stopOnModelUnavailable`) with HUD collapsible model panel, Popup quick-pick chips, one-click **Use Current / Detect Models / Switch Now**, and pre-continue + pre-stall-recovery verification.
+- **Full Multi-Size, Zoom & Background Compatibility**: Works seamlessly across desktop `<header>`, bottom composer, Shadow DOM, narrow mobile icon-only triggers + `mat-bottom-sheet-container`, duplicate responsive triggers, high zoom (`visualViewport` + scrollable HUD), and minimized/background tabs with double-toggle prevention in `MAIN`-world clicks.
+- **Hard Error Stop & Anti-Flap Protection**: Detects disabled/quota-locked options, missing models, error snackbars, and repeated Gemini model reverts; cleanly closes menus, trips `model_unavailable` (halting all automation), sets a red `ERR` icon badge, and dispatches a localized OS desktop alert — verified at **129/129 passing tests**.
+
+### [v2.0](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v2.0) - 2026-11-24
+- **Background, Minimized & Screen-Off / Sleep Continuity Overhaul**: Expanded `isBackgroundOrUnfocused` detection for minimized, occluded, and off-screen windows; added immediate `MAIN`-world click escalation (`triggerMainWorldClick`) on initial clicks for both `Always allow` and `Continue` chips alongside retries and stall-recovery send flows.
+- **Post-Sleep & Visibility Wakeup Recovery**: Automatically re-acquires the shared background keepalive Web Lock (`syncBackgroundKeepaliveLock`), rotates/reconnects the Service Worker port (`forceReconnectBackgroundPort`), and triggers an immediate scan upon returning from hidden, screen-off, or sleep states (**116/116 passing tests**).
+
+### [v1.0.1](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v1.0.1) - 2026-11-24
 - **Notion-Style UI Complete Refactor**: Rebuilt HUD and Popup stylesheets with Paper Light (`#FFFFFF / #F7F6F3`) & Charcoal Dark (`#191919 / #202020`) palettes, 1px hairline borders, active drawer highlights, Clear/Refresh toolbars, and real-DOM 2x headless Chrome previews (`assets/notion-ui-preview.png`).
 - **Per-Chat Independent Controls & Isolated Emergency Stop**: Added URL-keyed `gmah_chat_overrides_v1` overrides, HUD **`This chat / Global`** segmented switcher, Popup **`This Conversation`** card, single-chat **`E-Stop`** isolated across SPA navigation, **`Stop All Chats`** broadcast action, `/app` → `/app/<id>` override migration, and one-click **`Reset`**.
-- **Background / Minimized Clicking & Deep Boundary Hardening**: Added `MAIN`-world click escalation (`mainWorldClickByToken`, piercing ShadowRoots & `<mat-chip>` across Allow, Continue, and Stall-Recovery Stop/Send), per-chat background heartbeat & `autoDiscardable` isolation, `1200ms` minimize follow-up wakeups, and 27 deep boundary/fuzz guards — verified at **116/116 passing tests**.
+- **Background / Minimized Clicking & Deep Boundary Hardening**: Added `MAIN`-world click escalation (`mainWorldClickByToken`, piercing ShadowRoots & `<mat-chip>`), per-chat background heartbeat & `autoDiscardable` isolation, `1200ms` minimize follow-up wakeups, and 27 deep boundary/fuzz guards (**115/115 passing tests**).
 
-### v1.0.0 (Official Release) - 2026-11-23
+### [v1.0.0 (Official Release)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/tag/v1.0.0) - 2026-11-23
 - **Stall Auto-Stop & Custom Reconnect Prompt**: Automatically cancels stuck MCP/Gemini turns past the configured timeout (default 5 min) and sends a customizable reconnect prompt (default `继续，刚才mcp连接断开了`) with draft protection and per-task recovery cap.
 - **Live Wait Timer & One-Click Immediate Resume**: Real-time connecting/wait elapsed timer in HUD & Popup plus a one-click **"Resume Now"** button to recover immediately without waiting.
 - **Human-Like Anti-Throttling Pacing**: Randomized post-stop/pre-send pauses, chunked typing, natural hover + off-center click jitter, and a 60s rolling anti-burst governor.

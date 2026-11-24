@@ -74,6 +74,27 @@
         if (/\bstop(?:-button)?\b/i.test(sendCls) || /\bstop\b|停止|取消生成|终止|終止|中止/i.test(sendAria)) {
           return { clicked: false, reason: 'already_sending' };
         }
+      } else if (kind === 'model_trigger') {
+        // Prevent double-toggling an already-opened model switcher menu
+        if (el.getAttribute && el.getAttribute('aria-expanded') === 'true') {
+          return { clicked: false, reason: 'already_expanded' };
+        }
+        try {
+          if (
+            document.querySelector(
+              'bard-mode-switcher-menu, .mat-mdc-menu-panel, mat-bottom-sheet-container, .cdk-overlay-pane [role="menu"]'
+            )
+          ) {
+            return { clicked: false, reason: 'menu_already_open' };
+          }
+        } catch (_) {}
+      } else if (kind === 'model_option') {
+        if (
+          el.getAttribute &&
+          (el.getAttribute('aria-checked') === 'true' || el.getAttribute('aria-selected') === 'true')
+        ) {
+          return { clicked: false, reason: 'already_selected' };
+        }
       }
       if (typeof window.getComputedStyle === 'function') {
         const st = window.getComputedStyle(el);
@@ -702,8 +723,9 @@
       const reasonCode = (payload && payload.reasonCode) || 'breaker';
       const reason = (payload && payload.reason) || '';
       const isEmergency = reasonCode === 'emergency_stop';
-      const badgeText = isEmergency ? '!' : '!!';
-      const badgeColor = isEmergency ? '#ea4335' : '#fbbc04';
+      const isModelError = reasonCode === 'model_unavailable';
+      const badgeText = isModelError ? 'ERR' : isEmergency ? '!' : '!!';
+      const badgeColor = isEmergency || isModelError ? '#ea4335' : '#fbbc04';
       breakerBadgeMap.set(tabId, { text: badgeText, color: badgeColor });
       persistBreakerBadges();
       setTabBadge(tabId, badgeText, badgeColor);
@@ -719,17 +741,27 @@
           ? api.runtime.getURL('icons/icon128.png')
           : 'icons/icon128.png';
       try {
+        const title = isModelError
+          ? trBg('bgNotifModelErrorTitle', null, 'Gemini 默认模型不可用，已报错停止')
+          : trBg('bgNotifBreakerTitle', null, 'Gemini 自动助手已触发安全熔断');
+        const message = isModelError
+          ? trBg(
+              'bgNotifModelErrorMsg',
+              { reason: reason || reasonCode },
+              `${reason || reasonCode}。点击此处切回对应 Gemini 标签页处理。`
+            )
+          : trBg(
+              'bgNotifBreakerMsg',
+              { reason: reason || reasonCode },
+              `${reason || reasonCode}。点击此处切回对应 Gemini 标签页查看。`
+            );
         const res = api.notifications.create(
           notifId,
           {
             type: 'basic',
             iconUrl,
-            title: trBg('bgNotifBreakerTitle', null, 'Gemini 自动助手已触发安全熔断'),
-            message: trBg(
-              'bgNotifBreakerMsg',
-              { reason: reason || reasonCode },
-              `${reason || reasonCode}。点击此处切回对应 Gemini 标签页查看。`
-            ),
+            title,
+            message,
             priority: 2,
             requireInteraction: true
           },

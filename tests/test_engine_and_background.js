@@ -1789,14 +1789,15 @@ function runTests(test) {
       const rootEl = hud.mount();
       assert.ok(rootEl && doc.getElementById('gmah-hud'));
 
-      // Check the 5th row (桌面通知) and 6th row (超时自动续接)
+      // Check the 5th row (桌面通知), 6th row (超时自动续接), and 7th row (默认模型)
       const rows = rootEl.querySelectorAll('.gmah-row');
-      assert.strictEqual(rows.length, 6, 'HUD must have 6 control rows including desktop notifications and stall auto-recovery');
+      assert.strictEqual(rows.length, 7, 'HUD must have 7 control rows including desktop notifications, stall auto-recovery, and default model lock');
       const notifRow = rows[4];
       assert.ok(notifRow.textContent.includes('桌面通知'));
       const notifPill = notifRow.querySelector('.gmah-pill');
       assert.ok(notifPill);
       assert.ok(rows[5].textContent.includes('超时自动续接'));
+      assert.ok(rows[6].textContent.includes('默认模型'));
 
       hud.update(engine.getState());
       assert.strictEqual(notifPill.textContent, '已开启');
@@ -1932,7 +1933,7 @@ function runTests(test) {
       // Version badge check
       const betaBadge = rootEl.querySelector('.gmah-badge-beta');
       assert.ok(betaBadge, 'HUD must contain .gmah-badge-beta element');
-      assert.strictEqual(betaBadge.textContent, '2.0');
+      assert.strictEqual(betaBadge.textContent, '2.2');
 
       // Restored initial position
       assert.strictEqual(rootEl.style.left, '200px');

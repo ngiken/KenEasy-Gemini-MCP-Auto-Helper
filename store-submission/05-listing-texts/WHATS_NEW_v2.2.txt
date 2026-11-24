@@ -1,0 +1,25 @@
+【Chrome Web Store 更新說明 · v2.2 Release】
+
+============================================================
+English (Release Notes / Update Summary)
+============================================================
+v2.2 Update:
+• Default Model Lock & Responsive Auto-Switch Guard: Set your preferred working model (presets, custom input, or one-click Use Current / Detect Models) globally or per chat. Automatically switches back whenever Gemini drifts across desktop headers, composer toolbars, Shadow DOM, narrow/mobile bottom sheets, high zoom, and minimized/background tabs.
+• Hard Error Stop & Anti-Flap Protection: Immediately halts all automation (`model_unavailable`), flags a red `ERR` icon badge, and sends a localized OS desktop notification if the target model is disabled/quota-locked, missing, rejected by an error banner, or repeatedly reverted beyond your retry cap.
+• Responsive HUD & Full Verification: Added scrollable small-window HUD layout with `visualViewport` clamping, double-toggle prevention in `MAIN`-world clicks, repaired README/Release notes, and passed all 129/129 automated & E2E tests.
+
+============================================================
+繁體中文（更新說明）
+============================================================
+v2.2 更新內容：
+• 預設模型鎖定與全尺寸自動切換守護：支援全域或單對話設定預設工作模型（快速預設、自由輸入或一鍵設為目前/探測清單），全面相容桌面頂部列、輸入框工具列、Shadow DOM、窄屏行動端底部抽屜、高縮放比例與背景/最小化分頁，偏離時自動切回。
+• 不可用報錯停機與防回彈保護：當目標模型置灰/達上限、選單缺失、彈出限流報錯或反覆被切回超過重試上限時，立即觸發 `model_unavailable` 全面停機、圖示亮紅 `ERR` 角標並發送桌面通知。
+• 響應式懸浮窗與全量驗證：新增小視窗滾動與 `visualViewport` 貼邊約束、`MAIN` 世界點擊防重複切換保護，同步修復 README/Release 文件，129/129 項自動化與端到端測試全數通過。
+
+============================================================
+简体中文（更新说明）
+============================================================
+v2.2 更新内容：
+• 默认模型锁定与全尺寸自动切换守护：支持全局或单对话设置默认工作模型（快速预设、自由输入或一键设为当前/探测列表），全面兼容桌面顶部栏、输入框工具栏、Shadow DOM、窄屏移动端底部抽屉、高缩放比例与后台/最小化标签页，偏离时自动切回。
+• 不可用报错停机与防回弹保护：当目标模型置灰/达上限、菜单缺失、弹出限流报错或反复被切回超过重试上限时，立即触发 `model_unavailable` 全面停机、图标亮红 `ERR` 角标并发送桌面通知。
+• 响应式悬浮窗与全量验证：新增小窗口滚动与 `visualViewport` 贴边约束、`MAIN` 世界点击防重复切换保护，同步修复 README/Release 文档，129/129 项自动化与端到端测试全部通过。

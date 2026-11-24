@@ -118,8 +118,21 @@
     function applyPosition(left, top) {
       if (!container) return { left: 0, top: 0 };
       const win = getWindow();
-      const vw = (win && typeof win.innerWidth === 'number') ? win.innerWidth : 1024;
-      const vh = (win && typeof win.innerHeight === 'number') ? win.innerHeight : 768;
+      const vv = win && win.visualViewport;
+      const rawVw =
+        vv && typeof vv.width === 'number' && vv.width > 0
+          ? vv.width
+          : win && typeof win.innerWidth === 'number'
+            ? win.innerWidth
+            : 1024;
+      const rawVh =
+        vv && typeof vv.height === 'number' && vv.height > 0
+          ? vv.height
+          : win && typeof win.innerHeight === 'number'
+            ? win.innerHeight
+            : 768;
+      const vw = Math.round(rawVw);
+      const vh = Math.round(rawVh);
       // Guard against Windows minimized viewport (0x0) snapping the HUD to top-left (0, 0)
       if (vw < 120 || vh < 120) {
         const curLeft = container.style.left ? parseFloat(container.style.left) : Math.round(Number(left) || 0);
@@ -134,8 +147,8 @@
         if (container.getBoundingClientRect) r = container.getBoundingClientRect();
       } catch (_) {}
       if (!r) r = { width: 262, height: 290 };
-      const width = (r && typeof r.width === 'number' && r.width > 0) ? r.width : 262;
-      const height = (r && typeof r.height === 'number' && r.height > 0) ? r.height : 290;
+      const width = Math.min(vw, (r && typeof r.width === 'number' && r.width > 0) ? r.width : 262);
+      const height = Math.min(vh, (r && typeof r.height === 'number' && r.height > 0) ? r.height : 290);
 
       const maxLeft = Math.max(0, vw - width);
       const maxTop = Math.max(0, vh - height);
@@ -165,7 +178,10 @@
 
     function handleWinResize() {
       const w = getWindow();
-      if (w && (w.innerWidth < 120 || w.innerHeight < 120)) return;
+      const vv = w && w.visualViewport;
+      const vw = vv && typeof vv.width === 'number' ? vv.width : (w && w.innerWidth);
+      const vh = vv && typeof vv.height === 'number' ? vv.height : (w && w.innerHeight);
+      if (typeof vw === 'number' && typeof vh === 'number' && (vw < 120 || vh < 120)) return;
       ensureInViewport();
     }
 
@@ -183,6 +199,9 @@
         win.addEventListener('blur', handleWinBlur);
         win.addEventListener('pagehide', handleWinBlur);
         win.addEventListener('beforeunload', handleWinBlur);
+        if (win.visualViewport && typeof win.visualViewport.addEventListener === 'function') {
+          win.visualViewport.addEventListener('resize', handleWinResize);
+        }
         winListenersAttached = true;
       }
     }
@@ -195,6 +214,9 @@
         win.removeEventListener('blur', handleWinBlur);
         win.removeEventListener('pagehide', handleWinBlur);
         win.removeEventListener('beforeunload', handleWinBlur);
+        if (win.visualViewport && typeof win.visualViewport.removeEventListener === 'function') {
+          win.visualViewport.removeEventListener('resize', handleWinResize);
+        }
       }
       winListenersAttached = false;
     }
@@ -358,6 +380,24 @@
       stallRecoverControls.appendChild(btnStallRecover);
       rowStallRecover.appendChild(stallRecoverControls);
 
+      // Row 7: Default Model Lock Toggle + Model Picker Trigger
+      const rowModelLock = el('div', 'gmah-row');
+      const lblModelLockWrap = el('span', 'gmah-row-label');
+      const lblModelLock = el('span', '', tr('hudRowModelLock'));
+      const dotModelLockCustom = el('span', 'gmah-override-dot');
+      lblModelLockWrap.appendChild(lblModelLock);
+      lblModelLockWrap.appendChild(dotModelLockCustom);
+      rowModelLock.appendChild(lblModelLockWrap);
+      const modelLockControls = el('div', 'gmah-row-controls');
+      const btnModelPick = el('button', 'gmah-pill gmah-pill-action gmah-model-pick', tr('modelUnset'));
+      btnModelPick.type = 'button';
+      btnModelPick.title = tr('modelPickTip');
+      const btnModelLock = el('button', 'gmah-pill');
+      btnModelLock.type = 'button';
+      modelLockControls.appendChild(btnModelPick);
+      modelLockControls.appendChild(btnModelLock);
+      rowModelLock.appendChild(modelLockControls);
+
       // Live connection / wait elapsed timer bar (shown when waiting/connecting)
       const waitBar = el('div', 'gmah-wait-bar');
       waitBar.style.display = 'none';
@@ -388,6 +428,7 @@
       body.appendChild(rowBackground);
       body.appendChild(rowNotification);
       body.appendChild(rowStallRecover);
+      body.appendChild(rowModelLock);
       body.appendChild(waitBar);
       body.appendChild(statusBox);
       body.appendChild(actions);
@@ -699,6 +740,13 @@
       btnForceRecover.addEventListener('click', () => {
         if (cb.onForceStallRecover) cb.onForceStallRecover();
       });
+      btnModelLock.addEventListener('click', () => {
+        if (cb.onToggleModelLock) cb.onToggleModelLock(editScope);
+      });
+      btnModelPick.addEventListener('click', () => {
+        activePanel = activePanel === 'model' ? null : 'model';
+        renderPanel();
+      });
       btnEmergency.addEventListener('click', () => {
         if (currentState && currentState.circuitBreaker && currentState.circuitBreaker.tripped) {
           if (cb.onResetBreaker) cb.onResetBreaker();
@@ -756,6 +804,11 @@
         dotStallRecoverCustom,
         btnStallRecover,
         btnForceRecover,
+        rowModelLock,
+        lblModelLock,
+        dotModelLockCustom,
+        btnModelPick,
+        btnModelLock,
         waitBar,
         statusBox,
         btnEmergency,
@@ -871,6 +924,108 @@
           els.panel.appendChild(wrap);
         }
         ensureInViewport();
+        return;
+      }
+
+      if (activePanel === 'model') {
+        const s = (currentState && currentState.settings) || {};
+        const curModel = (currentState && currentState.detectedModel) || '';
+        const prefModel = s.preferredModel || '';
+        const detectedList =
+          currentState && Array.isArray(currentState.availableModels) ? currentState.availableModels : [];
+        const presets = (D && Array.isArray(D.MODEL_PRESETS) ? D.MODEL_PRESETS : ['Pro', 'Thinking', 'Fast']);
+
+        const toolbar = el('div', 'gmah-panel-toolbar');
+        const curLabel = el(
+          'span',
+          'gmah-panel-meta',
+          tr('modelPanelCurrent', { current: curModel || tr('modelUnknown') })
+        );
+        const detectBtn = el('button', 'gmah-panel-mini-btn', tr('modelPanelDetectBtn'));
+        detectBtn.type = 'button';
+        detectBtn.addEventListener('click', () => {
+          if (cb.onDetectModels) cb.onDetectModels();
+        });
+        toolbar.appendChild(curLabel);
+        toolbar.appendChild(detectBtn);
+        els.panel.appendChild(toolbar);
+
+        if (prefModel && curModel) {
+          const isMatched =
+            D && typeof D.isModelNameMatch === 'function'
+              ? D.isModelNameMatch(curModel, prefModel)
+              : curModel.toLowerCase() === prefModel.toLowerCase();
+          const stateBadge = el(
+            'div',
+            isMatched ? 'gmah-model-state ok' : 'gmah-model-state warn',
+            isMatched ? tr('modelPanelMatched') : tr('modelPanelMismatch')
+          );
+          els.panel.appendChild(stateBadge);
+        }
+
+        const inputRow = el('div', 'gmah-model-input-row');
+        const modelInput = el('input', 'gmah-model-input');
+        modelInput.type = 'text';
+        modelInput.maxLength = 80;
+        modelInput.value = prefModel;
+        modelInput.placeholder = tr('modelPanelPlaceholder');
+        const saveModelBtn = el('button', 'gmah-panel-mini-btn gmah-model-save', tr('modelPanelSaveBtn'));
+        saveModelBtn.type = 'button';
+        const commitModel = () => {
+          if (cb.onSetPreferredModel) cb.onSetPreferredModel(modelInput.value);
+        };
+        saveModelBtn.addEventListener('click', commitModel);
+        modelInput.addEventListener('keydown', (e) => {
+          if (e && e.key === 'Enter') {
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+            commitModel();
+          }
+        });
+        inputRow.appendChild(modelInput);
+        inputRow.appendChild(saveModelBtn);
+        els.panel.appendChild(inputRow);
+
+        const quickBtns = el('div', 'gmah-model-actions');
+        const useCurBtn = el('button', 'gmah-panel-mini-btn', tr('modelPanelUseCurrentBtn'));
+        useCurBtn.type = 'button';
+        useCurBtn.addEventListener('click', () => {
+          if (cb.onUseCurrentModel) {
+            const val = cb.onUseCurrentModel();
+            if (val) modelInput.value = val;
+          }
+        });
+        const switchNowBtn = el('button', 'gmah-panel-mini-btn', tr('modelPanelSwitchNowBtn'));
+        switchNowBtn.type = 'button';
+        switchNowBtn.addEventListener('click', () => {
+          if (cb.onForceModelSwitch) cb.onForceModelSwitch();
+        });
+        quickBtns.appendChild(useCurBtn);
+        quickBtns.appendChild(switchNowBtn);
+        els.panel.appendChild(quickBtns);
+
+        const appendChipsSection = (headingText, items) => {
+          if (!items || items.length === 0) return;
+          const lbl = el('div', 'gmah-panel-meta gmah-model-chips-label', headingText);
+          els.panel.appendChild(lbl);
+          const chipWrap = el('div', 'gmah-model-chips');
+          for (const name of items) {
+            const isSelected = Boolean(prefModel && name.toLowerCase() === prefModel.toLowerCase());
+            const chip = el('button', isSelected ? 'gmah-model-chip active' : 'gmah-model-chip', name);
+            chip.type = 'button';
+            chip.addEventListener('click', () => {
+              modelInput.value = name;
+              if (cb.onSetPreferredModel) cb.onSetPreferredModel(name);
+            });
+            chipWrap.appendChild(chip);
+          }
+          els.panel.appendChild(chipWrap);
+        };
+
+        if (detectedList.length > 0) {
+          appendChipsSection(tr('modelPanelDetectedLabel'), detectedList);
+        }
+        appendChipsSection(tr('modelPanelPresetsLabel'), presets);
+        ensureInViewport();
       }
     }
 
@@ -902,8 +1057,10 @@
         chatOverride.backgroundMode === true ? '1' : chatOverride.backgroundMode === false ? '0' : '-',
         chatOverride.stallAlertEnabled === true ? '1' : chatOverride.stallAlertEnabled === false ? '0' : '-',
         chatOverride.stallAutoRecoverEnabled === true ? '1' : chatOverride.stallAutoRecoverEnabled === false ? '0' : '-',
+        chatOverride.modelLockEnabled === true ? '1' : chatOverride.modelLockEnabled === false ? '0' : '-',
         chatOverride.emergencyStopped ? 'E' : '-'
       ].join('');
+      const availModelsSig = Array.isArray(state.availableModels) ? state.availableModels.join(',') : '';
       const renderSig = [
         effectiveScope,
         state.conversationKey || '',
@@ -919,12 +1076,15 @@
         s.backgroundMode ? 1 : 0,
         s.stallAlertEnabled ? 1 : 0,
         s.stallAutoRecoverEnabled ? 1 : 0,
+        s.modelLockEnabled ? 1 : 0,
+        s.preferredModel || '',
         g.enabled ? 1 : 0,
         g.autoAllow ? 1 : 0,
         g.autoContinue ? 1 : 0,
         g.backgroundMode ? 1 : 0,
         g.stallAlertEnabled ? 1 : 0,
         g.stallAutoRecoverEnabled ? 1 : 0,
+        g.modelLockEnabled ? 1 : 0,
         s.stallAutoRecoverMinutes || 5,
         s.stallAutoRecoverPrompt || '',
         s.maxContinuesPerTask,
@@ -937,6 +1097,10 @@
         state.stallAlertActive ? 1 : 0,
         state.stallRecoveryActive ? 1 : 0,
         state.stallRecoveryCount || 0,
+        state.detectedModel || '',
+        availModelsSig,
+        state.modelMismatchActive ? 1 : 0,
+        state.modelSwitchingActive ? 1 : 0,
         waitSec,
         waitLabel,
         cbState.tripped ? 1 : 0,
@@ -1013,6 +1177,9 @@
       if (els.lblStallRecover) {
         els.lblStallRecover.textContent = tr('hudRowStallRecover');
       }
+      if (els.lblModelLock) {
+        els.lblModelLock.textContent = tr('hudRowModelLock');
+      }
       els.btnInspect.textContent = tr('btnInspect');
       els.btnLogs.textContent = tr('btnLogs');
 
@@ -1032,6 +1199,7 @@
       markOverride(els.rowBackground, els.dotBackgroundCustom, 'backgroundMode');
       markOverride(els.rowNotification, els.dotNotificationCustom, 'stallAlertEnabled');
       markOverride(els.rowStallRecover, els.dotStallRecoverCustom, 'stallAutoRecoverEnabled');
+      markOverride(els.rowModelLock, els.dotModelLockCustom, 'modelLockEnabled');
 
       // Minimized state
       const wasMinimized = lastMinimized;
@@ -1052,10 +1220,13 @@
       // Status dot (always reflects effective state of current conversation)
       let dotClass = 'gmah-dot';
       if (cbState.tripped) {
-        dotClass += cbState.reasonCode === 'emergency_stop' ? ' stopped' : ' warn';
-      } else if (state.stallAlertActive || state.stallRecoveryActive) {
+        dotClass +=
+          cbState.reasonCode === 'emergency_stop' || cbState.reasonCode === 'model_unavailable'
+            ? ' stopped'
+            : ' warn';
+      } else if (state.stallAlertActive || state.stallRecoveryActive || state.modelSwitchingActive) {
         dotClass += ' warn';
-      } else if (s.enabled && (s.autoAllow || s.autoContinue)) {
+      } else if (s.enabled && (s.autoAllow || s.autoContinue || s.modelLockEnabled)) {
         dotClass += ' active';
       }
       els.dot.className = dotClass;
@@ -1102,8 +1273,26 @@
         els.btnForceRecover.title = tr('btnForceRecoverTip', { prompt: promptText });
         els.btnForceRecover.disabled = Boolean(
           state.isNonChatPage ||
-            (cbState.tripped && cbState.reasonCode === 'emergency_stop')
+            (cbState.tripped &&
+              (cbState.reasonCode === 'emergency_stop' || cbState.reasonCode === 'model_unavailable'))
         );
+      }
+
+      // Default Model Lock pill & model picker button
+      if (els.btnModelLock) {
+        const lockOn = Boolean(view.modelLockEnabled);
+        els.btnModelLock.textContent = lockOn ? tr('stateOn') : tr('stateOff');
+        els.btnModelLock.className = lockOn ? 'gmah-pill on' : 'gmah-pill';
+        els.btnModelLock.title = lockOn ? tr('modelLockPillDisableTip') : tr('modelLockPillEnableTip');
+      }
+      if (els.btnModelPick) {
+        const prefLabel = s.preferredModel ? String(s.preferredModel) : tr('modelUnset');
+        els.btnModelPick.textContent = prefLabel.length > 12 ? `${prefLabel.slice(0, 11)}…` : prefLabel;
+        els.btnModelPick.title = tr('modelPickTip');
+        const isMismatchWarn = Boolean(s.modelLockEnabled && state.modelMismatchActive);
+        els.btnModelPick.className = isMismatchWarn
+          ? 'gmah-pill danger gmah-model-pick'
+          : 'gmah-pill gmah-pill-action gmah-model-pick';
       }
 
       // Live connection / wait elapsed duration bar
@@ -1193,6 +1382,16 @@
         const sig = logs.length > 0 ? `${logs.length}|${logs[0].time}|${logs[0].message}` : '0';
         if (sig !== lastLogSignature) {
           lastLogSignature = sig;
+          renderPanel();
+        }
+      } else if (activePanel === 'model') {
+        const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+        const isTypingInModelInput = Boolean(
+          activeEl &&
+            activeEl.className &&
+            String(activeEl.className).includes('gmah-model-input')
+        );
+        if (!isTypingInModelInput) {
           renderPanel();
         }
       }
