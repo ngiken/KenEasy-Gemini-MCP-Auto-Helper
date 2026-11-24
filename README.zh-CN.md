@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v1.0.0-16a34a?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v1.0.1-16a34a?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,9 +24,9 @@
 </div>
 
 > [!NOTE]
-> ### ✅ v1.0.0 正式发布版
-> **KenEasy Gemini MCP Auto Helper v1.0.0** 现已正式发布！
-> 核心自动化引擎、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、一键立即续接、拟人防降速节流、MV3 永不断线后台保活、6 层防刷熔断器、按住拖拽 HUD、4 语言黑白双模式及桌面通知均已通过全部自动化与端到端沙盒测试验证。
+> ### ✅ v1.0.1 正式发布版
+> **KenEasy Gemini MCP Auto Helper v1.0.1** 现已正式发布！
+> 全新重构 Notion 极简双主题 UI（浅色纸感 / 深色炭灰）、单对话独立开关与隔离紧急停止、后台 / 最小化 MAIN 世界点击升级、连接卡死实时计时、超时自动终止并自定义续接（默认「继续，刚才mcp连接断开了」）、拟人防降速节流、MV3 后台保活及 6 层防刷熔断器均已通过全部 **115/115** 项自动化与压力测试验证。
 > - 如遇到 Gemini 页面新弹窗或想补充自定义续接话术，可直接在设置面板中自定义，或前往 [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues) 反馈。
 > - 欢迎各位开发者 Star 🌟 与提交 PR，共同完善 Gemini 网页端自动化生态！
 
@@ -44,8 +44,8 @@
 
 直接点击下方任意一个下载链接即可**一键自动下载 `.zip` 安装包**：
 
-- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.0/KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
-- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.0/KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-store.zip)**（解压即根目录 `manifest.json`）
+- 📦 **[点击直接下载：手动安装完整包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip)**（推荐，解压后含 `KenEasy-Gemini-MCP-Auto-Helper` 文件夹及说明文档）
+- 🏪 **[点击直接下载：纯净扩展包 (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip)**（解压即根目录 `manifest.json`）
 
 安装步骤：
 1. 点击上方链接下载 `.zip` 压缩包并解压到本地目录（例如 `E:\code\KenEasy-Gemini-MCP-Auto-Helper`）。

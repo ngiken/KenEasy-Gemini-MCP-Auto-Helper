@@ -21,7 +21,7 @@ function runTests(test) {
     const manifestPath = path.join(ROOT, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.strictEqual(manifest.manifest_version, 3);
-    assert.strictEqual(manifest.version, '1.0.0', "manifest.json version must be '1.0.0'");
+    assert.strictEqual(manifest.version, '1.0.1', "manifest.json version must be '1.0.1'");
     assert.ok(manifest.permissions.includes('storage'));
     assert.ok(manifest.permissions.includes('tabs'));
     assert.ok(manifest.permissions.includes('alarms'));
@@ -126,18 +126,18 @@ function runTests(test) {
     }
   });
 
-  test('version is 1.0.0 official release in manifest, popup, and HUD', () => {
+  test('version is 1.0.1 official release in manifest, popup, and HUD', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
-    assert.strictEqual(manifest.version, '1.0.0', "manifest.json must have version '1.0.0'");
+    assert.strictEqual(manifest.version, '1.0.1', "manifest.json must have version '1.0.1'");
 
     const popupHtml = fs.readFileSync(path.join(ROOT, 'popup.html'), 'utf8');
-    assert.ok(popupHtml.includes('v1.0.0'), 'popup.html must clearly display v1.0.0 badge');
-    assert.ok(/Stable Release|正式发布版|正式發布版|正式リリース版/i.test(popupHtml), 'popup.html must indicate v1.0.0 official release');
+    assert.ok(popupHtml.includes('v1.0.1'), 'popup.html must clearly display v1.0.1 badge');
+    assert.ok(/Stable Release|正式发布版|正式發布版|正式リリース版/i.test(popupHtml), 'popup.html must indicate v1.0.1 official release');
 
     const defaultsJs = fs.readFileSync(path.join(ROOT, 'defaults.js'), 'utf8');
     const hudJs = fs.readFileSync(path.join(ROOT, 'hud.js'), 'utf8');
-    assert.ok(defaultsJs.includes("betaBadge: 'v1.0.0'") && hudJs.includes("tr('betaBadge')"), 'HUD must display v1.0.0 badge from defaults');
-    assert.ok(/Stable Release \(v1\.0\.0\)|正式发布版 \(v1\.0\.0\)/i.test(defaultsJs), 'defaults.js must indicate v1.0.0 official release');
+    assert.ok(defaultsJs.includes("betaBadge: 'v1.0.1'") && hudJs.includes("tr('betaBadge')"), 'HUD must display v1.0.1 badge from defaults');
+    assert.ok(/Stable Release \(v1\.0\.1\)|正式发布版 \(v1\.0\.1\)/i.test(defaultsJs), 'defaults.js must indicate v1.0.1 official release');
   });
 
   test('all asset images referenced in README.md and README.zh-CN.md exist in assets/ and have valid non-empty sizes', () => {

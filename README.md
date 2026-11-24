@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-v1.0.0-16a34a?logo=googlechrome&logoColor=white">
+    <img alt="Version" src="https://img.shields.io/badge/version-v1.0.1-16a34a?logo=googlechrome&logoColor=white">
     <img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-4285F4?logo=googlechrome&logoColor=white">
     <img alt="Manifest" src="https://img.shields.io/badge/manifest-v3-00aeec">
     <img alt="License" src="https://img.shields.io/badge/license-MIT-27c499">
@@ -24,9 +24,9 @@
 </div>
 
 > [!NOTE]
-> ### ✅ Stable Release (v1.0.0)
-> **KenEasy Gemini MCP Auto Helper v1.0.0** is now officially released!
-> The automation engine, live connection wait timer, stall auto-stop &amp; custom reconnect prompt, one-click immediate resume, human-like anti-throttling pacing, 6-layer circuit breaker, hold-to-drag HUD, 4-language &amp; dark/light themes, multi-window guards, and desktop notifications have all passed 100% of automated &amp; VM end-to-end test suites.
+> ### ✅ Stable Release (v1.0.1)
+> **KenEasy Gemini MCP Auto Helper v1.0.1** is now officially released!
+> Featuring a completely refactored Notion-style UI (Paper Light &amp; Charcoal Dark), per-chat independent toggles &amp; isolated emergency stop, MAIN-world background/minimized click escalation, live connection wait timer, stall auto-stop &amp; custom reconnect prompt, human-like anti-throttling pacing, 6-layer circuit breaker, 4-language support, and 115/115 passing automated &amp; stress tests.
 > - Customize your reconnect prompt or keywords anytime in the popup settings, or report Gemini UI updates on [GitHub Issues](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/issues).
 > - Star 🌟 and PR contributions are warmly welcomed!
 
@@ -44,8 +44,8 @@ The extension has been submitted for Chrome Web Store security review. Once appr
 
 Click either link below to **immediately download the `.zip` package with one click**:
 
-- 📦 **[Direct Download: Manual Install Bundle (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.0/KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-manual-install.zip)** (Recommended — extracts to `KenEasy-Gemini-MCP-Auto-Helper/` folder with docs)
-- 🏪 **[Direct Download: Clean Extension Zip (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.0/KenEasy-Gemini-MCP-Auto-Helper-v1.0.0-store.zip)** (Clean root containing `manifest.json`)
+- 📦 **[Direct Download: Manual Install Bundle (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-manual-install.zip)** (Recommended — extracts to `KenEasy-Gemini-MCP-Auto-Helper/` folder with docs)
+- 🏪 **[Direct Download: Clean Extension Zip (`KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip`)](https://github.com/ngiken/KenEasy-Gemini-MCP-Auto-Helper/releases/download/v1.0.1/KenEasy-Gemini-MCP-Auto-Helper-v1.0.1-store.zip)** (Clean root containing `manifest.json`)
 
 Installation steps:
 1. Click a link above to download the `.zip` file and extract it to a local folder (e.g. `E:\code\KenEasy-Gemini-MCP-Auto-Helper`).

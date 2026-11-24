@@ -1,0 +1,31 @@
+【Chrome Web Store 更新說明 · v1.0.1 Release】
+
+============================================================
+English (Release Notes / Update Summary)
+============================================================
+v1.0.1 Update:
+• Notion-Style UI Refactor: Rebuilt both the floating HUD and Popup with Notion-inspired Paper Light & Charcoal Dark themes, 1px hairline borders, subtle hover fills, active drawer highlights, and Clear Logs / Refresh Inspect toolbars.
+• Per-Chat Independent Controls: Toggle 6 core switches independently per conversation via the HUD ("This chat / Global" switcher) or Popup ("This Conversation" card), with automatic /app -> /app/<id> migration and one-click Reset to global defaults.
+• Isolated Single-Chat Emergency Stop: Emergency Stop now halts only the current conversation and persists across navigation while other Gemini tabs keep running; a separate "Stop All Chats" button is available when you need a global halt.
+• Background & Minimized Clicking Hardening: Added MAIN-world click escalation piercing ShadowRoots and Angular Material chips across Allow, Continue, and Stall-Recovery Stop/Send buttons, per-chat background heartbeat & autoDiscardable isolation, and 1200ms minimize follow-up wakeups.
+• Deep Boundary & Concurrency Hardening: 27 new boundary/fuzz defenses (Shadow DOM cycles, NTP clock skew, ReDoS guards, Web Locks atomic stats) — 115/115 automated tests passing.
+
+============================================================
+繁體中文（更新說明）
+============================================================
+v1.0.1 更新內容：
+• Notion 風格極簡 UI 重構：全面重塑懸浮窗與設定彈窗（淺色紙感 / 深色炭灰、1px 極細邊框、微灰懸停與低飽和語意色），新增日誌清空與探測重新整理工具列。
+• 單對話獨立控制：透過懸浮窗「本對話 / 全域預設」分段切換或彈窗頂部「目前對話獨立控制」卡片，針對單一對話獨立開關 6 項核心功能，支援新對話自動遷移與一鍵恢復全域。
+• 隔離緊急停止：緊急停止改為僅鎖定目前對話並跨路由持久化（其他對話與分頁照常運作），彈窗底部另提供「停止全部對話」按鈕。
+• 背景與最小化點擊加固：新增 MAIN 世界點擊升級穿透 ShadowRoot 與 Material 晶片（覆蓋允許、繼續與逾時續接停止/發送）、按對話隔離背景心跳與防休眠，以及視窗最小化 1200ms 跟進喚醒。
+• 深層邊界與併發防護：補齊 Shadow DOM 循環防禦、時鐘回撥保護、ReDoS 防護與 Web Locks 原子統計寫入（115/115 自動化測試全數通過）。
+
+============================================================
+简体中文（更新说明）
+============================================================
+v1.0.1 更新内容：
+• Notion 风格极简 UI 重构：全面重塑悬浮窗与设置弹窗（浅色纸感 / 深色炭灰、1px 极细边框、微灰悬停与低饱和语义色），新增日志清空与探测刷新工具栏。
+• 单对话独立控制：通过悬浮窗「本对话 / 全局默认」分段切换或弹窗顶部「当前对话独立控制」卡片，针对单一对话独立开关 6 项核心功能，支持新对话自动迁移与一键恢复全局。
+• 隔离紧急停止：紧急停止改为仅锁定当前对话并跨路由持久化（其他对话与标签页照常运行），弹窗底部另提供「停止全部对话」按钮。
+• 后台与最小化点击加固：新增 MAIN 世界点击升级穿透 ShadowRoot 与 Material 芯片（覆盖允许、继续与超时续接停止/发送）、按对话隔离后台心跳与防休眠，以及窗口最小化 1200ms 跟进唤醒。
+• 深层边界与并发防护：补齐 Shadow DOM 循环防御、时钟回拨保护、ReDoS 防护与 Web Locks 原子统计写入（115/115 自动化测试全部通过）。
